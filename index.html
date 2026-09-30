@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>영화 짜깁기 쇼츠 제작기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* 편집실 레이아웃: 왼쪽 단계 패널, 오른쪽 세로 미리보기 고정 */
+:root{
+  --bg:#0d0e10; --panel:#16171a; --panel2:#1e2024; --line:#2c2e35;
+  --fg:#ececef; --mute:#9c9fa9; --accent:#ffd21f; --accent-ink:#1b1600;
+  --bad:#ff6b6b; --good:#5fd38a; --dlg:#8fd3ff;
+  --ui:"Noto Sans KR",system-ui,sans-serif; --display:"Black Han Sans","Noto Sans KR",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 var(--ui)}
+.wrap{max-width:1200px;margin:0 auto;padding-block:20px 60px;padding-inline:16px}
+header{margin-bottom:18px}
+h1{font:400 30px/1.1 var(--display);margin:0}
+h1 span{color:var(--accent)}
+.sub{color:var(--mute);font-size:13px;margin:4px 0 0}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.preview{position:static!important}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.card h2{font:400 19px/1.2 var(--display);margin:0 0 12px;display:flex;gap:10px;align-items:center}
+.step{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:400 15px var(--display)}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+input[type=text],input[type=password],input[type=number],textarea,select{width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:9px 10px;font:14px var(--ui)}
+textarea{resize:vertical}
+input:focus,textarea:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.row>*{min-width:0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+button{font:500 14px var(--ui);border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);padding:9px 14px;cursor:pointer}
+button:hover{border-color:#52555f}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.small{padding:4px 8px;font-size:12px}
+.note{font-size:12.5px;color:var(--mute);margin:8px 0 0}
+.warn{color:#ffc36b}
+details summary{cursor:pointer;color:var(--mute);font-size:13px;margin-top:8px}
+.status{font-size:13px;color:var(--mute);min-height:1.4em;margin-top:8px;white-space:pre-wrap}
+.status.err{color:var(--bad)}
+.bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;text-align:center;color:var(--mute);cursor:pointer}
+.drop.has{border-style:solid;color:var(--fg)}
+/* 제목 후보 */
+.titles{display:grid;gap:4px}
+.titles label{display:flex;gap:8px;align-items:center;margin:0;color:var(--fg);font-size:14px;padding:5px 8px;border-radius:6px;background:var(--panel2);cursor:pointer}
+.titles .cnt{margin-left:auto;font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.titles .cnt.bad{color:var(--bad)}
+/* 장면 목록 */
+.scene{display:grid;grid-template-columns:30px 160px minmax(0,1fr);gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.scene:first-child{border-top:0}
+@media (max-width:620px){.scene{grid-template-columns:30px minmax(0,1fr)}.scene .th{grid-column:2}}
+.snum{font:400 17px var(--display);color:var(--accent);padding-top:4px}
+.scene.dlg .snum{color:var(--dlg)}
+.th canvas{width:160px;max-width:100%;aspect-ratio:16/9;background:#000;border-radius:6px;border:1px solid var(--line);display:block;cursor:pointer}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;border:1px solid var(--line);color:var(--mute);margin-bottom:4px}
+.scene.dlg .tag{color:var(--dlg);border-color:#2f4d60}
+.tc{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:12px;color:var(--mute)}
+.tc input{width:84px;padding:5px 7px;font-size:13px;font-variant-numeric:tabular-nums}
+.tc select{width:auto;padding:5px 7px;font-size:13px}
+.guide{font-size:12px;color:var(--mute);margin-top:4px}
+.sstat{font-size:12px;color:var(--mute)}
+.sstat .ok{color:var(--good)} .sstat .no{color:var(--bad)}
+/* 미리보기 */
+.preview{position:sticky;top:12px}
+.phone{background:#000;border:1px solid var(--line);border-radius:14px;padding:8px}
+canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;background:#000}
+.dl{display:block;text-align:center;margin-top:10px;padding:11px;border-radius:7px;background:var(--good);color:#04160b;font-weight:700;text-decoration:none}
+#guideOut{font:13px/1.55 ui-monospace,Menlo,Consolas,monospace;min-height:220px}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>영화 <span>짜깁기</span> 쇼츠 제작기</h1>
+    <p class="sub">원본 영상 올리기 → AI가 장면·대사 분석 → 제목·대본·편집점 → 자동 컷 편집 + 나레이션 + 자막 → 세로 영상</p>
+  </header>
+
+  <div class="grid">
+    <main>
+      <!-- 설정 -->
+      <section class="card">
+        <h2>API 키 · 목소리 설정</h2>
+        <div class="cols">
+          <div><label for="openaiKey">OpenAI API 키 (목소리·대사 받아쓰기, 필수)</label><input id="openaiKey" type="password" placeholder="sk-..." autocomplete="off"></div>
+          <div><label for="anthropicKey">Claude API 키 (대본·장면 분석, 선택)</label><input id="anthropicKey" type="password" placeholder="sk-ant-..." autocomplete="off"></div>
+        </div>
+        <div class="cols">
+          <div><label for="engine">목소리 엔진</label><select id="engine"><option value="supertonic">무료 목소리 (Supertonic, 한국어)</option><option value="openai">OpenAI 목소리 (유료, 말투 지시 가능)</option></select></div>
+          <div><label for="speed">말 속도 <b id="speedVal">1.10</b>배</label><input id="speed" type="range" min="0.9" max="1.5" step="0.05" value="1.1" style="width:100%"></div>
+        </div>
+        <div id="stBox">
+          <div class="cols">
+            <div><label for="stVoice">무료 목소리 선택 (남성 5, 여성 5)</label><select id="stVoice"></select></div>
+            <div><label for="stSteps">음질</label><select id="stSteps"><option value="5">빠르게</option><option value="8" selected>보통</option><option value="12">고품질 (느림)</option></select></div>
+          </div>
+          <div class="row" style="margin-top:8px"><button type="button" id="stTry" class="small">▶ 들어보기</button><span class="note" id="stStatus" style="margin:0">처음 누를 때 모델(약 400MB)을 받아요. 이후엔 바로 나와요.</span></div>
+        </div>
+        <div id="oaVoiceBox">
+          <div class="cols"><div><label for="voice">목소리</label>
+            <select id="voice">
+              <option value="onyx">onyx (남성, 낮고 묵직함)</option><option value="ash">ash (남성, 건조함)</option><option value="echo">echo (남성)</option><option value="ballad">ballad (남성, 부드러움)</option><option value="verse">verse (남성, 생동감)</option><option value="sage">sage (여성, 차분)</option><option value="coral">coral (여성, 밝음)</option><option value="nova">nova (여성)</option><option value="shimmer">shimmer (여성)</option><option value="alloy">alloy (중성)</option>
+            </select></div></div>
+          <label for="voiceInst">말투 지시</label>
+        <textarea id="voiceInst" rows="2">영화 줄거리를 들려주는 30대 남성 전문 나레이터. 또렷하고 신뢰감 있는 목소리에 은근한 긴장감. 약간 빠른 호흡, 문장 끝을 늘이지 말 것. 자연스러운 한국어 억양.</textarea>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label style="margin:0;display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="remember"> 이 브라우저에 API 키 저장</label>
+        </div>
+        <p class="note warn">PC방에서는 체크하지 마세요. 창을 닫으면 키가 지워져요.</p>
+        <details>
+          <summary>고급 설정 (모델·소리 크기·화면)</summary>
+          <div class="cols">
+            <div><label for="provider">대본 작성 AI</label><select id="provider"><option value="claude">Claude (키 있으면 추천)</option><option value="openai">OpenAI</option></select></div>
+            <div><label for="claudeModel">Claude 모델</label><input id="claudeModel" type="text" value="claude-sonnet-5-5"></div>
+            <div><label for="gptModel">OpenAI 대본 모델</label><input id="gptModel" type="text" value="gpt-4.1"></div>
+            <div><label for="ttsModel">목소리 모델</label><input id="ttsModel" type="text" value="gpt-4o-mini-tts"></div>
+            <div><label for="sttModel">받아쓰기 모델</label><input id="sttModel" type="text" value="whisper-1"></div>
+          </div>
+          <div class="cols">
+            <div><label for="duckVol">나레이션 중 원본 소리 <b id="duckVolVal">15</b>%</label><input id="duckVol" type="range" min="0" max="50" value="15" style="width:100%"></div>
+            <div><label for="dlgVol">원본 대사 구간 소리 <b id="dlgVolVal">100</b>%</label><input id="dlgVol" type="range" min="30" max="150" value="100" style="width:100%"></div>
+            <div><label for="bandMode">영상 크기</label><select id="bandMode"><option value="crop">크게 (좌우 조금 자르기, 레퍼런스 방식)</option><option value="fit">원본 비율 그대로</option></select></div>
+          </div>
+          <div class="cols">
+            <div><label for="bgm">배경음악 (선택)</label><input id="bgm" type="file" accept="audio/*"></div>
+            <div><label for="bgmVol">배경음악 크기 <b id="bgmVolVal">10</b>%</label><input id="bgmVol" type="range" min="0" max="40" value="10" style="width:100%"></div>
+          </div>
+        </details>
+      </section>
+
+      <!-- 1. 영상 -->
+      <section class="card">
+        <h2><span class="step">1</span>원본 영상 올리기</h2>
+        <label class="drop" id="drop" for="videoFile">여기를 눌러 영화·드라마 영상 파일(mp4)을 고르세요<br><small>핵심 갈등 장면이 담긴 3~13분 클립을 추천해요</small></label>
+        <input id="videoFile" type="file" accept="video/*" hidden>
+        <div class="row" style="margin-top:10px"><button type="button" id="driveBtn">구글 드라이브에서 가져오기</button><span class="note" style="margin:0">드라이브에 올려 둔 영상을 골라서 바로 불러와요.</span></div>
+        <details id="driveSetup"><summary>구글 드라이브 연결 설정 (처음 한 번)</summary>
+          <div class="cols">
+            <div><label for="gClientId">OAuth 클라이언트 ID</label><input id="gClientId" type="text" placeholder="1234567890-xxxx.apps.googleusercontent.com" autocomplete="off"></div>
+            <div><label for="gApiKey">API 키</label><input id="gApiKey" type="text" placeholder="AIza..." autocomplete="off"></div>
+          </div>
+          <p class="note">두 값은 설정 안내대로 구글 클라우드에서 만들어요. 내 도구 주소에서만 작동하게 제한되니 저장해도 괜찮아요. 값을 알려 주시면 도구 안에 미리 넣어 드릴 수도 있어요.</p>
+        </details>
+        <div class="cols">
+          <div><label for="work">작품명 (영상 아래 작게 표시)</label><input id="work" type="text" placeholder="예) It Ends with Us (2024)"></div>
+          <div><label for="stt" style="margin-top:10px">&nbsp;</label><label style="margin:0;display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="stt" checked> 원본 대사 받아쓰기 (앞 13분까지)</label></div>
+        </div>
+        <label for="memo">메모 (선택): 줄거리, 등장인물 이름, 강조하고 싶은 장면</label>
+        <textarea id="memo" rows="3" placeholder="예) 여주 릴리가 노숙하는 남학생 아틀라스를 몰래 도와주는 이야기. 폐건물에 사는 걸 알게 되는 장면을 강조"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="primary" id="analyzeBtn" type="button" disabled>분석하고 대본 만들기</button>
+          <button id="testBtn" type="button" disabled>API 없이 편집 테스트</button>
+        </div>
+        <div class="bar"><i id="anaBar"></i></div>
+        <div class="status" id="anaStatus"></div>
+      </section>
+
+      <!-- 2. 대본 -->
+      <section class="card">
+        <h2><span class="step">2</span>제목 · 대본 · 편집점 확인</h2>
+        <label>추천 제목 10개 (공백 제외 12~14자). 고르면 상단 제목이 바뀌어요.</label>
+        <div class="titles" id="titles"><p class="note">분석이 끝나면 여기에 나와요.</p></div>
+        <div class="cols">
+          <div><label for="title1">상단 제목 1줄 (흰색)</label><input id="title1" type="text"></div>
+          <div><label for="title2">상단 제목 2줄 (노란색)</label><input id="title2" type="text"></div>
+        </div>
+        <p class="note">썸네일을 누르면 그 장면이 미리보기에 나와요. 시작 시간(초)을 고치거나 ±버튼으로 장면을 옮길 수 있어요. <span style="color:var(--dlg)">파란 번호</span>는 나레이션을 멈추고 원본 대사를 크게 들려주는 장면이에요.</p>
+        <div id="scenes"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="primary" id="ttsBtn" type="button" disabled>나레이션 목소리 만들기</button>
+        </div>
+        <div class="bar"><i id="ttsBar"></i></div>
+        <div class="status" id="ttsStatus"></div>
+      </section>
+
+      <!-- 3. 영상 -->
+      <section class="card">
+        <h2><span class="step">3</span>영상 만들기</h2>
+        <div class="row">
+          <button id="playBtn" type="button" disabled>미리보기 재생</button>
+          <button class="primary" id="renderBtn" type="button" disabled>영상 파일 만들기</button>
+          <button id="stopBtn" type="button" disabled>멈춤</button>
+          <label style="margin:0;display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="monitor" checked> 만들 때 소리 듣기</label>
+        </div>
+        <p class="note">실제 길이만큼 재생하면서 녹화돼요. 녹화 중에는 이 탭을 화면에 띄워 두세요.</p>
+        <div class="bar"><i id="renderBar"></i></div>
+        <div class="status" id="renderStatus"></div>
+      </section>
+
+      <!-- 4. 가이드 -->
+      <section class="card">
+        <h2><span class="step">4</span>편집 가이드 (지침서 형식)</h2>
+        <textarea id="guideOut" rows="12" readonly placeholder="대본이 만들어지면 제목 후보, 대본, 타임코드 가이드가 여기에 정리돼요."></textarea>
+        <div class="row" style="margin-top:8px">
+          <button id="copyGuide" type="button">복사</button>
+          <button id="saveGuide" type="button">텍스트 파일로 저장</button>
+        </div>
+      </section>
+    </main>
+
+    <aside class="preview">
+      <div class="phone"><canvas id="cv" width="720" height="1280"></canvas></div>
+      <div id="dlBox"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================= 기본 ================= */
+const $ = id => document.getElementById(id);
+const W=720, H=1280;
+const cv=$('cv'), g=cv.getContext('2d');
+const YELLOW='#ffd21f', SPEAKER={female:'#ffe066', male:'#8fd3ff', other:'#ffffff'};
+const S = { file:null, url:'', videoDur:0, work:'', titles:[], title1:'', title2:'', scenes:[] };
+let actx=null, bgmBuf=null, busy=false, stopFlag=false;
+let VA=null, VB=null, gA=null, gB=null;
+const getCtx = () => (actx ||= new (window.AudioContext||window.webkitAudioContext)());
+const key = n => $(n).value.trim();
+function setStatus(id,msg,err=false){ const el=$(id); el.textContent=msg; el.classList.toggle('err',!!err); }
+const fmt = t => { t=Math.max(0,t); const m=Math.floor(t/60), s=t-m*60; return String(m).padStart(2,'0')+':'+s.toFixed(1).padStart(4,'0'); };
+const clean = s => String(s||'').replace(/[.,!?"'“”‘’…·~。、！？]/g,'').replace(/\s+/g,' ').trim();
+const noSpaceLen = s => String(s||'').replace(/\s/g,'').length;
+
+/* 숨은 비디오: 썸네일·장면 캡처용 */
+const vThumb = document.createElement('video'); vThumb.muted=true; vThumb.preload='auto'; vThumb.playsInline=true;
+function seekTo(v,t){ return new Promise(res=>{ t=Math.max(0,Math.min(t,(v.duration||t)-0.05));
+  if(Math.abs(v.currentTime-t)<0.01 && v.readyState>=2){ res(); return; }
+  let done=false; const fin=()=>{ if(done) return; done=true; v.removeEventListener('seeked',fin); res(); };
+  v.addEventListener('seeked',fin); v.currentTime=t; setTimeout(fin,4000); }); }
+
+/* ================= 무료 목소리: Supertonic 3 (브라우저에서 직접 실행) ================= */
+const ST_REV='aafc6e32416a594460b32413efc49d7fe4ce6d46';
+const ST_BASE=`https://huggingface.co/supertone-oss-archive/supertonic-3/resolve/${ST_REV}`;
+const ORT_BASE='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
+const ST_FILES=[['dp','duration_predictor.onnx',3.7],['te','text_encoder.onnx',36.4],['ve','vector_estimator.onnx',257],['vo','vocoder.onnx',101]];
+const ST={ready:false, loading:null, sess:null, cfg:null, indexer:null, styles:{}, backend:'', bufs:null, lock:Promise.resolve()};
+async function stFetch(url){ let r; try{ r=await fetch(url); }catch(e){ throw new Error('목소리 모델 서버(huggingface.co)에 연결하지 못했어요. 인터넷 연결이나 회사·PC방 차단 여부를 확인해 주세요.'); } if(!r.ok) throw new Error(`목소리 모델 파일을 받지 못했어요 (${r.status}). 잠시 뒤 다시 시도해 주세요.`); return r; }
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('목소리 프로그램을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.')); document.head.appendChild(s); }); }
+async function fetchBuf(url,onProg){
+  const r=await stFetch(url);
+  const total=+r.headers.get('content-length')||0;
+  if(!r.body){ const b=await r.arrayBuffer(); onProg&&onProg(b.byteLength); return b; }
+  const rd=r.body.getReader(), parts=[]; let got=0;
+  for(;;){ const {done,value}=await rd.read(); if(done) break; parts.push(value); got+=value.length; onProg&&onProg(got,total); }
+  const out=new Uint8Array(got); let o=0; for(const p of parts){ out.set(p,o); o+=p.length; } return out;
+}
+async function stGetBufs(onStatus){
+  if(ST.bufs) return ST.bufs;
+  const bufs={}; let doneMB=0; const totalMB=398;
+  for(const [k,f,mb] of ST_FILES){
+    bufs[k]=await fetchBuf(`${ST_BASE}/onnx/${f}`,g=>onStatus&&onStatus(`무료 목소리 모델 받는 중… ${Math.min(totalMB,Math.round(doneMB+g/1048576))}/${totalMB}MB (처음 한 번만)`));
+    doneMB+=mb;
+  }
+  return ST.bufs=bufs;
+}
+async function stMakeSessions(eps,onStatus){
+  const bufs=await stGetBufs(onStatus); onStatus&&onStatus('무료 목소리 모델 준비 중…');
+  const opt={executionProviders:eps, graphOptimizationLevel:'all'}; const s={};
+  for(const [k] of ST_FILES) s[k]=await ort.InferenceSession.create(bufs[k],opt);
+  return s;
+}
+async function stLoad(onStatus){
+  if(ST.ready) return;
+  if(!ST.loading) ST.loading=(async()=>{
+    if(!window.ort) await loadScript(ORT_BASE+'ort.all.min.js');
+    ort.env.wasm.wasmPaths=ORT_BASE;
+    onStatus&&onStatus('무료 목소리 설정 받는 중…');
+    ST.cfg=await (await stFetch(`${ST_BASE}/onnx/tts.json`)).json();
+    ST.indexer=await (await stFetch(`${ST_BASE}/onnx/unicode_indexer.json`)).json();
+    try{ if(!navigator.gpu) throw new Error('no webgpu'); ST.sess=await stMakeSessions(['webgpu'],onStatus); ST.backend='webgpu'; }
+    catch(e){ ST.sess=await stMakeSessions(['wasm'],onStatus); ST.backend='wasm'; }
+    ST.ready=true;
+  })().catch(e=>{ ST.loading=null; throw e; });
+  return ST.loading;
+}
+async function stStyle(name){
+  if(ST.styles[name]) return ST.styles[name];
+  const j=await (await stFetch(`${ST_BASE}/voice_styles/${name}.json`)).json();
+  const mk=o=>new ort.Tensor('float32',Float32Array.from(o.data.flat(Infinity)),o.dims);
+  return ST.styles[name]={ttl:mk(j.style_ttl),dp:mk(j.style_dp)};
+}
+function stPre(text,lang){
+  text=text.normalize('NFKD');
+  text=text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]+/gu,'');
+  const rep={'–':'-','‑':'-','—':'-','_':' ','“':'"','”':'"','‘':"'",'’':"'",'´':"'",'`':"'",'[':' ',']':' ','|':' ','/':' ','#':' ','→':' ','←':' '};
+  for(const [k,v] of Object.entries(rep)) text=text.replaceAll(k,v);
+  text=text.replace(/[♥☆♡©\\]/g,'').replaceAll('@',' at ');
+  text=text.replace(/ ,/g,',').replace(/ \./g,'.').replace(/ !/g,'!').replace(/ \?/g,'?').replace(/ ;/g,';').replace(/ :/g,':').replace(/ '/g,"'");
+  while(text.includes('""')) text=text.replace('""','"'); while(text.includes("''")) text=text.replace("''","'");
+  text=text.replace(/\s+/g,' ').trim();
+  if(!/[.!?;:,'"')\]}…。」』】〉》›»]$/.test(text)) text+='.';
+  return `<${lang}>${text}</${lang}>`;
+}
+async function stInfer(text,style,steps,speed){
+  const T=ort.Tensor, p=stPre(text,'ko'), L=p.length, ids=new BigInt64Array(L);
+  for(let j=0;j<L;j++){ const cp=p.codePointAt(j); ids[j]=BigInt(cp<ST.indexer.length? ST.indexer[cp] : -1); }
+  const idsT=new T('int64',ids,[1,L]), maskT=new T('float32',new Float32Array(L).fill(1),[1,1,L]);
+  const dpo=await ST.sess.dp.run({text_ids:idsT,style_dp:style.dp,text_mask:maskT});
+  const dur=dpo.duration.data[0]/speed;
+  const teo=await ST.sess.te.run({text_ids:idsT,style_ttl:style.ttl,text_mask:maskT});
+  const sr=ST.cfg.ae.sample_rate, chunk=ST.cfg.ae.base_chunk_size*ST.cfg.ttl.chunk_compress_factor, dim=ST.cfg.ttl.latent_dim*ST.cfg.ttl.chunk_compress_factor;
+  const wavLen=Math.floor(dur*sr), latLen=Math.max(1,Math.floor((wavLen+chunk-1)/chunk));
+  let xt=new Float32Array(dim*latLen);
+  for(let i=0;i<xt.length;i++){ const u1=Math.max(1e-4,Math.random()), u2=Math.random(); xt[i]=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2); }
+  const lmT=new T('float32',new Float32Array(latLen).fill(1),[1,1,latLen]), totT=new T('float32',new Float32Array([steps]),[1]);
+  for(let s=0;s<steps;s++){
+    const o=await ST.sess.ve.run({noisy_latent:new T('float32',xt,[1,dim,latLen]),text_emb:teo.text_emb,style_ttl:style.ttl,latent_mask:lmT,text_mask:maskT,current_step:new T('float32',new Float32Array([s]),[1]),total_step:totT});
+    xt=new Float32Array(o.denoised_latent.data);
+  }
+  const vo=await ST.sess.vo.run({latent:new T('float32',xt,[1,dim,latLen])});
+  const w=vo.wav_tts.data; return {wav:w.slice(0,Math.min(w.length,wavLen)), sr};
+}
+function wavBlob(f32,sr){
+  const buf=new ArrayBuffer(44+f32.length*2), v=new DataView(buf), w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4,36+f32.length*2,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,f32.length*2,true);
+  for(let i=0;i<f32.length;i++){ const s=Math.max(-1,Math.min(1,f32[i])); v.setInt16(44+i*2,s<0?s*0x8000:s*0x7fff,true); }
+  return new Blob([buf],{type:'audio/wav'});
+}
+/* 한 번에 하나씩만 실행 (같은 모델을 동시에 돌리면 오류가 나요) */
+function stSpeak(text,voice,steps,speed,onStatus){
+  const job=ST.lock.then(async()=>{
+    await stLoad(onStatus); const style=await stStyle(voice); let r;
+    try{ r=await stInfer(text,style,steps,speed); }
+    catch(e){ if(ST.backend!=='webgpu') throw e; ST.sess=await stMakeSessions(['wasm'],onStatus); ST.backend='wasm'; r=await stInfer(text,style,steps,speed); }
+    ST.bufs=null;
+    return wavBlob(r.wav,r.sr);
+  });
+  ST.lock=job.catch(()=>{});
+  return job;
+}
+const ST_VOICES=[['M1','남성 1'],['M2','남성 2'],['M3','남성 3'],['M4','남성 4'],['M5','남성 5'],['F1','여성 1'],['F2','여성 2'],['F3','여성 3'],['F4','여성 4'],['F5','여성 5']];
+function setupEngineUI(sample){
+  const sel=$('stVoice'); sel.innerHTML=ST_VOICES.map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
+  try{ const v=JSON.parse(localStorage.getItem('st_ui')||'{}'); if(v.voice) sel.value=v.voice; if(v.engine) $('engine').value=v.engine; if(v.steps) $('stSteps').value=v.steps; }catch(e){}
+  const sync=()=>{ const st=$('engine').value==='supertonic'; $('stBox').hidden=!st; $('oaVoiceBox').hidden=st;
+    try{ localStorage.setItem('st_ui',JSON.stringify({engine:$('engine').value,voice:sel.value,steps:$('stSteps').value})); }catch(e){} };
+  ['engine','stVoice','stSteps'].forEach(id=>$(id).addEventListener('change',sync)); sync();
+  $('stTry').addEventListener('click',async()=>{
+    const b=$('stTry'); b.disabled=true; const say=m=>{ $('stStatus').textContent=m; };
+    try{ const blob=await stSpeak(sample,sel.value,+$('stSteps').value,+$('speed').value,say);
+      say(`${sel.selectedOptions[0].text} 목소리예요. (${ST.backend==='webgpu'?'그래픽카드 가속':'CPU'}로 실행 중)`);
+      const a=new Audio(URL.createObjectURL(blob)); a.play().catch(()=>{}); }
+    catch(e){ say(e.message); }
+    b.disabled=false;
+  });
+}
+const useST=()=>$('engine').value==='supertonic';
+
+/* ================= 설정 ================= */
+const SET_IDS=['gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
+function loadSettings(){
+  try{
+    const s=JSON.parse(localStorage.getItem('mrm_settings')||'{}');
+    SET_IDS.forEach(k=>{ if(s[k]!==undefined){ const el=$(k); el.type==='checkbox'? el.checked=s[k] : el.value=s[k]; } });
+    const k=JSON.parse(localStorage.getItem('mrm_keys')||'null');
+    if(k){ $('openaiKey').value=k.o||''; $('anthropicKey').value=k.a||''; $('remember').checked=true; }
+  }catch(e){}
+  ['speed','duckVol','dlgVol','bgmVol'].forEach(id=>syncVal(id));
+}
+function syncVal(id){ const v=$(id).value; $(id+'Val').textContent = id==='speed'? (+v).toFixed(2) : v; }
+function saveSettings(){
+  try{
+    const s={}; SET_IDS.forEach(k=>{ const el=$(k); s[k]= el.type==='checkbox'? el.checked : el.value; });
+    localStorage.setItem('mrm_settings',JSON.stringify(s));
+    if($('remember').checked) localStorage.setItem('mrm_keys',JSON.stringify({o:key('openaiKey'),a:key('anthropicKey')}));
+    else localStorage.removeItem('mrm_keys');
+  }catch(e){}
+}
+document.addEventListener('change',e=>{ if(e.target.closest('section.card') && e.target.type!=='file') saveSettings(); });
+['speed','duckVol','dlgVol','bgmVol'].forEach(id=>$(id).addEventListener('input',()=>{ syncVal(id); if(id==='speed') { refreshStats(); buildGuide(); } }));
+$('bandMode').addEventListener('change',()=>redrawPreview());
+$('bgm').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f){bgmBuf=null;return;}
+  try{ bgmBuf=await getCtx().decodeAudioData(await f.arrayBuffer()); }catch(err){ bgmBuf=null; setStatus('renderStatus','배경음악 파일을 읽지 못했어요.',true); } });
+
+/* ================= 영상 올리기 ================= */
+$('videoFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) loadVideoFile(f); });
+async function loadVideoFile(f){
+  if(S.url) URL.revokeObjectURL(S.url);
+  S.file=f; S.url=URL.createObjectURL(f);
+  vThumb.src=S.url;
+  if(VA){ VA.src=S.url; VB.src=S.url; }
+  await new Promise(r=>{ vThumb.onloadedmetadata=r; vThumb.onerror=r; });
+  if(!vThumb.duration || !isFinite(vThumb.duration)){ setStatus('anaStatus','영상을 열 수 없어요. mp4(H.264) 파일인지 확인해 주세요.',true); return; }
+  S.videoDur=vThumb.duration;
+  const mb=(f.size/1048576).toFixed(0);
+  $('drop').classList.add('has');
+  $('drop').innerHTML=`<b>${f.name}</b><br><small>${fmt(S.videoDur)} · ${mb}MB · ${vThumb.videoWidth}×${vThumb.videoHeight}</small>`;
+  if(!$('work').value) $('work').value='';
+  let msg='영상을 불러왔어요.';
+  if(S.videoDur>15*60) msg+=' 영상이 15분보다 길어서 장면을 드문드문 보게 돼요. 핵심 장면만 잘라 올리면 편집점이 더 정확해져요.';
+  setStatus('anaStatus',msg, S.videoDur>15*60);
+  $('analyzeBtn').disabled=false; $('testBtn').disabled=false;
+  await seekTo(vThumb, Math.min(5, S.videoDur/3)); drawComposite(-1, vThumb);
+}
+
+/* ================= 구글 드라이브 ================= */
+const G_DEFAULT={clientId:'', apiKey:''};
+let gToken=null, gTokenExp=0;
+const gCfg=()=>({clientId:key('gClientId')||G_DEFAULT.clientId, apiKey:key('gApiKey')||G_DEFAULT.apiKey});
+async function gInit(){
+  if(location.protocol==='file:') throw new Error('구글 드라이브 연결은 인터넷 주소(https://…)로 연 도구에서만 돼요. 컴퓨터에 받은 파일로 열면 안 돼요. 그동안은 드라이브에서 영상을 내려받아 위 칸에서 고르세요.');
+  const c=gCfg(); if(!c.clientId||!c.apiKey){ $('driveSetup').open=true; throw new Error('먼저 아래 "구글 드라이브 연결 설정"에 클라이언트 ID와 API 키를 넣어 주세요.'); }
+  if(!(window.google&&google.accounts&&google.accounts.oauth2)) await loadScript('https://accounts.google.com/gsi/client');
+  if(!window.gapi) await loadScript('https://apis.google.com/js/api.js');
+  if(!(window.google&&google.picker)) await new Promise((res,rej)=>gapi.load('picker',{callback:res,onerror:()=>rej(new Error('구글 파일 선택 창을 불러오지 못했어요.'))}));
+}
+function gGetToken(){ return new Promise((res,rej)=>{
+  if(gToken && Date.now()<gTokenExp-60000) return res(gToken);
+  const tc=google.accounts.oauth2.initTokenClient({client_id:gCfg().clientId, scope:'https://www.googleapis.com/auth/drive.file',
+    callback:r=>{ if(r.error) return rej(new Error('구글 로그인이 취소됐거나 실패했어요 ('+r.error+').')); gToken=r.access_token; gTokenExp=Date.now()+(+r.expires_in||3600)*1000; res(gToken); },
+    error_callback:()=>rej(new Error('구글 로그인 창이 닫혔어요. 브라우저의 팝업 차단을 풀고 다시 눌러 주세요.'))});
+  tc.requestAccessToken();
+}); }
+function gPick(token){ return new Promise(res=>{
+  const c=gCfg(), appId=c.clientId.split('-')[0];
+  const view=new google.picker.DocsView(google.picker.ViewId.DOCS_VIDEOS).setIncludeFolders(true);
+  new google.picker.PickerBuilder().addView(view).setOAuthToken(token).setDeveloperKey(c.apiKey).setAppId(appId).setLocale('ko').setTitle('쇼츠로 만들 영상 고르기')
+    .setCallback(d=>{ if(d.action===google.picker.Action.PICKED){ const f=d.docs[0]; res({id:f.id,name:f.name,size:+f.sizeBytes||0,mime:f.mimeType}); } else if(d.action===google.picker.Action.CANCEL) res(null); })
+    .build().setVisible(true);
+}); }
+async function gDownload(f,token,onProg){
+  const r=await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media&supportsAllDrives=true`,{headers:{Authorization:'Bearer '+token}});
+  if(!r.ok) throw new Error(await apiErr(r,'구글 드라이브'));
+  const total=f.size||+r.headers.get('content-length')||0, rd=r.body.getReader(), parts=[]; let got=0;
+  for(;;){ const {done,value}=await rd.read(); if(done) break; parts.push(value); got+=value.length; onProg(got,total); }
+  return new File(parts,f.name,{type:f.mime||'video/mp4'});
+}
+$('driveBtn').addEventListener('click',async()=>{
+  const b=$('driveBtn'); b.disabled=true;
+  try{
+    await gInit(); const tok=await gGetToken(); const f=await gPick(tok);
+    if(f){
+      if(f.size>1.5*1024**3) throw new Error('영상이 1.5GB보다 커요. 핵심 장면만 잘라서 올려 주세요.');
+      const file=await gDownload(f,tok,(g,t)=>{ setStatus('anaStatus',`구글 드라이브에서 받는 중… ${(g/1048576).toFixed(0)}${t?' / '+(t/1048576).toFixed(0):''}MB`); $('anaBar').style.width=(t?g/t*100:0)+'%'; });
+      $('anaBar').style.width='0%'; await loadVideoFile(file);
+    }
+  }catch(e){ setStatus('anaStatus',e.message,true); }
+  b.disabled=false;
+});
+$('work').addEventListener('input',()=>{ S.work=$('work').value; redrawPreview(); });
+
+/* ================= API ================= */
+async function apiErr(r,name){
+  let msg=''; try{ const j=await r.json(); msg=(j.error&&(j.error.message||j.error.type))||JSON.stringify(j).slice(0,200);}catch(e){ msg=r.statusText; }
+  const hint={401:'API 키가 틀렸어요.',403:'권한이 없어요.',429:'사용 한도 초과 또는 잔액 부족이에요.',400:'요청이 거절됐어요.',404:'모델 이름을 확인해 주세요.',413:'파일이 너무 커요.'}[r.status]||'';
+  return `${name} 오류(${r.status}) ${hint} ${msg}`;
+}
+async function callClaude(system, images, text){
+  const content=[...images.map(b64=>({type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}})),{type:'text',text}];
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key('anthropicKey'),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:key('claudeModel'),max_tokens:8000,system,messages:[{role:'user',content}]})});
+  if(!r.ok) throw new Error(await apiErr(r,'Claude'));
+  const j=await r.json(); return (j.content||[]).map(c=>c.text||'').join('');
+}
+async function callGPT(system, images, text){
+  const content=[...images.map(b64=>({type:'image_url',image_url:{url:'data:image/jpeg;base64,'+b64,detail:'high'}})),{type:'text',text}];
+  const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+key('openaiKey')},
+    body:JSON.stringify({model:key('gptModel'),response_format:{type:'json_object'},messages:[{role:'system',content:system},{role:'user',content}]})});
+  if(!r.ok) throw new Error(await apiErr(r,'OpenAI'));
+  const j=await r.json(); return j.choices[0].message.content;
+}
+async function tts(text){
+  const model=key('ttsModel'); const body={model,voice:$('voice').value,input:text,response_format:'mp3'};
+  if(!/^tts-1/.test(model)) body.instructions=$('voiceInst').value;
+  const r=await fetch('https://api.openai.com/v1/audio/speech',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+key('openaiKey')},body:JSON.stringify(body)});
+  if(!r.ok) throw new Error(await apiErr(r,'목소리'));
+  return await r.blob();
+}
+async function transcribe(wavBlob){
+  const fd=new FormData(); fd.append('file',wavBlob,'audio.wav'); fd.append('model',key('sttModel')); fd.append('response_format','verbose_json');
+  const r=await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{'authorization':'Bearer '+key('openaiKey')},body:fd});
+  if(!r.ok) throw new Error(await apiErr(r,'받아쓰기'));
+  const j=await r.json(); return (j.segments||[]).map(s=>({start:+s.start,end:+s.end,text:String(s.text||'').trim()})).filter(s=>s.text);
+}
+async function pool(items,n,fn){ let i=0; const run=async()=>{ while(i<items.length){ const k=i++; await fn(items[k],k); } }; await Promise.all(Array.from({length:Math.min(n,items.length)},run)); }
+
+/* ================= 오디오 추출 (받아쓰기용 16kHz 모노 wav) ================= */
+function encodeWav(f32, sr){
+  const buf=new ArrayBuffer(44+f32.length*2), v=new DataView(buf);
+  const w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4,36+f32.length*2,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,f32.length*2,true);
+  for(let i=0;i<f32.length;i++){ const s=Math.max(-1,Math.min(1,f32[i])); v.setInt16(44+i*2, s<0? s*0x8000 : s*0x7fff, true); }
+  return new Blob([buf],{type:'audio/wav'});
+}
+async function extractWav(file, maxSec=780){
+  if(file.size>600*1048576) throw new Error('영상 파일이 600MB보다 커서 대사 받아쓰기를 건너뛰어요.');
+  const buf=await getCtx().decodeAudioData(await file.arrayBuffer());
+  const dur=Math.min(buf.duration,maxSec);
+  const off=new OfflineAudioContext(1,Math.ceil(dur*16000),16000);
+  const src=off.createBufferSource(); src.buffer=buf; src.connect(off.destination); src.start(0);
+  const out=await off.startRendering();
+  return encodeWav(out.getChannelData(0),16000);
+}
+
+/* ================= 장면 캡처 시트 (16컷 = 1장, 시간 표시) ================= */
+async function captureSheets(onProg){
+  const dur=S.videoDur; const N=Math.max(12,Math.min(160,Math.floor(dur/1.5))); const step=dur/N;
+  const sheets=[]; let c=null, x=null;
+  for(let i=0;i<N;i++){
+    if(i%16===0){ c=document.createElement('canvas'); c.width=1280; c.height=720; x=c.getContext('2d'); x.fillStyle='#000'; x.fillRect(0,0,1280,720); sheets.push(c); }
+    const t=(i+0.5)*step; await seekTo(vThumb,t);
+    const j=i%16, tx=(j%4)*320, ty=Math.floor(j/4)*180;
+    const vw=vThumb.videoWidth, vh=vThumb.videoHeight, sc=Math.min(320/vw,180/vh), dw=vw*sc, dh=vh*sc;
+    x.drawImage(vThumb, tx+(320-dw)/2, ty+(180-dh)/2, dw, dh);
+    x.fillStyle='rgba(0,0,0,.75)'; x.fillRect(tx,ty,92,30); x.fillStyle='#ffe400'; x.font='bold 22px sans-serif'; x.textBaseline='top'; x.fillText(t.toFixed(1),tx+6,ty+4);
+    x.strokeStyle='#000'; x.lineWidth=2; x.strokeRect(tx,ty,320,180);
+    onProg && onProg(i+1,N);
+  }
+  return sheets.map(c=>c.toDataURL('image/jpeg',0.72).split(',')[1]);
+}
+
+/* ================= 지침서 프롬프트 ================= */
+const SYSTEM = `너는 유튜브 영화·드라마 짜깁기 쇼츠 작가 겸 편집자다. 사용자가 준 원본 영상의 장면 캡처 시트(각 칸 왼쪽 위 노란 숫자 = 원본 영상의 초)와 원본 대사 받아쓰기(있으면)를 보고, 아래 지침서대로 쇼츠를 설계한다.
+
+# 지침서
+## 1. 추천 제목 10개
+- 표준 맞춤법대로 정상 띄어쓰기(붙여쓰기 금지).
+- 공백을 뺀 글자 수가 반드시 12자 이상 14자 이하. 출력 전 직접 세어서 확인.
+- 올바른 예: "너구리 때문에 망한 의사"(공백 제외 13자)
+- 호기심·분노를 자극하는 고관여 단어 위주.
+
+## 2. 고농도 도파민 대본
+- 평범한 요약 금지. 불륜, 약점 협박, 비밀, 배신처럼 가장 자극적인 갈등 구간을 중심으로.
+- 의미 단위(한 호흡)마다 한 구절. 구절 하나가 화면 한 컷(2~4초)에 대응.
+- 종결어미는 전문 나레이터처럼 자연스럽게: ~했죠, ~했습니다, ~것이었죠, ~했으나, ~것입니다, ~는데. "~했지", "~였지" 남발 금지.
+- 문장부호(마침표, 쉼표, 느낌표, 물음표, 따옴표) 전혀 쓰지 않음.
+- 마지막 구절은 엔딩 유도(다음 내용 궁금증 또는 구독 유도).
+
+## 3. 초정밀 편집점
+- 구절마다 캡처 시트에 적힌 시간 중 그 구절 내용과 가장 맞는 장면의 시간을 src_start로 지정(소수점 1자리).
+- 대체로 원본 시간 순서를 따르고, 같은 장면을 반복하지 말 것. 연속된 구절은 서로 다른 장면.
+- guide에는 편집자가 바로 알 수 있게 인물 행동과 카메라 구도를 짧게 묘사.
+
+# 원본 대사 장면 (1~2개)
+- 받아쓰기가 있으면, 극적인 원본 대사 1~2개를 골라 type "dialogue"로 넣는다. 이 장면에서는 나레이션을 멈추고 원본 소리를 크게 들려준다.
+- src_start와 src_end는 받아쓰기에 적힌 시간을 그대로 사용(길이 1.5~5초).
+- subtitle은 자연스러운 한국어 번역(문장부호 없이). speaker는 female, male, other 중 하나.
+- 받아쓰기가 없으면 dialogue는 넣지 않는다.
+
+# 사실 규칙
+- 캡처와 대사, 사용자 메모에 근거한 실제 줄거리만 쓴다. 보이지 않는 사건이나 설정을 지어내지 않는다.
+
+# 분량
+- narration 18~26개, 각 10~22자(공백 포함). 전체 약 50~65초.
+
+# 출력 (JSON만, 설명·코드블록 금지)
+{"titles":["제목1", "...10개"],
+ "title_lines":["상단 1줄(흰색)","상단 2줄(노란색)"],
+ "scenes":[
+  {"type":"narration","text":"편의점에서 복권을 사는데","src_start":12.5,"guide":"여주가 계산대에서 복권을 받는 클로즈업"},
+  {"type":"dialogue","subtitle":"너 왜 거기서 사는 거야","src_start":45.2,"src_end":47.8,"speaker":"female","guide":"버스 안 여주 정면 샷"}
+ ]}
+title_lines는 10개 중 가장 좋은 제목을 의미 단위로 두 줄로 나눈 것(한 줄 9자 안팎).`;
+
+function parseJSON(t){ t=t.replace(/```json|```/g,''); const a=t.indexOf('{'), b=t.lastIndexOf('}'); if(a<0||b<0) throw new Error('AI 응답 형식을 읽지 못했어요. 다시 눌러 주세요.'); return JSON.parse(t.slice(a,b+1)); }
+function splitTitle(t){ t=String(t||'').trim(); const words=t.split(' '); if(words.length<2) return [t,'']; let best=1, bd=1e9; for(let i=1;i<words.length;i++){ const d=Math.abs(words.slice(0,i).join(' ').length - words.slice(i).join(' ').length); if(d<bd){bd=d;best=i;} } return [words.slice(0,best).join(' '), words.slice(best).join(' ')]; }
+const newScene = o => ({type:o.type, text:o.text, src_start:o.src_start, src_end:o.src_end, speaker:o.speaker||'other', guide:o.guide||'', audio:null, audioDur:0, audioEl:null, srcNode:null, aState:''});
+function normalize(o){
+  S.titles=(o.titles||[]).map(t=>String(t).replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,10);
+  let tl=o.title_lines; if(!Array.isArray(tl)||!tl[0]) tl=splitTitle(S.titles[0]||'');
+  S.title1=clean(tl[0]); S.title2=clean(tl[1]);
+  const d=S.videoDur||1e9;
+  S.scenes=(o.scenes||[]).map(s=>{
+    const st=Math.max(0,Math.min(+s.src_start||0,d-0.5));
+    if(s.type==='dialogue'){ let en=+s.src_end||st+2.5; en=Math.min(Math.max(en,st+1),st+6,d); const sp=['female','male','other'].includes(s.speaker)?s.speaker:'other';
+      return newScene({type:'dialogue',text:clean(s.subtitle||s.text),src_start:st,src_end:en,speaker:sp,guide:s.guide}); }
+    return newScene({type:'narration',text:clean(s.text),src_start:st,guide:s.guide});
+  }).filter(s=>s.text);
+  if(!S.scenes.length) throw new Error('장면이 비어 있어요. 다시 눌러 주세요.');
+}
+
+/* ================= 분석 실행 ================= */
+$('analyzeBtn').addEventListener('click', async ()=>{
+  if(!S.file) return;
+  let provider=$('provider').value;
+  if(provider==='claude' && !key('anthropicKey')) provider='openai';
+  if(!key('openaiKey') && provider==='openai'){ setStatus('anaStatus','OpenAI API 키를 먼저 넣어 주세요.',true); return; }
+  busy=true; updateButtons(); $('analyzeBtn').disabled=true;
+  const bar=p=>$('anaBar').style.width=(p*100)+'%';
+  try{
+    setStatus('anaStatus','장면 캡처 중…'); bar(0.02);
+    const sheets=await captureSheets((i,n)=>{ bar(0.02+0.38*i/n); setStatus('anaStatus',`장면 캡처 중… ${i}/${n}`); });
+    let transcript=[], sttNote='';
+    if($('stt').checked && key('openaiKey')){
+      try{
+        setStatus('anaStatus','원본 소리를 뽑는 중… (영상 길이에 따라 10~40초)'); bar(0.42);
+        const wav=await extractWav(S.file);
+        setStatus('anaStatus','원본 대사 받아쓰는 중…'); bar(0.5);
+        transcript=await transcribe(wav);
+      }catch(e){ sttNote='(대사 받아쓰기 실패: '+e.message+')'; }
+    }
+    bar(0.6); setStatus('anaStatus',`${provider==='claude'?'Claude':'OpenAI'}가 장면을 보고 대본과 편집점을 짜는 중… (30초~1분 30초) ${sttNote}`);
+    let tx=transcript.map(s=>`[${s.start.toFixed(1)}~${s.end.toFixed(1)}] ${s.text}`).join('\n'); if(tx.length>14000) tx=tx.slice(0,14000)+'\n…';
+    const text=`원본 영상 길이: ${S.videoDur.toFixed(1)}초
+작품명: ${$('work').value||'(모름)'}
+사용자 메모: ${$('memo').value||'(없음)'}
+장면 캡처 시트: 위 이미지 ${sheets.length}장 (각 칸 노란 숫자 = 초)
+원본 대사 받아쓰기:
+${tx||'(없음)'}
+
+지침서대로 JSON을 만들어 줘.`;
+    const out = provider==='claude' ? await callClaude(SYSTEM,sheets,text) : await callGPT(SYSTEM,sheets,text);
+    normalize(parseJSON(out));
+    S.work=$('work').value;
+    bar(1); renderAll();
+    const nd=S.scenes.filter(s=>s.type==='dialogue').length;
+    setStatus('anaStatus',`완성: 제목 ${S.titles.length}개, 장면 ${S.scenes.length}개 (원본 대사 ${nd}개). 편집점을 확인하고 목소리를 만드세요. ${sttNote}`, !!sttNote);
+  }catch(e){ setStatus('anaStatus',e.message,true); }
+  busy=false; updateButtons(); $('analyzeBtn').disabled=!S.file;
+});
+
+/* API 없이 테스트: 영상 곳곳에서 장면을 골라 예시 대본을 만들어요 */
+$('testBtn').addEventListener('click', ()=>{
+  const d=S.videoDur, lines=['이 남자는 매일 같은 시간에','같은 장소를 지나갔습니다','그런데 그날따라 이상한 게 보였죠','누군가 그를 지켜보고 있었던 것','하지만 진짜 반전은 따로 있었습니다','그 사람의 정체는','바로 그가 가장 믿던 사람이었죠','과연 그는 이 사실을 알게 될까요'];
+  const n=lines.length+1; S.scenes=[];
+  lines.forEach((t,i)=>{ S.scenes.push(newScene({type:'narration',text:t,src_start:+(d*(i+0.3)/n).toFixed(1),guide:'예시 장면'})); if(i===4) S.scenes.push(newScene({type:'dialogue',text:'너 지금 어디야',src_start:+(d*0.62).toFixed(1),src_end:+(d*0.62+2.5).toFixed(1),speaker:'female',guide:'원본 대사 예시'})); });
+  S.titles=['믿었던 사람의 소름 돋는 정체','매일 지나가던 길의 비밀'];
+  S.title1='전교1등 우등생의'; S.title2='충격적인 비밀'; S.work=$('work').value||'작품명 (연도)';
+  renderAll(); setStatus('anaStatus','예시 대본을 넣었어요. 목소리 없이 컷 편집·자막·소리 섞기를 확인할 수 있어요. ③에서 미리보기를 눌러 보세요.');
+});
+
+/* ================= 편집 UI ================= */
+['title1','title2'].forEach(id=>$(id).addEventListener('input',()=>{ S[id]=$(id).value; redrawPreview(); buildGuide(); }));
+function renderAll(){ renderTitles(); $('title1').value=S.title1; $('title2').value=S.title2; renderScenes(); buildGuide(); updateButtons(); showScene(0); }
+function renderTitles(){
+  const box=$('titles'); box.innerHTML='';
+  if(!S.titles.length){ box.innerHTML='<p class="note">제목 후보가 없어요.</p>'; return; }
+  S.titles.forEach((t,i)=>{
+    const n=noSpaceLen(t), ok=n>=12&&n<=14;
+    const l=document.createElement('label');
+    l.innerHTML=`<input type="radio" name="tpick" ${i===0?'checked':''}> <span></span><span class="cnt ${ok?'':'bad'}">공백 제외 ${n}자${ok?'':' ⚠'}</span>`;
+    l.querySelector('span').textContent=t;
+    l.querySelector('input').addEventListener('change',()=>{ const [a,b]=splitTitle(t); S.title1=clean(a); S.title2=clean(b); $('title1').value=S.title1; $('title2').value=S.title2; redrawPreview(); buildGuide(); });
+    box.appendChild(l);
+  });
+}
+let thumbQueue=Promise.resolve();
+function renderScenes(){
+  const box=$('scenes'); box.innerHTML='';
+  S.scenes.forEach((sc,i)=>{
+    const d=document.createElement('div'); d.className='scene'+(sc.type==='dialogue'?' dlg':''); d.dataset.i=i;
+    const isD=sc.type==='dialogue';
+    d.innerHTML=`
+      <div class="snum">${i+1}</div>
+      <div class="th"><canvas width="320" height="180" title="눌러서 미리보기"></canvas></div>
+      <div style="min-width:0">
+        <span class="tag">${isD?'원본 대사 (나레이션 멈춤)':'나레이션'}</span>
+        <input type="text" class="tx" id="tx${i}" aria-label="${i+1}번 ${isD?'대사 자막':'나레이션'}">
+        <div class="tc">
+          <span>원본</span><input type="number" step="0.1" min="0" class="st" id="st${i}" aria-label="시작 초">
+          <button type="button" class="small mv" data-d="-1">-1초</button><button type="button" class="small mv" data-d="1">+1초</button>
+          ${isD?`<span>~</span><input type="number" step="0.1" min="0" class="en" id="en${i}" aria-label="끝 초">
+          <select class="spk" id="spk${i}"><option value="female">여자 (노랑)</option><option value="male">남자 (파랑)</option><option value="other">기타 (흰색)</option></select>`:''}
+          <button type="button" class="small del">삭제</button>
+        </div>
+        <div class="guide"></div>
+        <div class="sstat"></div>
+      </div>`;
+    d.querySelector('.tx').value=sc.text;
+    d.querySelector('.st').value=sc.src_start.toFixed(1);
+    d.querySelector('.guide').textContent=sc.guide?('연출: '+sc.guide):'';
+    if(isD){ d.querySelector('.en').value=sc.src_end.toFixed(1); d.querySelector('.spk').value=sc.speaker; }
+    box.appendChild(d);
+    const tcv=d.querySelector('canvas');
+    queueThumb(tcv, sc.src_start);
+    tcv.addEventListener('click',()=>showScene(i));
+    d.querySelector('.tx').addEventListener('change',e=>{ sc.text=clean(e.target.value); e.target.value=sc.text; if(!isD){ sc.audio=null; sc.audioDur=0; sc.audioEl=null; sc.srcNode=null; sc.rate=0; } renderStat(i); buildGuide(); showScene(i); });
+    d.querySelector('.tx').addEventListener('focus',()=>showScene(i));
+    const setStart=v=>{ const len=isD? sc.src_end-sc.src_start : 0; sc.src_start=Math.max(0,Math.min(+v||0,S.videoDur-0.3)); if(isD){ sc.src_end=Math.min(S.videoDur,sc.src_start+len); d.querySelector('.en').value=sc.src_end.toFixed(1); } d.querySelector('.st').value=sc.src_start.toFixed(1); queueThumb(tcv,sc.src_start); buildGuide(); showScene(i); };
+    d.querySelector('.st').addEventListener('change',e=>setStart(e.target.value));
+    d.querySelectorAll('.mv').forEach(b=>b.addEventListener('click',()=>setStart(sc.src_start+(+b.dataset.d))));
+    if(isD){
+      d.querySelector('.en').addEventListener('change',e=>{ sc.src_end=Math.max(sc.src_start+0.8,Math.min(+e.target.value||0,S.videoDur)); e.target.value=sc.src_end.toFixed(1); buildGuide(); refreshStats(); });
+      d.querySelector('.spk').addEventListener('change',e=>{ sc.speaker=e.target.value; showScene(i); });
+    }
+    d.querySelector('.del').addEventListener('click',()=>{ S.scenes.splice(i,1); renderScenes(); buildGuide(); updateButtons(); });
+    renderStat(i);
+  });
+}
+function queueThumb(c,t){
+  thumbQueue=thumbQueue.then(async()=>{ if(!S.url) return; await seekTo(vThumb,t); const x=c.getContext('2d'); x.fillStyle='#000'; x.fillRect(0,0,320,180);
+    const vw=vThumb.videoWidth, vh=vThumb.videoHeight; if(!vw) return; const s=Math.min(320/vw,180/vh); x.drawImage(vThumb,(320-vw*s)/2,(180-vh*s)/2,vw*s,vh*s); }).catch(()=>{});
+}
+function renderStat(i){
+  const sc=S.scenes[i]; const el=document.querySelector(`.scene[data-i="${i}"] .sstat`); if(!el) return;
+  const sp=+$('speed').value;
+  if(sc.type==='dialogue'){ el.innerHTML=`원본 소리로 ${(sc.src_end-sc.src_start).toFixed(1)}초`; return; }
+  el.innerHTML = sc.audio? `<span class="ok">목소리 ✓ ${(sc.audioDur/rateOf(sc)).toFixed(1)}초</span>` : (sc.aState? `<span class="${sc.aState==='실패'?'no':''}">목소리 ${sc.aState}</span>` : `목소리 없음 (예상 ${(est(sc.text)/sp).toFixed(1)}초)`);
+}
+function refreshStats(){ S.scenes.forEach((_,i)=>renderStat(i)); }
+function updateButtons(){
+  const has=S.scenes.length>0;
+  $('ttsBtn').disabled=!has||busy; $('playBtn').disabled=!has||busy||!S.url; $('renderBtn').disabled=!has||busy||!S.url; $('stopBtn').disabled=!busy;
+}
+let previewIdx=-1;
+async function showScene(i){ previewIdx=i; const sc=S.scenes[i]; if(!sc||!S.url){ drawComposite(i,null); return; } await seekTo(vThumb,sc.src_start+0.2); if(previewIdx===i && !busy) drawComposite(i,vThumb); }
+function redrawPreview(){ if(!busy) showScene(previewIdx<0?0:previewIdx); }
+
+/* ================= 목소리 ================= */
+const rateOf = sc => sc.rate || +$('speed').value;
+const est = t => Math.max(1.2, noSpaceLen(t)/5.8);
+$('ttsBtn').addEventListener('click', async ()=>{
+  if(!useST() && !key('openaiKey')){ setStatus('ttsStatus','OpenAI API 키를 먼저 넣어 주세요. (또는 무료 목소리를 고르세요)',true); return; }
+  const jobs=S.scenes.map((s,i)=>({s,i})).filter(o=>o.s.type==='narration'&&!o.s.audio);
+  if(!jobs.length){ setStatus('ttsStatus','목소리가 이미 다 만들어져 있어요.'); return; }
+  busy=true; updateButtons(); let done=0, fails=0, last='';
+  const prog=()=>{ $('ttsBar').style.width=(done/jobs.length*100)+'%'; setStatus('ttsStatus',`목소리 만드는 중… ${done}/${jobs.length}${fails?` (실패 ${fails})`:''}`); };
+  prog();
+  await pool(jobs,useST()?1:4,async({s,i})=>{ s.aState='만드는 중…'; renderStat(i);
+    try{ let blob; if(useST()){ blob=await stSpeak(s.text,$('stVoice').value,+$('stSteps').value,+$('speed').value,m=>setStatus('ttsStatus',m)); s.rate=1; } else { blob=await tts(s.text); s.rate=0; } const buf=await getCtx().decodeAudioData(await blob.arrayBuffer());
+      s.audio=blob; s.audioDur=buf.duration; s.audioEl=new Audio(URL.createObjectURL(blob)); s.audioEl.preload='auto'; s.srcNode=null; s.aState=''; }
+    catch(e){ s.aState='실패'; fails++; last=e.message; }
+    done++; renderStat(i); prog(); });
+  busy=false; updateButtons(); buildGuide();
+  setStatus('ttsStatus', fails? `${fails}개 실패했어요. 다시 누르면 실패한 것만 다시 만들어요.\n${last}` : '목소리 준비 완료. 미리보기로 확인하고 영상 파일을 만드세요.', !!fails);
+});
+
+/* ================= 타임라인 ================= */
+function buildTL(){
+  const sp=+$('speed').value; let t=0.05; const tl=[]; const vd=S.videoDur||1e9;
+  S.scenes.forEach((sc,i)=>{
+    let d = sc.type==='dialogue' ? Math.max(0.8, sc.src_end-sc.src_start) : (sc.audioDur? sc.audioDur/rateOf(sc) : est(sc.text)/sp) + 0.06;
+    let src=sc.src_start; if(src+d>vd-0.05) src=Math.max(0,vd-0.05-d);
+    tl.push({i,start:t,end:t+d,src,type:sc.type}); t+=d;
+  });
+  return {tl,total:t+0.35};
+}
+
+/* ================= 그리기 ================= */
+const TFONT = s => `${s}px "Black Han Sans","Noto Sans KR",sans-serif`;
+const SFONT = s => `700 ${s}px "Noto Sans KR",sans-serif`;
+function band(){ return $('bandMode').value==='fit' ? {x:0,y:290+117,w:720,h:405} : {x:0,y:290,w:720,h:640}; }
+function fit(font, txt, max, size){ g.font=font(size); while(size>16 && g.measureText(txt).width>max){ size-=2; g.font=font(size); } return size; }
+function wrap(font, txt, max, size){ g.font=font(size); const words=txt.split(' '); const lines=[]; let cur=''; for(const w of words){ const c=cur?cur+' '+w:w; if(cur && g.measureText(c).width>max){ lines.push(cur); cur=w; } else cur=c; } if(cur) lines.push(cur); return lines; }
+function drawCoverVid(v,b,zoom){ const vw=v.videoWidth, vh=v.videoHeight; if(!vw) return;
+  const base = $('bandMode').value==='fit' ? Math.min(b.w/vw,b.h/vh) : Math.max(b.w/vw,b.h/vh); const s=base*zoom, dw=vw*s, dh=vh*s;
+  g.drawImage(v, b.x+(b.w-dw)/2, b.y+(b.h-dh)/2, dw, dh); }
+function drawTitleLine(txt,y,color){
+  if(!txt) return; const size=fit(TFONT,txt,640,66);
+  g.save(); g.translate(W/2,y); g.transform(1,0,-0.16,1,0,0);
+  g.font=TFONT(size); g.textAlign='center'; g.textBaseline='alphabetic'; g.lineJoin='round';
+  g.lineWidth=size*0.14; g.strokeStyle='#000'; g.strokeText(txt,0,0); g.fillStyle=color; g.fillText(txt,0,0); g.restore();
+}
+function drawSub(txt,b){
+  const size=40, lines=wrap(SFONT,txt,640,size).slice(0,2); const lh=52; const baseY=b.y+b.h-34;
+  g.textAlign='center'; g.textBaseline='alphabetic'; g.lineJoin='round';
+  lines.forEach((ln,k)=>{ const y=baseY-(lines.length-1-k)*lh; const s=fit(SFONT,ln,660,size);
+    g.save(); g.shadowColor='rgba(0,0,0,.85)'; g.shadowBlur=10; g.shadowOffsetY=2;
+    g.lineWidth=s*0.16; g.strokeStyle='rgba(0,0,0,.9)'; g.strokeText(ln,W/2,y); g.restore();
+    g.fillStyle='#fff'; g.fillText(ln,W/2,y); });
+}
+function drawDialogue(txt,speaker,b){
+  const size=38, lines=wrap(SFONT,txt,600,size).slice(0,2), lh=50; g.font=SFONT(size);
+  const bw=Math.min(680,Math.max(...lines.map(l=>g.measureText(l).width))+40), bh=lines.length*lh+18;
+  const bx=(W-bw)/2, by=b.y+b.h-34-bh+16;
+  g.fillStyle='rgba(10,12,16,.72)'; g.beginPath(); g.roundRect? g.roundRect(bx,by,bw,bh,10) : g.rect(bx,by,bw,bh); g.fill();
+  g.fillStyle=SPEAKER[speaker]||'#fff'; g.textAlign='center'; g.textBaseline='alphabetic';
+  lines.forEach((ln,k)=>g.fillText(ln,W/2,by+14+size+k*lh-4));
+}
+function drawComposite(i, vid, zoom=1){
+  const b=band();
+  g.fillStyle='#000'; g.fillRect(0,0,W,H);
+  g.save(); g.beginPath(); g.rect(b.x,b.y,b.w,b.h); g.clip();
+  if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
+  g.restore();
+  drawTitleLine(S.title1||'', 150, '#ffffff');
+  drawTitleLine(S.title2||'', 236, YELLOW);
+  const sc=S.scenes[i];
+  if(sc && sc.text){ sc.type==='dialogue' ? drawDialogue(sc.text,sc.speaker,b) : drawSub(sc.text,b); }
+  const work=S.work||$('work').value; if(work){ g.font='700 25px "Noto Sans KR",sans-serif'; g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+46); }
+}
+
+/* ================= 재생 · 녹화 ================= */
+function mkVideo(){ const v=document.createElement('video'); v.preload='auto'; v.playsInline=true; v.src=S.url; v.crossOrigin='anonymous'; return v; }
+function pickMime(){ const l=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1,mp4a','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']; return l.find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m))||''; }
+async function run(record){
+  if(!S.scenes.length||!S.url) return;
+  const miss=S.scenes.filter(s=>s.type==='narration'&&!s.audio).length;
+  busy=true; stopFlag=false; updateButtons(); $('dlBox').innerHTML='';
+  const c=getCtx(); await c.resume();
+  try{ await document.fonts.load(TFONT(66)); await document.fonts.load(SFONT(40)); }catch(e){}
+  if(!VA){ VA=mkVideo(); VB=mkVideo(); gA=c.createGain(); gB=c.createGain(); c.createMediaElementSource(VA).connect(gA); c.createMediaElementSource(VB).connect(gB); }
+  if(VA.src!==S.url){ VA.src=S.url; VB.src=S.url; }
+  await Promise.all([VA,VB].map(v=>v.readyState>=1?0:new Promise(r=>{ v.onloadedmetadata=r; setTimeout(r,5000); })));
+  const TL=buildTL(), sp=+$('speed').value, duck=(+$('duckVol').value)/100, dlg=(+$('dlgVol').value)/100;
+  const master=c.createGain(); const mon=c.createGain(); mon.gain.value=(record&&!$('monitor').checked)?0:1; master.connect(mon); mon.connect(c.destination);
+  [gA,gB].forEach(gn=>{ try{gn.disconnect();}catch(e){} gn.gain.value=0; gn.connect(master); });
+  let rec=null, chunks=[], mime='';
+  if(record){
+    mime=pickMime(); if(!mime){ setStatus('renderStatus','이 브라우저는 영상 녹화를 지원하지 않아요. 크롬 최신 버전을 써 주세요.',true); busy=false; updateButtons(); return; }
+    const dest=c.createMediaStreamDestination(); master.connect(dest);
+    rec=new MediaRecorder(new MediaStream([...cv.captureStream(30).getVideoTracks(),...dest.stream.getAudioTracks()]),{mimeType:mime,videoBitsPerSecond:8_000_000,audioBitsPerSecond:192_000});
+    rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  }
+  S.scenes.forEach(sc=>{ const el=sc.audioEl; if(!el) return; if(!sc.srcNode) sc.srcNode=c.createMediaElementSource(el); try{sc.srcNode.disconnect();}catch(e){} sc.srcNode.connect(master);
+    el.pause(); el.currentTime=0; el.playbackRate=rateOf(sc); el.preservesPitch=true; el.webkitPreservesPitch=true; });
+  const els=[VA,VB], gains=[gA,gB];
+  setStatus('renderStatus','준비 중…');
+  VA.pause(); VB.pause();
+  await seekTo(VA,TL.tl[0].src); if(TL.tl[1]) await seekTo(VB,TL.tl[1].src);
+  let bgmSrc=null; if(bgmBuf){ bgmSrc=c.createBufferSource(); bgmSrc.buffer=bgmBuf; bgmSrc.loop=true; const bg=c.createGain(); bg.gain.value=(+$('bgmVol').value)/100; bgmSrc.connect(bg).connect(master); }
+  if(rec) rec.start(250);
+  const t0=c.currentTime+0.12; if(bgmSrc) bgmSrc.start(t0);
+  let cur=-1;
+  setStatus('renderStatus', record? `녹화 중이에요. 이 탭을 그대로 두세요…${miss?` (목소리 없는 나레이션 ${miss}개는 자막만 나와요)`:''}` : '미리보기 재생 중…');
+  await new Promise(res=>{
+    const tick=()=>{
+      const t=c.currentTime-t0;
+      let k=cur<0?0:cur; while(k<TL.tl.length-1 && t>=TL.tl[k].end) k++;
+      if(k!==cur && t>=0){
+        const seg=TL.tl[k], el=els[k%2], gn=gains[k%2], other=els[(k+1)%2], og=gains[(k+1)%2], now=c.currentTime;
+        og.gain.cancelScheduledValues(now); og.gain.setTargetAtTime(0,now,0.01); other.pause();
+        if(Math.abs(el.currentTime-seg.src)>0.35) el.currentTime=seg.src;
+        gn.gain.cancelScheduledValues(now); gn.gain.setTargetAtTime(seg.type==='dialogue'?dlg:duck, now, 0.02);
+        el.play().catch(()=>{});
+        const sc=S.scenes[seg.i]; if(sc.audioEl){ sc.audioEl.currentTime=0; sc.audioEl.play().catch(()=>{}); }
+        const nx=TL.tl[k+1]; if(nx) setTimeout(()=>{ other.pause(); other.currentTime=nx.src; },40);
+        cur=k;
+      }
+      if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], 1+0.035*p); }
+      else drawComposite(0, VA);
+      $('renderBar').style.width=Math.min(100,Math.max(0,t)/TL.total*100)+'%';
+      if(t>=TL.total||stopFlag) res(); else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  els.forEach(v=>v.pause()); S.scenes.forEach(s=>s.audioEl&&s.audioEl.pause()); gains.forEach(gn=>gn.gain.setTargetAtTime(0,c.currentTime,0.02));
+  if(bgmSrc) try{bgmSrc.stop();}catch(e){}
+  setTimeout(()=>{ try{master.disconnect();}catch(e){} },1500);
+  if(rec){
+    await new Promise(r=>{ rec.onstop=r; rec.stop(); });
+    if(stopFlag) setStatus('renderStatus','중간에 멈췄어요. 다시 누르면 처음부터 만들어요.');
+    else{
+      const blob=new Blob(chunks,{type:mime.split(';')[0]}); const ext=mime.includes('mp4')?'mp4':'webm';
+      const name=((S.title1+' '+S.title2).trim()||'shorts').replace(/[\\/:*?"<>|]/g,'').slice(0,40)+'.'+ext;
+      $('dlBox').innerHTML=`<a class="dl" href="${URL.createObjectURL(blob)}" download="${name}">영상 저장하기 (${(blob.size/1048576).toFixed(1)}MB, ${ext})</a>`;
+      setStatus('renderStatus',`완성! ${TL.total.toFixed(1)}초 영상이에요.${ext==='webm'?' webm도 유튜브에 그대로 올릴 수 있어요.':''}`);
+      window.__lastVideo={size:blob.size,ext,dur:TL.total};
+    }
+  } else setStatus('renderStatus', stopFlag?'멈췄어요.':'미리보기 끝.');
+  busy=false; updateButtons();
+}
+$('playBtn').addEventListener('click',()=>run(false));
+$('renderBtn').addEventListener('click',()=>run(true));
+$('stopBtn').addEventListener('click',()=>{ stopFlag=true; });
+
+/* ================= 편집 가이드 (지침서 템플릿) ================= */
+function buildGuide(){
+  if(!S.scenes.length){ $('guideOut').value=''; return; }
+  const {tl,total}=buildTL(); const out=[];
+  out.push('### 1. 추천 제목 후보 10개 (정상 띄어쓰기 적용, 공백 제외 12~14자 엄수)');
+  S.titles.forEach((t,i)=>out.push(`${i+1}. ${t} (공백 제외 ${noSpaceLen(t)}자)`));
+  out.push('', `상단 표시: ${S.title1} / ${S.title2}`, '');
+  out.push('### 2. 고농도 도파민 쇼츠 대본 (의미 단위 줄바꿈, 자연스러운 종결어미 적용)');
+  S.scenes.forEach(s=>out.push(s.type==='dialogue'? `(원본 대사) ${s.text}` : s.text));
+  out.push('', '### 3. 초정밀 타임코드 미세 편집 가이드 (단일 장면 2~4초 단위 매칭)');
+  tl.forEach(seg=>{ const s=S.scenes[seg.i];
+    const src = s.type==='dialogue'? `원본 ${fmt(seg.src)}~${fmt(seg.src+(seg.end-seg.start))} 원본 소리 크게` : `원본 ${fmt(seg.src)}부터`;
+    out.push(`* **${fmt(seg.start)} ~ ${fmt(seg.end)}** | "${s.text}" | ${src}${s.guide?' · '+s.guide:''}`); });
+  out.push('', `총 길이 약 ${total.toFixed(1)}초${S.work?' · '+S.work:''}`);
+  $('guideOut').value=out.join('\n');
+}
+$('copyGuide').addEventListener('click',()=>{ const t=$('guideOut').value; navigator.clipboard.writeText(t).then(()=>{},()=>{ $('guideOut').select(); }); });
+$('saveGuide').addEventListener('click',()=>{ const t=$('guideOut').value; if(!t) return; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([t],{type:'text/plain;charset=utf-8'})); a.download=((S.title1+' '+S.title2).trim()||'편집가이드')+'_편집가이드.txt'; a.click(); });
+
+loadSettings(); setupEngineUI('평범해 보이던 전교 일등 우등생 하지만 그에게는 아무도 모르는 충격적인 비밀이 있었습니다'); drawComposite(-1,null);
+document.fonts && document.fonts.ready.then(()=>redrawPreview());
+</script>
+</body>
+</html>
