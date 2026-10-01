@@ -144,7 +144,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
         <label class="drop" id="drop" for="videoFile">여기를 눌러 영화·드라마 영상 파일(mp4)을 고르세요<br><small>핵심 갈등 장면이 담긴 3~13분 클립을 추천해요</small></label>
         <input id="videoFile" type="file" accept="video/*" hidden>
         <div class="row" style="margin-top:10px"><button type="button" id="driveBtn">구글 드라이브에서 가져오기</button><span class="note" style="margin:0">드라이브에 올려 둔 영상을 골라서 바로 불러와요.</span></div>
-        <details id="driveSetup"><summary>구글 드라이브 연결 설정 (처음 한 번)</summary>
+        <details id="driveSetup"><summary>구글 드라이브 연결 설정 (이미 넣어 두었어요. 바꿀 때만 열기)</summary>
           <div class="cols">
             <div><label for="gClientId">OAuth 클라이언트 ID</label><input id="gClientId" type="text" placeholder="1234567890-xxxx.apps.googleusercontent.com" autocomplete="off"></div>
             <div><label for="gApiKey">API 키</label><input id="gApiKey" type="text" placeholder="AIza..." autocomplete="off"></div>
@@ -406,7 +406,7 @@ async function loadVideoFile(f){
 }
 
 /* ================= 구글 드라이브 ================= */
-const G_DEFAULT={clientId:'', apiKey:''};
+const G_DEFAULT={clientId:'652397697845-6m7egqnuu058l36kehov1q47kpvoimt4.apps.googleusercontent.com', apiKey:'AIzaSyC6bYbguRn_r9_tz1iJN96-P_TzgxqLcgE'};
 let gToken=null, gTokenExp=0;
 const gCfg=()=>({clientId:key('gClientId')||G_DEFAULT.clientId, apiKey:key('gApiKey')||G_DEFAULT.apiKey});
 async function gInit(){
