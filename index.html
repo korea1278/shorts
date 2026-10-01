@@ -1260,7 +1260,7 @@ function renderScenes(){
   });
 }
 const PAN_HTML='<select class="small pan" aria-label="화면 위치" title="정사각형 화면에서 보여 줄 위치"><option value="0">◀ 왼쪽</option><option value="0.25">왼쪽 조금</option><option value="0.5">가운데</option><option value="0.75">오른쪽 조금</option><option value="1">오른쪽 ▶</option></select>';
-function bindPan(d,sc,i,t){ const el=d.querySelector('.pan'); if(!el) return; const v=[0,0.25,0.5,0.75,1].reduce((a,b)=>Math.abs(b-sc.fx)<Math.abs(a-sc.fx)?b:a,0.5); el.value=String(v); el.addEventListener('change',e=>{ sc.fx=+e.target.value; showScene(i,t); }); }
+function bindPan(d,sc,i,t){ const el=d.querySelector('.pan'); if(!el) return; const v=[0,0.25,0.5,0.75,1].reduce((a,b)=>Math.abs(b-sc.fx)<Math.abs(a-sc.fx)?b:a,0.5); el.value=String(v); el.addEventListener('change',e=>{ sc.fx=+e.target.value; sc.shots=null; showScene(i,t); }); }
 function renderClipRow(box,sc,i){
   const d=document.createElement('div'); d.className='scene clip'; d.dataset.i=i;
   d.innerHTML=`<div class="snum">${i+1}</div>
@@ -1331,15 +1331,26 @@ async function autoFocus(say){
   if(vDet.src!==S.url){ vDet.src=S.url; await new Promise(r=>{ vDet.onloadedmetadata=r; vDet.onerror=r; setTimeout(r,8000); }); }
   const vw=vDet.videoWidth, vh=vDet.videoHeight*(1-hsFrac()); if(!vw) return 0;
   const sc0=Math.max(b.w/vw,b.h/vh), vf=b.w/(vw*sc0); if(vf>=0.98) return 0;
+  const toFx=cx=>Math.max(0,Math.min(1,(cx-vf/2)/(1-vf)));
+  const sm=document.createElement('canvas'); sm.width=48; sm.height=27; const smx=sm.getContext('2d',{willReadFrequently:true});
+  const sig=()=>{ smx.drawImage(vDet,0,0,48,27); return smx.getImageData(0,0,48,27).data; };
   let n=0;
   for(let i=0;i<S.scenes.length;i++){ const sc=S.scenes[i];
     say&&say(`인물 위치 찾는 중… ${i+1}/${S.scenes.length}`);
-    let ts; if(sc.type==='clip'&&sc.lines&&sc.lines.length) ts=sc.lines.slice(0,4).map(l=>(l.start+l.end)/2);
-    else if(sc.type==='clip'||sc.type==='dialogue') ts=[sc.src_start+0.3,(sc.src_start+sc.src_end)/2,sc.src_end-0.3];
-    else ts=[sc.src_start+0.3,sc.src_start+1.5,sc.src_start+3];
-    const cs=[]; for(const t of ts){ await seekTo(vDet,t); const c=centerOf(await detPersons(vDet),vf); if(c!=null) cs.push(c); }
-    if(!cs.length) continue; cs.sort((a,b)=>a-b); const cx=cs[Math.floor(cs.length/2)];
-    sc.fx=Math.max(0,Math.min(1,(cx-vf/2)/(1-vf))); n++;
+    const a=sc.src_start, z=(sc.type==='clip'||sc.type==='dialogue')? sc.src_end : sc.src_start+Math.max(2.5,(sc.audioDur||est(sc.text))+0.5);
+    // 1) 장면 안에서 카메라가 바뀌는 곳(컷)을 찾아요
+    const step=0.4, cuts=[a]; let prev=null;
+    for(let t=a+0.05;t<z-0.05;t+=step){ await seekTo(vDet,t); const d=sig();
+      if(prev){ let df=0; for(let k=0;k<d.length;k+=4) df+=Math.abs(d[k]-prev[k])+Math.abs(d[k+1]-prev[k+1])+Math.abs(d[k+2]-prev[k+2]); df/=(d.length/4)*3; if(df>28 && t-cuts[cuts.length-1]>0.6) cuts.push(t-step/2); }
+      prev=d; }
+    // 2) 컷마다 사람을 찾아서 그 컷의 화면 위치를 정해요
+    const shots=[];
+    for(let k=0;k<cuts.length;k++){ const s0=cuts[k], s1=k+1<cuts.length?cuts[k+1]:z; const ts=s1-s0>1.6? [s0+0.4,(s0+s1)/2,s1-0.3] : [(s0+s1)/2];
+      const cs=[]; for(const t of ts){ await seekTo(vDet,t); const c=centerOf(await detPersons(vDet),vf); if(c!=null) cs.push(c); }
+      cs.sort((x,y)=>x-y); shots.push({t:s0, fx: cs.length? toFx(cs[Math.floor(cs.length/2)]) : null}); }
+    const known=shots.filter(x=>x.fx!=null); if(!known.length){ sc.shots=null; continue; }
+    shots.forEach((x,k)=>{ if(x.fx==null){ const nb=shots.slice(k).find(y=>y.fx!=null)||[...shots.slice(0,k)].reverse().find(y=>y.fx!=null); x.fx=nb.fx; } });
+    sc.shots=shots; sc.fx=shots[0].fx; n++;
   }
   return n;
 }
@@ -1473,11 +1484,12 @@ function drawBrand(b){
   g.fillStyle='rgba(0,0,0,.72)'; g.beginPath(); g.roundRect? g.roundRect(px,py,pw,ph,20) : g.rect(px,py,pw,ph); g.fill();
   g.fillStyle=ACC(); g.textAlign='center'; g.textBaseline='middle'; g.fillText(name,px+pw/2,py+ph/2+1); g.textBaseline='alphabetic';
 }
+function fxAt(sc,t){ if(!sc) return 0.5; const sh=sc.shots; if(!sh||!sh.length||t==null) return sc.fx; let f=sh[0].fx; for(const x of sh){ if(t>=x.t-0.02) f=x.fx; else break; } return f; }
 function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
   const b=band(); const sc0=S.scenes[i];
   drawBg(vid);
   g.save(); g.beginPath(); g.rect(b.x,b.y,b.w,b.h); g.clip();
-  if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom,sc0?sc0.fx:0.5); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
+  if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom,fxAt(sc0,srcT)); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
   g.restore();
   drawBrand(b);
   drawTitleLine(S.title1||'', 150, '#ffffff');
