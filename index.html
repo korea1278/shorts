@@ -129,6 +129,8 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
           <div class="cols">
             <div><label for="duckVol">나레이션 중 원본 소리 <b id="duckVolVal">15</b>%</label><input id="duckVol" type="range" min="0" max="50" value="15" style="width:100%"></div>
             <div><label for="dlgVol">원본 대사 구간 소리 <b id="dlgVolVal">100</b>%</label><input id="dlgVol" type="range" min="30" max="150" value="100" style="width:100%"></div>
+            <div><label for="bgStyle">배경</label><select id="bgStyle"><option value="blur">장면 블러 배경 (추천)</option><option value="black">검은 배경</option></select></div>
+            <div><label for="accentBar" style="margin-top:10px">&nbsp;</label><label style="margin:0;display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="accentBar" checked> 영상 위아래 노란 띠</label></div>
             <div><label for="bandMode">영상 크기</label><select id="bandMode"><option value="crop">크게 (좌우 조금 자르기, 레퍼런스 방식)</option><option value="fit">원본 비율 그대로</option></select></div>
           </div>
           <div class="cols">
@@ -143,7 +145,16 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
         <h2><span class="step">1</span>원본 영상 올리기</h2>
         <label class="drop" id="drop" for="videoFile">여기를 눌러 영화·드라마 영상 파일(mp4)을 고르세요<br><small>핵심 갈등 장면이 담긴 3~13분 클립을 추천해요</small></label>
         <input id="videoFile" type="file" accept="video/*" hidden>
-        <div class="row" style="margin-top:10px"><button type="button" id="driveBtn">구글 드라이브에서 가져오기</button><span class="note" style="margin:0">드라이브에 올려 둔 영상을 골라서 바로 불러와요.</span></div>
+        <div class="row" style="margin-top:10px"><button type="button" id="driveBtn">구글 드라이브에서 가져오기</button><span class="note" style="margin:0">드라이브에 올려 둔 영상을 골라서 바로 불러와요. mp4(H.264) 영상만 열려요.</span></div>
+        <div class="row" style="margin-top:8px">
+          <label for="subFile" style="margin:0"><span style="display:inline-block;border:1px solid var(--line);border-radius:7px;padding:9px 14px;color:var(--fg);background:var(--panel2);cursor:pointer;font-size:14px">내 PC에서 자막 (smi·srt)</span></label>
+          <input id="subFile" type="file" accept=".smi,.sami,.srt,.txt" hidden>
+          <button type="button" id="driveSubBtn">드라이브에서 자막 가져오기</button>
+          <span class="note" id="subNote" style="margin:0">한국어 자막이 있으면 대사 받아쓰기 대신 써요 (무료, 더 정확)</span>
+        </div>
+        <div class="cols">
+          <div><label for="subOffset">자막 시간 맞추기: 이 영상이 원본 영화의 몇 분부터인지 (자른 클립일 때)</label><input id="subOffset" type="text" value="0:00:00" placeholder="예) 1:05:30"></div>
+        </div>
         <details id="driveSetup"><summary>구글 드라이브 연결 설정 (이미 넣어 두었어요. 바꿀 때만 열기)</summary>
           <div class="cols">
             <div><label for="gClientId">OAuth 클라이언트 ID</label><input id="gClientId" type="text" placeholder="1234567890-xxxx.apps.googleusercontent.com" autocomplete="off"></div>
@@ -153,6 +164,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
         </details>
         <div class="cols">
           <div><label for="work">작품명 (영상 아래 작게 표시)</label><input id="work" type="text" placeholder="예) It Ends with Us (2024)"></div>
+          <div><label for="channelName">채널 로고 (영상 오른쪽 위, 비우면 안 넣음)</label><input id="channelName" type="text" placeholder="예) 내 채널 이름"></div>
           <div><label for="stt" style="margin-top:10px">&nbsp;</label><label style="margin:0;display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="stt" checked> 원본 대사 받아쓰기 (앞 13분까지)</label></div>
         </div>
         <label for="memo">메모 (선택): 줄거리, 등장인물 이름, 강조하고 싶은 장면</label>
@@ -359,7 +371,7 @@ function setupEngineUI(sample){
 const useST=()=>$('engine').value==='supertonic';
 
 /* ================= 설정 ================= */
-const SET_IDS=['gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
+const SET_IDS=['bgStyle','channelName','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
 function loadSettings(){
   try{
     const s=JSON.parse(localStorage.getItem('mrm_settings')||'{}');
@@ -380,19 +392,19 @@ function saveSettings(){
 }
 document.addEventListener('change',e=>{ if(e.target.closest('section.card') && e.target.type!=='file') saveSettings(); });
 ['speed','duckVol','dlgVol','bgmVol'].forEach(id=>$(id).addEventListener('input',()=>{ syncVal(id); if(id==='speed') { refreshStats(); buildGuide(); } }));
-$('bandMode').addEventListener('change',()=>redrawPreview());
+['bandMode','bgStyle','accentBar'].forEach(id=>$(id).addEventListener('change',()=>redrawPreview())); $('channelName').addEventListener('input',()=>redrawPreview());
 $('bgm').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f){bgmBuf=null;return;}
   try{ bgmBuf=await getCtx().decodeAudioData(await f.arrayBuffer()); }catch(err){ bgmBuf=null; setStatus('renderStatus','배경음악 파일을 읽지 못했어요.',true); } });
 
 /* ================= 영상 올리기 ================= */
-$('videoFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) loadVideoFile(f); });
+$('videoFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(!f) return; if(looksBad(f.name)) setStatus('anaStatus','이 파일은 크롬에서 안 열릴 수 있어요. 열어 볼게요…',true); loadVideoFile(f); });
 async function loadVideoFile(f){
   if(S.url) URL.revokeObjectURL(S.url);
   S.file=f; S.url=URL.createObjectURL(f);
   vThumb.src=S.url;
   if(VA){ VA.src=S.url; VB.src=S.url; }
   await new Promise(r=>{ vThumb.onloadedmetadata=r; vThumb.onerror=r; });
-  if(!vThumb.duration || !isFinite(vThumb.duration)){ setStatus('anaStatus','영상을 열 수 없어요. mp4(H.264) 파일인지 확인해 주세요.',true); return; }
+  if(!vThumb.duration || !isFinite(vThumb.duration) || !vThumb.videoWidth){ setStatus('anaStatus',BAD_FMT_MSG,true); return; }
   S.videoDur=vThumb.duration;
   const mb=(f.size/1048576).toFixed(0);
   $('drop').classList.add('has');
@@ -404,6 +416,44 @@ async function loadVideoFile(f){
   $('analyzeBtn').disabled=false; $('testBtn').disabled=false;
   await seekTo(vThumb, Math.min(5, S.videoDur/3)); drawComposite(-1, vThumb);
 }
+
+const BAD_FMT_MSG='이 영상은 크롬에서 열 수 없는 형식이에요. 파일 이름에 mkv, x265, HEVC, 10bit가 있으면 대부분 안 열려요. mp4(H.264) 영상으로 바꿔서 올려 주세요.';
+const looksBad = n => /\.(mkv|avi|wmv|flv|ts|m2ts|rmvb)$/i.test(n) || /(hevc|x265|h\.?265|10bit)/i.test(n);
+
+/* ================= 자막 (smi · srt) ================= */
+S.subs=null;
+function decodeText(buf){ try{ return new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(e){ return new TextDecoder('euc-kr').decode(buf); } }
+const unent = t => t.replace(/<br\s*\/?>/gi,' ').replace(/<[^>]+>/g,'').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/&lt;/gi,'<').replace(/&gt;/gi,'>').replace(/&quot;/gi,'"').replace(/\s+/g,' ').trim();
+function parseSMI(t){
+  const out=[]; const re=/<sync[^>]*start\s*=\s*["']?(\d+)[^>]*>([\s\S]*?)(?=<sync|<\/body|$)/gi; let m;
+  while((m=re.exec(t))){
+    const body=m[2]; const ps=[...body.matchAll(/<p[^>]*class\s*=\s*["']?([\w-]+)[^>]*>([\s\S]*?)(?=<p[\s>]|$)/gi)];
+    let txt; if(ps.length){ const kr=ps.find(p=>/kr|ko/i.test(p[1]))||ps[0]; txt=unent(kr[2]); } else txt=unent(body);
+    out.push({start:+m[1]/1000,text:txt});
+  }
+  const res=[]; for(let i=0;i<out.length;i++){ if(!out[i].text) continue; const nx=out[i+1]?out[i+1].start:out[i].start+4; res.push({start:out[i].start,end:Math.min(nx,out[i].start+8),text:out[i].text}); }
+  return res;
+}
+function parseSRT(t){
+  const res=[]; for(const blk of t.replace(/\r/g,'').split(/\n\s*\n/)){
+    const m=blk.match(/(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)/); if(!m) continue;
+    const a=(+m[1])*3600+(+m[2])*60+(+m[3])+(+m[4])/1000, b=(+m[5])*3600+(+m[6])*60+(+m[7])+(+m[8])/1000;
+    const txt=unent(blk.split('\n').slice(blk.split('\n').findIndex(l=>l.includes('-->'))+1).join(' ')); if(txt) res.push({start:a,end:b,text:txt});
+  } return res;
+}
+function parseTimeStr(v){ v=String(v||'').trim(); if(!v) return 0; const p=v.split(':').map(Number); if(p.some(isNaN)) return 0; return p.reduce((a,x)=>a*60+x,0); }
+async function loadSubFile(file){
+  const txt=decodeText(await file.arrayBuffer());
+  const subs=/<sync/i.test(txt)? parseSMI(txt) : parseSRT(txt);
+  if(!subs.length) throw new Error('자막을 읽지 못했어요. smi나 srt 파일인지 확인해 주세요.');
+  S.subs=subs;
+  $('subNote').textContent=`자막 "${file.name}" 불러옴 (${subs.length}줄). 대사 받아쓰기 대신 이 자막을 써요.`;
+}
+function subsForClip(){
+  if(!S.subs) return null; const off=parseTimeStr($('subOffset').value), d=S.videoDur||1e9;
+  return S.subs.map(x=>({start:x.start-off,end:x.end-off,text:x.text})).filter(x=>x.end>0&&x.start<d).map(x=>({...x,start:Math.max(0,x.start)}));
+}
+$('subFile').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return; try{ await loadSubFile(f); }catch(err){ $('subNote').textContent=err.message; } });
 
 /* ================= 구글 드라이브 ================= */
 const G_DEFAULT={clientId:'652397697845-6m7egqnuu058l36kehov1q47kpvoimt4.apps.googleusercontent.com', apiKey:'AIzaSyC6bYbguRn_r9_tz1iJN96-P_TzgxqLcgE'};
@@ -423,13 +473,13 @@ function gGetToken(){ return new Promise((res,rej)=>{
     error_callback:()=>rej(new Error('구글 로그인 창이 닫혔어요. 브라우저의 팝업 차단을 풀고 다시 눌러 주세요.'))});
   tc.requestAccessToken();
 }); }
-function gPick(token){ return new Promise(res=>{
+function gPick(token,kind='video'){ return new Promise(res=>{
   const c=gCfg(), appId=c.clientId.split('-')[0];
-  const VM='video/mp4,video/x-matroska,video/quicktime,video/webm,video/x-msvideo,video/x-m4v,video/mpeg';
-  const folders=new google.picker.DocsView(google.picker.ViewId.DOCS).setParent('root').setIncludeFolders(true).setSelectFolderEnabled(false).setMimeTypes(VM).setMode(google.picker.DocsViewMode.LIST).setLabel('내 드라이브 (폴더)');
+  const folders=new google.picker.DocsView(google.picker.ViewId.DOCS).setParent('root').setIncludeFolders(true).setSelectFolderEnabled(false).setMode(google.picker.DocsViewMode.LIST).setLabel('내 드라이브 (폴더)');
   const vids=new google.picker.DocsView(google.picker.ViewId.DOCS_VIDEOS).setMode(google.picker.DocsViewMode.LIST).setLabel('모든 동영상');
   const recent=new google.picker.DocsView(google.picker.ViewId.RECENTLY_PICKED).setLabel('최근 고른 파일');
-  new google.picker.PickerBuilder().addView(folders).addView(vids).addView(recent).setSize(1051,650).enableFeature(google.picker.Feature.SUPPORT_DRIVES).setOAuthToken(token).setDeveloperKey(c.apiKey).setAppId(appId).setLocale('ko').setTitle('쇼츠로 만들 영상 고르기')
+  const pb=new google.picker.PickerBuilder().addView(folders); if(kind==='video') pb.addView(vids); pb.addView(recent);
+  pb.setTitle(kind==='video'?'쇼츠로 만들 영상 고르기':'자막 파일(smi·srt) 고르기').setSize(1051,650).enableFeature(google.picker.Feature.SUPPORT_DRIVES).setOAuthToken(token).setDeveloperKey(c.apiKey).setAppId(appId).setLocale('ko')
     .setCallback(d=>{ if(d.action===google.picker.Action.PICKED){ const f=d.docs[0]; res({id:f.id,name:f.name,size:+f.sizeBytes||0,mime:f.mimeType}); } else if(d.action===google.picker.Action.CANCEL) res(null); })
     .build().setVisible(true);
 }); }
@@ -448,12 +498,20 @@ $('driveBtn').addEventListener('click',async()=>{
     setStatus('anaStatus','③ 드라이브 파일 목록을 여는 중… 위쪽 탭에서 "모든 파일"도 확인해 보세요.'); const f=await gPick(tok);
     if(!f) setStatus('anaStatus','파일 고르기를 취소했어요.');
     if(f){
-      setStatus('anaStatus',`④ "${f.name}" 받는 중…`);
+      if(looksBad(f.name)) throw new Error(`"${f.name}"\n${BAD_FMT_MSG}`);
       if(f.size>1.5*1024**3) throw new Error('영상이 1.5GB보다 커요. 핵심 장면만 잘라서 올려 주세요.');
+      setStatus('anaStatus',`④ "${f.name}" 받는 중…`);
       const file=await gDownload(f,tok,(g,t)=>{ setStatus('anaStatus',`구글 드라이브에서 받는 중… ${(g/1048576).toFixed(0)}${t?' / '+(t/1048576).toFixed(0):''}MB`); $('anaBar').style.width=(t?g/t*100:0)+'%'; });
       $('anaBar').style.width='0%'; await loadVideoFile(file);
     }
   }catch(e){ setStatus('anaStatus',e.message,true); }
+  b.disabled=false;
+});
+$('driveSubBtn').addEventListener('click',async()=>{
+  const b=$('driveSubBtn'); b.disabled=true;
+  try{ await gInit(); const tok=await gGetToken(); const f=await gPick(tok,'sub');
+    if(f){ if(f.size>20*1048576) throw new Error('자막 파일이 너무 커요.'); $('subNote').textContent='자막 받는 중…'; await loadSubFile(await gDownload(f,tok,()=>{})); } }
+  catch(e){ $('subNote').textContent=e.message; }
   b.disabled=false;
 });
 $('work').addEventListener('input',()=>{ S.work=$('work').value; redrawPreview(); });
@@ -600,8 +658,11 @@ $('analyzeBtn').addEventListener('click', async ()=>{
   try{
     setStatus('anaStatus','장면 캡처 중…'); bar(0.02);
     const sheets=await captureSheets((i,n)=>{ bar(0.02+0.38*i/n); setStatus('anaStatus',`장면 캡처 중… ${i}/${n}`); });
-    let transcript=[], sttNote='';
-    if($('stt').checked && key('openaiKey')){
+    let transcript=[], sttNote='', txLabel='원본 대사 받아쓰기';
+    const clipSubs=subsForClip();
+    if(clipSubs && clipSubs.length){ transcript=clipSubs; txLabel='원본 대사 한국어 자막 (이미 번역됨. dialogue의 subtitle은 이 문장을 그대로 쓰고 문장부호만 뺄 것)'; }
+    else if(clipSubs){ sttNote='(자막 시간이 영상과 안 맞아요. 시작 시간 칸을 확인해 주세요)'; }
+    if(!transcript.length && $('stt').checked && key('openaiKey')){
       try{
         setStatus('anaStatus','원본 소리를 뽑는 중… (영상 길이에 따라 10~40초)'); bar(0.42);
         const wav=await extractWav(S.file);
@@ -615,7 +676,7 @@ $('analyzeBtn').addEventListener('click', async ()=>{
 작품명: ${$('work').value||'(모름)'}
 사용자 메모: ${$('memo').value||'(없음)'}
 장면 캡처 시트: 위 이미지 ${sheets.length}장 (각 칸 노란 숫자 = 초)
-원본 대사 받아쓰기:
+${txLabel}:
 ${tx||'(없음)'}
 
 지침서대로 JSON을 만들어 줘.`;
@@ -777,12 +838,29 @@ function drawDialogue(txt,speaker,b){
   g.fillStyle=SPEAKER[speaker]||'#fff'; g.textAlign='center'; g.textBaseline='alphabetic';
   lines.forEach((ln,k)=>g.fillText(ln,W/2,by+14+size+k*lh-4));
 }
+const bgC=document.createElement('canvas'); bgC.width=54; bgC.height=96; const bgX=bgC.getContext('2d');
+function drawBg(vid){
+  g.fillStyle='#000'; g.fillRect(0,0,W,H);
+  if($('bgStyle').value!=='blur' || !vid || !vid.videoWidth) return;
+  const vw=vid.videoWidth, vh=vid.videoHeight, s=Math.max(54/vw,96/vh);
+  bgX.filter='blur(2px)'; bgX.drawImage(vid,(54-vw*s)/2,(96-vh*s)/2,vw*s,vh*s);
+  g.save(); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.drawImage(bgC,-20,-20,W+40,H+40); g.restore();
+  g.fillStyle='rgba(0,0,0,.55)'; g.fillRect(0,0,W,H);
+}
+function drawBrand(b){
+  if($('accentBar').checked){ g.fillStyle=YELLOW; g.fillRect(0,b.y-8,W,8); g.fillRect(0,b.y+b.h,W,8); }
+  const name=$('channelName').value.trim(); if(!name) return;
+  g.font='700 24px "Noto Sans KR",sans-serif'; const tw=g.measureText(name).width, pw=tw+32, ph=40, px=W-pw-16, py=b.y+14;
+  g.fillStyle='rgba(0,0,0,.72)'; g.beginPath(); g.roundRect? g.roundRect(px,py,pw,ph,20) : g.rect(px,py,pw,ph); g.fill();
+  g.fillStyle=YELLOW; g.textAlign='center'; g.textBaseline='middle'; g.fillText(name,px+pw/2,py+ph/2+1); g.textBaseline='alphabetic';
+}
 function drawComposite(i, vid, zoom=1){
   const b=band();
-  g.fillStyle='#000'; g.fillRect(0,0,W,H);
+  drawBg(vid);
   g.save(); g.beginPath(); g.rect(b.x,b.y,b.w,b.h); g.clip();
   if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
   g.restore();
+  drawBrand(b);
   drawTitleLine(S.title1||'', 150, '#ffffff');
   drawTitleLine(S.title2||'', 236, YELLOW);
   const sc=S.scenes[i];
