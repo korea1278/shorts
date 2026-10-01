@@ -168,6 +168,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
           <label for="subFile" style="margin:0"><span style="display:inline-block;border:1px solid var(--line);border-radius:7px;padding:9px 14px;color:var(--fg);background:var(--panel2);cursor:pointer;font-size:14px">내 PC에서 자막 (smi·srt)</span></label>
           <input id="subFile" type="file" accept=".smi,.sami,.srt,.txt" hidden>
           <button type="button" id="driveSubBtn">드라이브에서 자막 가져오기</button>
+          <button type="button" id="saveSrtBtn" hidden>대사 자막 파일(srt)로 저장</button>
           <span class="note" id="subNote" style="margin:0">한국어 자막이 있으면 대사 받아쓰기 대신 써요 (무료, 더 정확)</span>
         </div>
         <div class="cols">
@@ -493,7 +494,9 @@ async function loadSubFile(file){
   const txt=decodeText(await file.arrayBuffer());
   const subs=/<sync/i.test(txt)? parseSMI(txt) : parseSRT(txt);
   if(!subs.length) throw new Error('자막을 읽지 못했어요. smi나 srt 파일인지 확인해 주세요.');
-  S.subs=subs; S.subsOrig=false;
+  S.subs=subs;
+  const all=subs.map(x=>x.text).join(''), hg=(all.match(/[\uac00-\ud7a3]/g)||[]).length; S.subsOrig = hg < all.replace(/\s/g,'').length*0.3;
+  showSaveSrt(false);
   $('subNote').textContent=`자막 "${file.name}" 불러옴 (${subs.length}줄). 대사 받아쓰기 대신 이 자막을 써요.`;
   if(!$('cutBox').hidden && S.srcPath){ $('aiPickBtn').disabled=false; $('aiPickNote').textContent='자막이 준비됐어요. AI가 구간을 고를 수 있어요.'; }
 }
@@ -502,6 +505,21 @@ function subsForClip(){
   return S.subs.map(x=>({start:x.start-off,end:x.end-off,text:x.text})).filter(x=>x.end>0&&x.start<d).map(x=>({...x,start:Math.max(0,x.start)}));
 }
 $('subFile').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return; try{ await loadSubFile(f); }catch(err){ $('subNote').textContent=err.message; } });
+
+/* ================= 받아쓴 대사를 srt로 저장 ================= */
+function showSaveSrt(highlight){ const b=$('saveSrtBtn'); b.hidden=!S.subs; b.classList.toggle('primary',!!highlight); }
+function toSRT(subs){
+  const ts=t=>{ t=Math.max(0,t); const h=Math.floor(t/3600), m=Math.floor(t%3600/60), s=Math.floor(t%60), ms=Math.round((t-Math.floor(t))*1000)%1000; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')},${String(ms).padStart(3,'0')}`; };
+  return subs.map((x,i)=>`${i+1}\n${ts(x.start)} --> ${ts(Math.max(x.end,x.start+0.5))}\n${x.text}\n`).join('\n');
+}
+$('saveSrtBtn').addEventListener('click',()=>{
+  if(!S.subs) return;
+  const base=(S.source||S.file) ? (S.source||S.file).name.replace(/\.[^.]+$/,'').replace(/_\d{5,6}$/,'') : 'movie';
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['\ufeff'+toSRT(S.subs)],{type:'application/x-subrip;charset=utf-8'}));
+  a.download=base+'.srt'; a.click();
+  $('subNote').textContent=`"${base}.srt"로 저장했어요. 영화와 같은 폴더(드라이브)에 넣어 두면, 다음에 "자막" 버튼으로 불러와 무료로 쓸 수 있어요.`;
+  $('saveSrtBtn').classList.remove('primary');
+});
 
 /* ================= 원래 박힌 자막 가리기 ================= */
 $('hsCut').addEventListener('input',()=>{ $('hsCutVal').textContent=$('hsCut').value; redrawPreview(); });
@@ -593,7 +611,7 @@ async function openCutter(file){
       const pick=ts.find(x=>/kor|ko/i.test(x.lang))||null;
       if(pick){ say(info+'\n영화 안에 든 한국어 자막을 꺼내는 중…'); FFLOG=[];
         try{ await FF.exec(['-i',S.srcPath,'-map','0:'+pick.idx,'-f','srt','/sub.srt']); const d=await FF.readFile('/sub.srt'); await FF.deleteFile('/sub.srt');
-          const subs=parseSRT(decodeText(d)); if(subs.length){ S.subs=subs; $('subNote').textContent=`영화 안에 든 한국어 자막을 꺼냈어요 (${subs.length}줄).`; } }catch(e){}
+          const subs=parseSRT(decodeText(d)); if(subs.length){ S.subs=subs; S.subsOrig=false; showSaveSrt(false); $('subNote').textContent=`영화 안에 든 한국어 자막을 꺼냈어요 (${subs.length}줄).`; } }catch(e){}
       }
     }
     const won=Math.max(100,Math.round(pr.dur/60*0.006*1450/100)*100);
@@ -617,7 +635,8 @@ async function transcribeFull(say){
   const segs=await transcribe(new Blob([d],{type:'audio/mpeg'}),'audio.mp3');
   if(!segs.length) throw new Error('대사를 받아쓰지 못했어요.');
   S.subs=segs; S.subsOrig=true;
-  $('subNote').textContent=`영화 전체 대사를 받아썼어요 (${segs.length}줄, 원래 언어). 대본 만들 때도 이걸 써요.`;
+  $('subNote').textContent=`영화 전체 대사를 받아썼어요 (${segs.length}줄, 원래 언어). 대본 만들 때도 이걸 써요. 옆 버튼으로 저장해 두면 다음엔 무료예요.`;
+  showSaveSrt(true);
 }
 $('aiPickBtn').addEventListener('click',async()=>{
   let provider=$('provider').value; if(provider==='claude'&&!key('anthropicKey')) provider='openai';
