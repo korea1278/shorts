@@ -202,6 +202,8 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
           <label for="hsCut" style="margin-top:0">영상에 원래 자막이 박혀 있으면: 아래쪽 <b id="hsCutVal">0</b>% 잘라서 가리기</label>
           <input id="hsCut" type="range" min="0" max="30" step="1" value="0" style="width:100%">
           <div class="row" style="margin-top:6px"><button type="button" class="small" id="hsAuto">자막 위치 자동으로 찾기</button><span class="note" id="hsNote" style="margin:0">영상을 불러온 뒤 누르세요. 오른쪽 미리보기에서 원래 자막이 안 보이는지 확인하세요.</span></div>
+          <label for="subPos">내 자막 위치·모양</label>
+          <select id="subPos"><option value="below">영상 아래 (장면을 안 가리고 잘 읽힘, 추천)</option><option value="box">영상 안 + 반투명 검은 띠</option><option value="inside">영상 안 + 그림자 (레퍼런스 방식)</option></select>
         </div>
         <label for="memo">메모 (선택): 줄거리, 등장인물 이름, 강조하고 싶은 장면</label>
         <textarea id="memo" rows="3" placeholder="예) 여주 릴리가 노숙하는 남학생 아틀라스를 몰래 도와주는 이야기. 폐건물에 사는 걸 알게 되는 장면을 강조"></textarea>
@@ -411,7 +413,7 @@ function setupEngineUI(sample){
 const useST=()=>$('engine').value==='supertonic';
 
 /* ================= 설정 ================= */
-const SET_IDS=['bgStyle','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
+const SET_IDS=['subPos','bgStyle','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
 function loadSettings(){
   try{
     const s=JSON.parse(localStorage.getItem('mrm_settings')||'{}');
@@ -432,7 +434,7 @@ function saveSettings(){
 }
 document.addEventListener('change',e=>{ if(e.target.closest('section.card') && e.target.type!=='file') saveSettings(); });
 ['speed','duckVol','dlgVol','bgmVol'].forEach(id=>$(id).addEventListener('input',()=>{ syncVal(id); if(id==='speed') { refreshStats(); buildGuide(); } }));
-['bandMode','bgStyle','accentBar'].forEach(id=>$(id).addEventListener('change',()=>redrawPreview())); 
+['subPos','bandMode','bgStyle','accentBar'].forEach(id=>$(id).addEventListener('change',()=>redrawPreview())); 
 $('bgm').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f){bgmBuf=null;return;}
   try{ bgmBuf=await getCtx().decodeAudioData(await f.arrayBuffer()); }catch(err){ bgmBuf=null; setStatus('renderStatus','배경음악 파일을 읽지 못했어요.',true); } });
 
@@ -1152,18 +1154,31 @@ function drawTitleLine(txt,y,color){
   g.font=TFONT(size); g.textAlign='center'; g.textBaseline='alphabetic'; g.lineJoin='round';
   g.lineWidth=size*0.14; g.strokeStyle='#000'; g.strokeText(txt,0,0); g.fillStyle=color; g.fillText(txt,0,0); g.restore();
 }
+/* 두 줄일 때 양쪽 길이가 비슷하게 나눔 */
+function wrap2(font,txt,max,size){
+  g.font=font(size); if(g.measureText(txt).width<=max) return [txt];
+  const sp=txt.includes(' '), u=sp?txt.split(' '):[...txt], sep=sp?' ':'';
+  let best=null, bw=1e9;
+  for(let i=1;i<u.length;i++){ const a=u.slice(0,i).join(sep), c=u.slice(i).join(sep); const w=Math.max(g.measureText(a).width,g.measureText(c).width); if(w<bw){ bw=w; best=[a,c]; } }
+  return best||[txt];
+}
+function subLayout(b,n=2,lh=53){ const pos=$('subPos').value; return pos==='below'? {pos, bottom:b.y+b.h+66+(n-1)*lh, max:660} : {pos, bottom:b.y+b.h-30, max:620}; }
 function drawSub(txt,b){
-  const size=40, lines=wrap(SFONT,txt,640,size).slice(0,2); const lh=52; const baseY=b.y+b.h-34;
+  let L=subLayout(b); let size=40; let lines=wrap2(SFONT,txt,L.max,size);
+  while(lines.length>1 && size>30 && lines.some(l=>{ g.font=SFONT(size); return g.measureText(l).width>L.max; })) size-=2;
+  lines=lines.slice(0,2); const lh=size*1.32; L=subLayout(b,lines.length,lh);
   g.textAlign='center'; g.textBaseline='alphabetic'; g.lineJoin='round';
-  lines.forEach((ln,k)=>{ const y=baseY-(lines.length-1-k)*lh; const s=fit(SFONT,ln,660,size);
-    g.save(); g.shadowColor='rgba(0,0,0,.85)'; g.shadowBlur=10; g.shadowOffsetY=2;
-    g.lineWidth=s*0.16; g.strokeStyle='rgba(0,0,0,.9)'; g.strokeText(ln,W/2,y); g.restore();
+  if(L.pos==='box'){ g.font=SFONT(size); const bw=Math.min(700,Math.max(...lines.map(l=>g.measureText(l).width))+44), bh=lines.length*lh+22;
+    g.fillStyle='rgba(0,0,0,.62)'; g.beginPath(); g.roundRect? g.roundRect((W-bw)/2,L.bottom-bh+14,bw,bh,10) : g.rect((W-bw)/2,L.bottom-bh+14,bw,bh); g.fill(); }
+  lines.forEach((ln,k)=>{ const y=L.bottom-(lines.length-1-k)*lh; const s=fit(SFONT,ln,L.max+30,size);
+    g.save(); if(L.pos!=='box'){ g.shadowColor='rgba(0,0,0,.85)'; g.shadowBlur=10; g.shadowOffsetY=2; }
+    g.lineWidth=s*(L.pos==='box'?0.08:0.16); g.strokeStyle='rgba(0,0,0,.9)'; g.strokeText(ln,W/2,y); g.restore();
     g.fillStyle='#fff'; g.fillText(ln,W/2,y); });
 }
 function drawDialogue(txt,speaker,b){
-  const size=38, lines=wrap(SFONT,txt,600,size).slice(0,2), lh=50; g.font=SFONT(size);
+  const size=38, lines=wrap2(SFONT,txt,600,size).slice(0,2), lh=50; g.font=SFONT(size); const L=subLayout(b,lines.length,lh);
   const bw=Math.min(680,Math.max(...lines.map(l=>g.measureText(l).width))+40), bh=lines.length*lh+18;
-  const bx=(W-bw)/2, by=b.y+b.h-34-bh+16;
+  const bx=(W-bw)/2, by= L.pos==='below'? b.y+b.h+24 : L.bottom-bh+16;
   g.fillStyle='rgba(10,12,16,.72)'; g.beginPath(); g.roundRect? g.roundRect(bx,by,bw,bh,10) : g.rect(bx,by,bw,bh); g.fill();
   g.fillStyle=SPEAKER[speaker]||'#fff'; g.textAlign='center'; g.textBaseline='alphabetic';
   lines.forEach((ln,k)=>g.fillText(ln,W/2,by+14+size+k*lh-4));
@@ -1195,7 +1210,7 @@ function drawComposite(i, vid, zoom=1){
   drawTitleLine(S.title2||'', 236, ACC());
   const sc=S.scenes[i];
   if(sc && sc.text){ sc.type==='dialogue' ? drawDialogue(sc.text,sc.speaker,b) : drawSub(sc.text,b); }
-  const work=S.work||$('work').value; if(work){ g.font='700 25px "Noto Sans KR",sans-serif'; g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+46); }
+  const work=S.work||$('work').value; if(work){ g.font='700 25px "Noto Sans KR",sans-serif'; g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+($('subPos').value==='below'?172:46)); }
 }
 
 /* ================= 재생 · 녹화 ================= */
