@@ -996,7 +996,8 @@ const CLIP_RULES = (lang) => `너는 유튜브 영화 쇼츠 채널 '명화관' 
 2) 소개 나레이션 1~2개: 주인공이 누구이고 어떤 상황인지 한 문장씩. 예: "얼어붙은 호수 위에서 장난을 치던 세 소년"
 3) 본편 기승전결 (시간 순서): clip 2~3개마다 나레이션 1개를 넣어 다음 장면으로 이어 준다.
  - 기: 인물과 일상 / 승: 갈등이 커짐 / 전: 사고·위기·반전 / 결: 감정이 가장 터지는 원본 대사 장면으로 끝낸다. 마지막은 나레이션이 아니라 원본 대사다.
- - clip 하나는 3~10초. 대사가 이어지는 부분만 고르고, 대사 없이 조용한 구간(2초 이상)은 넣지 않는다. src_start는 첫 대사 0.2초 전, src_end는 마지막 대사 끝 0.4초 뒤.
+ - clip 하나는 3~10초. 대사가 이어지는 부분만 고르고, 대사 없이 조용한 구간(2초 이상)은 넣지 않는다. src_start는 첫 대사 0.2초 전, src_end는 마지막 대사 끝 0.4초 뒤. 다만 인물이 하던 동작(물건을 꺼내기, 넘어지기 등)이 이어지면 그 동작이 끝날 때까지(최대 1.5초 더) 늘린다.
+ - clip들은 원본 시간 순서대로, 서로 겹치지 않게 고른다. 같은 장면을 두 번 쓰지 않는다.
  - lines: 그 clip 안의 대사를 빠짐없이, 대사 자료의 시간 그대로 start/end(초)로 적는다. text는 짧고 자연스러운 ${lang==='ja'?'일본어':'한국어'} 자막(한 줄, 문장부호 최소). speaker는 말하는 등장인물 이름(알면 이름, 모르면 '엄마', '친구1', '구조대원'처럼 역할). 같은 인물은 끝까지 같은 이름, 한국어로.
 4) 이 영상 구간 밖의 사건(이후 전개, 결말)은 절대 말하지 않는다. 구독·좋아요·다음 편 유도, "여러분은 어떻게 생각하세요" 같은 마무리 멘트는 절대 넣지 않는다.
 
@@ -1004,7 +1005,10 @@ const CLIP_RULES = (lang) => `너는 유튜브 영화 쇼츠 채널 '명화관' 
 - 한 나레이션 = 자연스러운 한 문장, ${lang==='ja'?'12~30자':'공백 포함 12~30자'}, 말하는 시간 2~5초. 화면 자막은 프로그램이 2~3어절씩 끊어서 보여 주니 문장을 억지로 줄이지 않는다.
 ${lang==='ja'?'- 일본 나레이터의 담담한 말투(〜でした / 〜のです / 〜始めます). 문장부호 없이.':'- 담담한 이야기체(~합니다, ~했습니다, ~였죠, ~는데). 문장부호 없이.'}
 - 나레이션 개수는 목표 길이 1분 30초 기준 6~10개, 나레이션 합계는 전체의 30% 이하.
-- 각 나레이션의 src_start는 그 말과 맞는 장면, 인물이 움직이는 장면의 시간(캡처 시트 기준). 앞뒤 clip과 같은 장면을 반복하지 않는다.
+- 나레이션이 나오는 동안 화면에는 '바로 앞 clip이 끝난 지점부터 다음 clip이 시작하기 전까지'의 원본이 그대로 이어서 나온다. 그러니 나레이션 내용은 반드시 그 사이(건너뛴 부분)에 화면에서 일어나는 일이나, 다음 clip으로 넘어가는 상황을 말해야 한다. 그 사이 화면과 상관없는 말(예: 아저씨가 전화하는 화면에 '친구들의 외침')은 금지.
+- 그래서 나레이션을 넣을 곳은 앞 clip과 다음 clip 사이에 3초 이상 원본이 비어 있게 clip을 고른다.
+- 맨 마지막은 반드시 clip(원본 대사)으로 끝낸다. 마지막 나레이션 금지.
+- src_start에는 그 사이 구간의 시작 시간을 적는다.
 
 # 화면 위치 (focus)
 - 화면은 정사각형으로 잘린다. 모든 장면(clip, narration)에 focus를 넣는다: 그 장면에서 말하는 인물/주인공이 원본 화면의 어디에 있는지 "left" / "center" / "right".
@@ -1034,10 +1038,35 @@ function dedupeFootage(d){
     if(b-a<1.5) return false;
     if(a!==sc.src_start||b!==sc.src_end){ sc.src_start=a; sc.src_end=b; sc.lines=(sc.lines||[]).filter(l=>l.start>=a-0.1&&l.end<=b+0.3); sc.text=sc.lines.map(l=>l.text).join(' / ')||sc.text; }
     used.push([a,b]); return true; });
-  S.scenes.forEach(sc=>{ if(sc.type!=='narration') return; const len=est(sc.text)*1.25+0.8;
-    if(!ov(sc.src_start,sc.src_start+len)){ used.push([sc.src_start,sc.src_start+len]); return; }
-    for(let k=1;k<=20;k++){ for(const sg of [-1,1]){ const t=sc.src_start+sg*k*1.5; if(t<0||t+len>d) continue; if(!ov(t,t+len)){ sc.src_start=+t.toFixed(1); used.push([t,t+len]); return; } } }
-    used.push([sc.src_start,sc.src_start+len]); });
+  assignNarrFootage();
+}
+/* 나레이션 화면 = 앞 장면과 다음 장면 '사이'의 원본 (영화 순서 그대로 이어져요).
+   앞 장면이 끝난 곳부터 이어서 보여 줘서 동작이 중간에 끊기지 않고, 다음 장면과 겹치지 않아요. */
+const narrLen = sc => (sc.audioDur? sc.audioDur/rateOf(sc) : est(sc.text)/(+$('speed').value||1)) + 0.06;
+function assignNarrFootage(){
+  const L=S.scenes, d=S.videoDur||1e9; if(!L.length) return;
+  // 영상의 끝은 나레이션이 아니라 원본 대사로
+  if(L.some(x=>x.type==='clip')) while(L[L.length-1].type==='narration'){ const n=L.pop(); let k=L.length-1; while(k>0&&L[k].type!=='clip') k--; L.splice(k,0,n); }
+  let cur=null;
+  L.forEach((sc,i)=>{
+    if(sc.type!=='narration'){ cur=sc.src_end; return; }
+    if(sc.aiSrc==null) sc.aiSrc=sc.src_start;
+    const len=narrLen(sc); let nx=null; for(let k=i+1;k<L.length;k++){ if(L[k].type!=='narration'){ nx=L[k]; break; } }
+    const nextStart=nx? nx.src_start : d;
+    if(sc.manual){ sc.vrate=1; cur=sc.src_start+len; return; }
+    if(cur==null){ sc.src_start=Math.max(0,+(nextStart-len).toFixed(2)); sc.vrate=1; }
+    else { const gap=nextStart-cur;
+      if(gap>=len){ sc.src_start=+cur.toFixed(2); sc.vrate=1; }
+      else if(gap>=len*0.6){ sc.src_start=+cur.toFixed(2); sc.vrate=Math.max(0.6,gap/len); }
+      else if(gap>-0.5 && nx && nx.type==='clip' && (!nx.lines||!nx.lines.length||nx.lines[0].start>=cur+len-0.2)){
+        // 사이가 너무 짧으면 앞 장면에서 이어서 보여 주고, 다음 장면의 대사 전 부분을 그만큼 잘라요
+        sc.src_start=+cur.toFixed(2); sc.vrate=1; nx.src_start=Math.min(nx.src_end-1,+(cur+len).toFixed(2)); }
+      else { // 순서가 안 맞으면 다른 장면과 겹치지 않는 곳에서 AI가 고른 화면을 써요
+        const clips=L.filter(x=>x.type==='clip').map(x=>[x.src_start,x.src_end]); const free=t=>t>=0&&t+len<=d&&!clips.some(u=>t<u[1]-0.1&&t+len>u[0]+0.1);
+        let t=sc.aiSrc; if(!free(t)){ for(let k=1;k<=30;k++){ if(free(sc.aiSrc-k)){ t=sc.aiSrc-k; break; } if(free(sc.aiSrc+k)){ t=sc.aiSrc+k; break; } } }
+        sc.src_start=+t.toFixed(2); sc.vrate=1; } }
+    cur=sc.src_start+len*(sc.vrate||1);
+  });
 }
 function normalize(o){
   S.titles=(o.titles||[]).map(t=>String(t).replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,10);
@@ -1285,7 +1314,7 @@ function renderScenes(){
     tcv.addEventListener('click',()=>showScene(i));
     d.querySelector('.tx').addEventListener('change',e=>{ sc.text=clean(e.target.value); e.target.value=sc.text; if(!isD){ sc.audio=null; sc.audioDur=0; sc.audioEl=null; sc.srcNode=null; sc.rate=0; } renderStat(i); buildGuide(); showScene(i); });
     d.querySelector('.tx').addEventListener('focus',()=>showScene(i));
-    const setStart=v=>{ const len=isD? sc.src_end-sc.src_start : 0; sc.src_start=Math.max(0,Math.min(+v||0,S.videoDur-0.3)); if(isD){ sc.src_end=Math.min(S.videoDur,sc.src_start+len); d.querySelector('.en').value=sc.src_end.toFixed(1); } d.querySelector('.st').value=sc.src_start.toFixed(1); queueThumb(tcv,sc.src_start); buildGuide(); showScene(i); };
+    const setStart=v=>{ const len=isD? sc.src_end-sc.src_start : 0; if(!isD) sc.manual=true; sc.src_start=Math.max(0,Math.min(+v||0,S.videoDur-0.3)); if(isD){ sc.src_end=Math.min(S.videoDur,sc.src_start+len); d.querySelector('.en').value=sc.src_end.toFixed(1); } d.querySelector('.st').value=sc.src_start.toFixed(1); queueThumb(tcv,sc.src_start); buildGuide(); showScene(i); };
     d.querySelector('.st').addEventListener('change',e=>setStart(e.target.value));
     d.querySelectorAll('.mv').forEach(b=>b.addEventListener('click',()=>setStart(sc.src_start+(+b.dataset.d))));
     if(isD){
@@ -1380,7 +1409,7 @@ async function autoFocusRun(say){
   let n=0;
   for(let i=0;i<S.scenes.length;i++){ const sc=S.scenes[i];
     say&&say(`인물 위치 찾는 중… ${i+1}/${S.scenes.length}`);
-    const a=sc.src_start, z=(sc.type==='clip'||sc.type==='dialogue')? sc.src_end : sc.src_start+Math.max(2.5,(sc.audioDur||est(sc.text))+0.5);
+    const a=sc.src_start, z=(sc.type==='clip'||sc.type==='dialogue')? sc.src_end : sc.src_start+Math.max(1.5,narrLen(sc)*(sc.vrate||1));
     // 1) 장면 안에서 카메라가 바뀌는 곳(컷)을 찾아요
     // 사람이 움직이거나 카메라가 천천히 도는 건 컷이 아니에요: 픽셀 차이와 색 분포 차이가 둘 다 커야 컷으로 봐요
     const isCut=(p,d)=>{ let df=0; const h1=new Float32Array(64), h2=new Float32Array(64);
@@ -1446,7 +1475,7 @@ $('ttsBtn').addEventListener('click', async ()=>{
       s.audio=blob; s.audioDur=buf.duration; s.audioEl=new Audio(URL.createObjectURL(blob)); s.audioEl.preload='auto'; s.srcNode=null; s.aState=''; }
     catch(e){ s.aState='실패'; fails++; last=e.message; }
     done++; renderStat(i); prog(); });
-  busy=false; updateButtons(); buildGuide();
+  assignNarrFootage(); renderScenes(); busy=false; updateButtons(); buildGuide();
   setStatus('ttsStatus', fails? `${fails}개 실패했어요. 다시 누르면 실패한 것만 다시 만들어요.\n${last}` : '목소리 준비 완료. 미리보기로 확인하고 영상 파일을 만드세요.', !!fails);
 });
 
@@ -1457,7 +1486,7 @@ function buildTL(only){
     if(only && !only.includes(i)) return;
     let d = (sc.type==='dialogue'||sc.type==='clip') ? Math.max(0.8, sc.src_end-sc.src_start) : (sc.audioDur? sc.audioDur/rateOf(sc) : est(sc.text)/sp) + 0.06;
     let src=sc.src_start; if(src+d>vd-0.05) src=Math.max(0,vd-0.05-d);
-    tl.push({i,start:t,end:t+d,src,type:sc.type}); t+=d;
+    tl.push({i,start:t,end:t+d,src,type:sc.type,rate:sc.type==='narration'?(sc.vrate||1):1}); t+=d;
   });
   return {tl,total:t+0.35};
 }
@@ -1571,7 +1600,7 @@ async function run(record,only){
   if(!VA){ VA=mkVideo(); VB=mkVideo(); gA=c.createGain(); gB=c.createGain(); c.createMediaElementSource(VA).connect(gA); c.createMediaElementSource(VB).connect(gB); }
   if(VA.src!==S.url){ VA.src=S.url; VB.src=S.url; }
   await Promise.all([VA,VB].map(v=>v.readyState>=1?0:new Promise(r=>{ v.onloadedmetadata=r; setTimeout(r,5000); })));
-  const TL=buildTL(only), sp=+$('speed').value, duck=(+$('duckVol').value)/100, dlg=(+$('dlgVol').value)/100;
+  assignNarrFootage(); const TL=buildTL(only), sp=+$('speed').value, duck=(+$('duckVol').value)/100, dlg=(+$('dlgVol').value)/100;
   const master=c.createGain(); const mon=c.createGain(); mon.gain.value=(record&&!$('monitor').checked)?0:1; master.connect(mon); mon.connect(c.destination);
   [gA,gB].forEach(gn=>{ try{gn.disconnect();}catch(e){} gn.gain.value=0; gn.connect(master); });
   let rec=null, chunks=[], mime='';
@@ -1599,14 +1628,14 @@ async function run(record,only){
       if(k!==cur && t>=0){
         const seg=TL.tl[k], el=els[k%2], gn=gains[k%2], other=els[(k+1)%2], og=gains[(k+1)%2], now=c.currentTime;
         og.gain.cancelScheduledValues(now); og.gain.setTargetAtTime(0,now,0.01); other.pause();
-        if(Math.abs(el.currentTime-seg.src)>0.35) el.currentTime=seg.src;
+        if(Math.abs(el.currentTime-seg.src)>0.35) el.currentTime=seg.src; el.playbackRate=seg.rate||1;
         gn.gain.cancelScheduledValues(now); gn.gain.setTargetAtTime((seg.type==='dialogue'||seg.type==='clip')?dlg:duck, now, 0.02);
         el.play().catch(()=>{});
         const sc=S.scenes[seg.i]; if(sc.audioEl){ sc.audioEl.currentTime=0; sc.audioEl.play().catch(()=>{}); }
         const nx=TL.tl[k+1]; if(nx) setTimeout(()=>{ other.pause(); other.currentTime=nx.src; },40);
         cur=k;
       }
-      if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], seg.type==='clip'?1:(JA()? 1.045-0.04*p : 1+0.035*p), seg.src+(t-seg.start), p); }
+      if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], seg.type==='clip'?1:(JA()? 1.045-0.04*p : 1+0.035*p), seg.src+(t-seg.start)*(seg.rate||1), p); }
       else drawComposite(0, VA);
       $('renderBar').style.width=Math.min(100,Math.max(0,t)/TL.total*100)+'%';
       if(t>=TL.total||stopFlag) res(); else requestAnimationFrame(tick);
