@@ -176,7 +176,8 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
         <div id="cutBox" class="cutbox" hidden>
           <h3>전체 영화에서 구간 자르기</h3>
           <p class="note" id="cutInfo" style="margin-top:0"></p>
-          <div class="row"><button class="primary" type="button" id="aiPickBtn" disabled>AI가 가장 자극적인 구간 고르기</button><span class="note" id="aiPickNote" style="margin:0">자막(smi·srt)이 있어야 AI가 고를 수 있어요.</span></div>
+          <div class="row"><button class="primary" type="button" id="aiPickBtn" disabled>AI가 가장 자극적인 구간 고르기</button><span class="note" id="aiPickNote" style="margin:0">자막이 없으면 영화 전체 대사를 받아써서 골라요.</span></div>
+          <div id="aiCands" class="mini" style="margin-top:8px"></div>
           <div class="cols">
             <div><label for="cutStart">시작 (시:분:초)</label><input id="cutStart" type="text" value="0:00:00"></div>
             <div><label for="cutEnd">끝 (시:분:초)</label><input id="cutEnd" type="text" value="0:10:00"></div>
@@ -492,7 +493,7 @@ async function loadSubFile(file){
   const txt=decodeText(await file.arrayBuffer());
   const subs=/<sync/i.test(txt)? parseSMI(txt) : parseSRT(txt);
   if(!subs.length) throw new Error('자막을 읽지 못했어요. smi나 srt 파일인지 확인해 주세요.');
-  S.subs=subs;
+  S.subs=subs; S.subsOrig=false;
   $('subNote').textContent=`자막 "${file.name}" 불러옴 (${subs.length}줄). 대사 받아쓰기 대신 이 자막을 써요.`;
   if(!$('cutBox').hidden && S.srcPath){ $('aiPickBtn').disabled=false; $('aiPickNote').textContent='자막이 준비됐어요. AI가 구간을 고를 수 있어요.'; }
 }
@@ -595,29 +596,51 @@ async function openCutter(file){
           const subs=parseSRT(decodeText(d)); if(subs.length){ S.subs=subs; $('subNote').textContent=`영화 안에 든 한국어 자막을 꺼냈어요 (${subs.length}줄).`; } }catch(e){}
       }
     }
-    info+= S.subs? '\n자막 있음: AI가 구간을 고를 수 있어요.' : '\n자막 없음: smi 자막을 넣으면 AI가 구간을 골라 줘요. 아니면 시작·끝 시간을 직접 넣으세요.';
+    const won=Math.max(100,Math.round(pr.dur/60*0.006*1450/100)*100);
+    info+= S.subs? '\n자막 있음: AI가 바로 구간을 고를 수 있어요.' : `\n자막 없음: AI 버튼을 누르면 영화 전체 대사를 받아써서 골라요 (1~3분, 약 ${won.toLocaleString()}원). smi 자막이 있으면 먼저 넣는 게 무료예요.`;
+    if(!$('work').value){ const m=file.name.match(/^(.+?)[ ._(\[]+((?:19|20)\d\d)\b/); if(m){ $('work').value=`${m[1].replace(/[._]+/g,' ').trim()} (${m[2]})`; S.work=$('work').value; } }
+    $('aiCands').innerHTML='';
     say(info);
     $('cutEnd').value=hms(Math.min(pr.dur,600)); $('cutStart').value='0:00:00';
-    $('cutBtn').disabled=false; $('aiPickBtn').disabled=!S.subs;
+    $('cutBtn').disabled=false; $('aiPickBtn').disabled=false;
   }catch(e){ say(e.message); }
 }
 $('cutCancel').addEventListener('click',()=>{ $('cutBox').hidden=true; });
+async function transcribeFull(say){
+  if(!key('openaiKey')) throw new Error('자막이 없을 때 대사를 받아쓰려면 OpenAI API 키가 필요해요. 또는 smi 자막을 넣어 주세요.');
+  const dur=S.srcInfo.dur||0, kb=Math.max(8,Math.min(16,Math.floor(23.5e6*8/Math.max(1,dur)/1000)));
+  say('영화 전체 소리를 뽑는 중… 0%'); FFLOG=[];
+  ffOnLog=m=>{ const t=m.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/); if(t&&dur) say(`영화 전체 소리를 뽑는 중… ${Math.min(99,Math.round(((+t[1])*3600+(+t[2])*60+(+t[3]))/dur*100))}%`); };
+  try{ await FF.exec(['-i',S.srcPath,'-vn','-map','0:a:0','-ac','1','-ar','16000','-c:a','libmp3lame','-b:a',kb+'k','/aud.mp3']); } finally { ffOnLog=null; }
+  let d; try{ d=await FF.readFile('/aud.mp3'); await FF.deleteFile('/aud.mp3'); }catch(e){ throw new Error('영화에서 소리를 뽑지 못했어요.'); }
+  say('영화 전체 대사를 받아쓰는 중… (1~3분)');
+  const segs=await transcribe(new Blob([d],{type:'audio/mpeg'}),'audio.mp3');
+  if(!segs.length) throw new Error('대사를 받아쓰지 못했어요.');
+  S.subs=segs; S.subsOrig=true;
+  $('subNote').textContent=`영화 전체 대사를 받아썼어요 (${segs.length}줄, 원래 언어). 대본 만들 때도 이걸 써요.`;
+}
 $('aiPickBtn').addEventListener('click',async()=>{
-  if(!S.subs){ $('aiPickNote').textContent='자막을 먼저 넣어 주세요.'; return; }
   let provider=$('provider').value; if(provider==='claude'&&!key('anthropicKey')) provider='openai';
   if(provider==='openai'&&!key('openaiKey')){ $('aiPickNote').textContent='API 키를 먼저 넣어 주세요.'; return; }
-  const b=$('aiPickBtn'); b.disabled=true; $('aiPickNote').textContent='AI가 영화 전체 자막을 읽고 있어요… (20초~1분)';
+  const b=$('aiPickBtn'), say=m=>{ $('aiPickNote').textContent=m; }; b.disabled=true; $('cutBtn').disabled=true; $('aiCands').innerHTML='';
   try{
+    if(!S.subs) await transcribeFull(say);
+    say('AI가 영화 전체 대사를 읽고 구간을 고르는 중… (20초~1분)');
     let lines=S.subs.map(x=>`${Math.round(x.start)} ${x.text}`).join('\n'); if(lines.length>90000) lines=lines.slice(0,90000);
-    const sys='너는 유튜브 영화 짜깁기 쇼츠 편집자다. 영화 전체 자막(각 줄 앞 숫자 = 초)을 읽고, 60초 쇼츠로 만들기 가장 좋은 연속 구간 하나를 고른다. 불륜, 약점 협박, 비밀 폭로, 배신, 반전처럼 시청자의 호기심과 분노가 폭발하는 최대 갈등 구간을 고른다. 구간 길이는 6~12분. JSON만 출력: {"start":초,"end":초,"reason":"왜 이 구간인지 한 줄"}';
-    const user=`작품명: ${$('work').value||'(모름)'}\n메모: ${$('memo').value||'(없음)'}\n영화 길이: ${Math.round(S.srcInfo?S.srcInfo.dur:0)}초\n\n자막:\n${lines}`;
+    const sys='너는 유튜브 영화 짜깁기 쇼츠 편집자다. 영화 전체 대사(각 줄 앞 숫자 = 초)와 네가 아는 이 작품의 줄거리를 바탕으로, 60초 쇼츠로 만들기 가장 좋은 연속 구간 3개를 고른다. 불륜, 약점 협박, 비밀 폭로, 배신, 반전, 감정이 폭발하는 장면처럼 시청자의 호기심과 감정을 강하게 건드리는 구간을 우선한다. 각 구간은 6~12분, 서로 겹치지 않게. 좋은 순서대로. JSON만 출력: {"candidates":[{"start":초,"end":초,"reason":"어떤 장면인지와 왜 좋은지 한국어 한 줄"}]}';
+    const user=`작품명: ${$('work').value||'(모름)'}\n파일 이름: ${S.source?S.source.name:''}\n메모: ${$('memo').value||'(없음)'}\n영화 길이: ${Math.round(S.srcInfo?S.srcInfo.dur:0)}초\n\n대사:\n${lines}`;
     const out= provider==='claude'? await callClaude(sys,[],user) : await callGPT(sys,[],user);
-    const j=parseJSON(out); let st=Math.max(0,+j.start||0), en=+j.end||st+600; if(en-st>13*60) en=st+12*60; if(en-st<120) en=st+360;
-    if(S.srcInfo&&S.srcInfo.dur) en=Math.min(en,S.srcInfo.dur);
-    $('cutStart').value=hms(st); $('cutEnd').value=hms(en);
-    $('aiPickNote').textContent=`추천: ${hms(st)} ~ ${hms(en)} · ${j.reason||''}`;
-  }catch(e){ $('aiPickNote').textContent=e.message; }
-  b.disabled=false;
+    const j=parseJSON(out); let cands=Array.isArray(j.candidates)? j.candidates : [j];
+    const D=S.srcInfo&&S.srcInfo.dur? S.srcInfo.dur : 1e9;
+    cands=cands.map(c=>{ let st=Math.max(0,+c.start||0), en=+c.end||st+600; if(en-st>13*60) en=st+12*60; if(en-st<120) en=st+360; en=Math.min(en,D); return {st,en,reason:c.reason||''}; }).filter(c=>c.en>c.st).slice(0,3);
+    if(!cands.length) throw new Error('구간을 고르지 못했어요. 다시 눌러 주세요.');
+    const pick=c=>{ $('cutStart').value=hms(c.st); $('cutEnd').value=hms(c.en); say(`선택: ${hms(c.st)} ~ ${hms(c.en)} · ${c.reason}`); };
+    $('aiCands').innerHTML='';
+    cands.forEach((c,i)=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='small'; btn.style.textAlign='left'; btn.style.whiteSpace='normal';
+      btn.textContent=`${i+1}순위 ${hms(c.st)}~${hms(c.en)} · ${c.reason}`; btn.addEventListener('click',()=>pick(c)); $('aiCands').appendChild(btn); });
+    pick(cands[0]); say(`1순위를 넣어 두었어요. 다른 후보를 누르면 바뀌어요. 정했으면 "이 구간 잘라서 불러오기"를 누르세요.`);
+  }catch(e){ say(e.message); }
+  b.disabled=false; $('cutBtn').disabled=false;
 });
 $('cutBtn').addEventListener('click',async()=>{
   if(!S.srcPath) return;
@@ -636,7 +659,7 @@ $('cutBtn').addEventListener('click',async()=>{
     setStatus('cutStatus',`완료! ${hms(st)} ~ ${hms(en)} 구간을 불러왔어요. 자막 시간도 자동으로 맞췄어요.`);
     setStatus('anaStatus','구간을 불러왔어요. 이제 "분석하고 대본 만들기"를 누르세요.');
   }catch(e){ setStatus('cutStatus',e.message||'자르기에 실패했어요.',true); }
-  b.disabled=false; $('aiPickBtn').disabled=!S.subs;
+  b.disabled=false; $('aiPickBtn').disabled=false;
 });
 
 /* ================= 구글 드라이브 ================= */
@@ -667,12 +690,32 @@ function gPick(token,kind='video'){ return new Promise(res=>{
     .setCallback(d=>{ if(d.action===google.picker.Action.PICKED){ const f=d.docs[0]; res({id:f.id,name:f.name,size:+f.sizeBytes||0,mime:f.mimeType}); } else if(d.action===google.picker.Action.CANCEL) res(null); })
     .build().setVisible(true);
 }); }
+/* 큰 파일은 메모리에 쌓지 않고 디스크(브라우저 저장 공간)에 바로 써요 */
+async function streamToDisk(resp,name,type,total,onProg){
+  const rd=resp.body.getReader(); let got=0;
+  let root=null, fh=null, w=null;
+  try{
+    root=await navigator.storage.getDirectory();
+    for await (const k of root.keys()){ if(k.startsWith('dl_')) try{ await root.removeEntry(k); }catch(e){} }
+    if(total && navigator.storage.estimate){ const e=await navigator.storage.estimate(); if(e.quota && e.quota-e.usage < total*1.05) throw new Error('space'); }
+    fh=await root.getFileHandle('dl_'+Date.now()+'.bin',{create:true}); w=await fh.createWritable();
+  }catch(e){ w=null; }
+  if(w){
+    try{ for(;;){ const {done,value}=await rd.read(); if(done) break; await w.write(value); got+=value.length; onProg(got,total); } await w.close(); }
+    catch(e){ try{ await w.abort(); }catch(_){} throw new Error('파일을 받는 중에 끊겼어요. 다시 시도해 주세요. ('+(e.message||e)+')'); }
+    const disk=await fh.getFile(); return new File([disk],name,{type});
+  }
+  // 예비 방법: 64MB마다 묶어서 크롬이 디스크로 넘길 수 있게
+  let blob=new Blob([]), parts=[], partBytes=0;
+  for(;;){ const {done,value}=await rd.read(); if(done) break; parts.push(value); partBytes+=value.length; got+=value.length; onProg(got,total);
+    if(partBytes>64*1048576){ blob=new Blob([blob,...parts]); parts=[]; partBytes=0; } }
+  return new File([blob,...parts],name,{type});
+}
 async function gDownload(f,token,onProg){
   const r=await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media&supportsAllDrives=true`,{headers:{Authorization:'Bearer '+token}});
   if(!r.ok) throw new Error(await apiErr(r,'구글 드라이브'));
-  const total=f.size||+r.headers.get('content-length')||0, rd=r.body.getReader(), parts=[]; let got=0;
-  for(;;){ const {done,value}=await rd.read(); if(done) break; parts.push(value); got+=value.length; onProg(got,total); }
-  return new File(parts,f.name,{type:f.mime||'video/mp4'});
+  const total=f.size||+r.headers.get('content-length')||0;
+  return await streamToDisk(r,f.name,f.mime||'video/mp4',total,onProg);
 }
 $('driveBtn').addEventListener('click',async()=>{
   const b=$('driveBtn'); b.disabled=true;
@@ -726,8 +769,8 @@ async function tts(text){
   if(!r.ok) throw new Error(await apiErr(r,'목소리'));
   return await r.blob();
 }
-async function transcribe(wavBlob){
-  const fd=new FormData(); fd.append('file',wavBlob,'audio.wav'); fd.append('model',key('sttModel')); fd.append('response_format','verbose_json');
+async function transcribe(wavBlob,fname='audio.wav'){
+  const fd=new FormData(); fd.append('file',wavBlob,fname); fd.append('model',key('sttModel')); fd.append('response_format','verbose_json');
   const r=await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{'authorization':'Bearer '+key('openaiKey')},body:fd});
   if(!r.ok) throw new Error(await apiErr(r,'받아쓰기'));
   const j=await r.json(); return (j.segments||[]).map(s=>({start:+s.start,end:+s.end,text:String(s.text||'').trim()})).filter(s=>s.text);
@@ -877,7 +920,8 @@ $('analyzeBtn').addEventListener('click', async ()=>{
       S.cache={file:S.file, sheets, tx:null}; }
     let transcript=[], sttNote='', txLabel='원본 대사 받아쓰기';
     const clipSubs=subsForClip();
-    if(clipSubs && clipSubs.length){ transcript=clipSubs; txLabel= JA()? '원본 대사 한국어 자막 (dialogue의 subtitle은 이 내용을 자연스러운 일본어로 옮길 것)' : '원본 대사 한국어 자막 (이미 번역됨. dialogue의 subtitle은 이 문장을 그대로 쓰고 문장부호만 뺄 것)'; }
+    if(clipSubs && clipSubs.length && S.subsOrig){ transcript=clipSubs; txLabel='원본 대사 받아쓰기 (원래 언어. dialogue의 subtitle은 '+(JA()?'자연스러운 일본어':'자연스러운 한국어')+'로 옮길 것)'; }
+    else if(clipSubs && clipSubs.length){ transcript=clipSubs; txLabel= JA()? '원본 대사 한국어 자막 (dialogue의 subtitle은 이 내용을 자연스러운 일본어로 옮길 것)' : '원본 대사 한국어 자막 (이미 번역됨. dialogue의 subtitle은 이 문장을 그대로 쓰고 문장부호만 뺄 것)'; }
     else if(S.cache.tx){ transcript=S.cache.tx; }
     else if(clipSubs){ sttNote='(자막 시간이 영상과 안 맞아요. 시작 시간 칸을 확인해 주세요)'; }
     if(!transcript.length && $('stt').checked && key('openaiKey')){
