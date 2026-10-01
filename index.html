@@ -425,8 +425,11 @@ function gGetToken(){ return new Promise((res,rej)=>{
 }); }
 function gPick(token){ return new Promise(res=>{
   const c=gCfg(), appId=c.clientId.split('-')[0];
-  const view=new google.picker.DocsView(google.picker.ViewId.DOCS_VIDEOS).setIncludeFolders(true);
-  new google.picker.PickerBuilder().addView(view).setOAuthToken(token).setDeveloperKey(c.apiKey).setAppId(appId).setLocale('ko').setTitle('쇼츠로 만들 영상 고르기')
+  const VM='video/mp4,video/x-matroska,video/quicktime,video/webm,video/x-msvideo,video/x-m4v,video/mpeg';
+  const folders=new google.picker.DocsView(google.picker.ViewId.DOCS).setParent('root').setIncludeFolders(true).setSelectFolderEnabled(false).setMimeTypes(VM).setMode(google.picker.DocsViewMode.LIST).setLabel('내 드라이브 (폴더)');
+  const vids=new google.picker.DocsView(google.picker.ViewId.DOCS_VIDEOS).setMode(google.picker.DocsViewMode.LIST).setLabel('모든 동영상');
+  const recent=new google.picker.DocsView(google.picker.ViewId.RECENTLY_PICKED).setLabel('최근 고른 파일');
+  new google.picker.PickerBuilder().addView(folders).addView(vids).addView(recent).setSize(1051,650).enableFeature(google.picker.Feature.SUPPORT_DRIVES).setOAuthToken(token).setDeveloperKey(c.apiKey).setAppId(appId).setLocale('ko').setTitle('쇼츠로 만들 영상 고르기')
     .setCallback(d=>{ if(d.action===google.picker.Action.PICKED){ const f=d.docs[0]; res({id:f.id,name:f.name,size:+f.sizeBytes||0,mime:f.mimeType}); } else if(d.action===google.picker.Action.CANCEL) res(null); })
     .build().setVisible(true);
 }); }
@@ -440,8 +443,12 @@ async function gDownload(f,token,onProg){
 $('driveBtn').addEventListener('click',async()=>{
   const b=$('driveBtn'); b.disabled=true;
   try{
-    await gInit(); const tok=await gGetToken(); const f=await gPick(tok);
+    setStatus('anaStatus','① 구글 연결 준비 중…'); await gInit();
+    setStatus('anaStatus','② 구글 로그인 창을 여는 중… (창이 안 뜨면 주소창 오른쪽의 팝업 차단을 풀어 주세요)'); const tok=await gGetToken();
+    setStatus('anaStatus','③ 드라이브 파일 목록을 여는 중… 위쪽 탭에서 "모든 파일"도 확인해 보세요.'); const f=await gPick(tok);
+    if(!f) setStatus('anaStatus','파일 고르기를 취소했어요.');
     if(f){
+      setStatus('anaStatus',`④ "${f.name}" 받는 중…`);
       if(f.size>1.5*1024**3) throw new Error('영상이 1.5GB보다 커요. 핵심 장면만 잘라서 올려 주세요.');
       const file=await gDownload(f,tok,(g,t)=>{ setStatus('anaStatus',`구글 드라이브에서 받는 중… ${(g/1048576).toFixed(0)}${t?' / '+(t/1048576).toFixed(0):''}MB`); $('anaBar').style.width=(t?g/t*100:0)+'%'; });
       $('anaBar').style.width='0%'; await loadVideoFile(file);
