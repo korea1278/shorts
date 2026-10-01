@@ -614,6 +614,8 @@ async function ffMount(file){
   if(ffMounted){ try{ await FF.unmount('/in'); }catch(e){} } else { try{ await FF.createDir('/in'); }catch(e){} }
   await FF.mount('WORKERFS',{files:[file]},'/in'); ffMounted=true; return '/in/'+file.name;
 }
+/* 자르기가 끝나면 자르기 프로그램이 잡고 있던 메모리(수백 MB~1GB)를 바로 돌려줘요 */
+function ffRelease(){ if(FF){ try{ FF.terminate(); }catch(e){} } FF=null; ffMounted=false; }
 async function ffFresh(say){
   if(FF){ try{ FF.terminate(); }catch(e){} }
   FF=null; ffMounted=false; await ffGet(say); S.srcPath=await ffMount(S.source);
@@ -681,16 +683,18 @@ async function openCutter(file){
     $('cutEnd').value=''; $('cutStart').value='';
     $('cutBtn').disabled=false; $('aiPickBtn').disabled=false;
   }catch(e){ say(e.message); }
+  ffRelease();
 }
 $('cutCancel').addEventListener('click',()=>{ $('cutBox').hidden=true; });
 async function transcribeFull(say){
   if(!key('openaiKey')) throw new Error('자막이 없을 때 대사를 받아쓰려면 OpenAI API 키가 필요해요. 또는 smi 자막을 넣어 주세요.');
+  if(!FF) await ffFresh(say);
   const dur=S.srcInfo.dur||0, kb=Math.max(8,Math.min(16,Math.floor(23.5e6*8/Math.max(1,dur)/1000)));
   say('영화 전체 소리를 뽑는 중… 0%'); FFLOG=[];
   ffOnLog=m=>{ const t=m.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/); if(t&&dur) say(`영화 전체 소리를 뽑는 중… ${Math.min(99,Math.round(((+t[1])*3600+(+t[2])*60+(+t[3]))/dur*100))}%`); };
   try{ await FF.exec(['-i',S.srcPath,'-vn','-map','0:a:0','-ac','1','-ar','16000','-c:a','libmp3lame','-b:a',kb+'k','/aud.mp3']); } finally { ffOnLog=null; }
   let d; try{ d=await FF.readFile('/aud.mp3'); await FF.deleteFile('/aud.mp3'); }catch(e){ throw new Error('영화에서 소리를 뽑지 못했어요.'); }
-  say('영화 전체 대사를 받아쓰는 중… (1~3분)');
+  ffRelease(); say('영화 전체 대사를 받아쓰는 중… (1~3분)');
   const segs=await transcribe(new Blob([d],{type:'audio/mpeg'}),'audio.mp3');
   if(!segs.length) throw new Error('대사를 받아쓰지 못했어요.');
   S.subs=segs; S.subsOrig=true;
@@ -746,10 +750,10 @@ $('cutBtn').addEventListener('click',async()=>{
       freeVideo(); f=null; await ffFresh();
       f=await ffCut(S.srcPath,st,en,false,prog); ok=await loadVideoFile(f,true); }
     if(!ok) throw new Error(BAD_FMT_MSG);
-    $('subOffset').value=hms(st); prog(1);
+    $('subOffset').value=hms(st); prog(1); ffRelease();
     setStatus('cutStatus',`${note?'(메모리 때문에 구간을 줄였어요) ':''}완료! ${hms(st)} ~ ${hms(en)} 구간을 불러왔어요 (${(f.size/1048576).toFixed(0)}MB). 자막 시간도 자동으로 맞췄어요.`);
     setStatus('anaStatus','구간을 불러왔어요. 이제 "분석하고 대본 만들기"를 누르세요.');
-  }catch(e){ setStatus('cutStatus',errText(e),true); }
+  }catch(e){ setStatus('cutStatus',errText(e),true); ffRelease(); }
   b.disabled=false; $('aiPickBtn').disabled=false;
 });
 
@@ -1317,15 +1321,15 @@ function renderClipRow(box,sc,i){
 }
 /* ================= 인물 자동 찾기 (YOLOv8n, 브라우저에서 실행) ================= */
 const DET_URLS=['yolov8n.onnx','https://cdn.jsdelivr.net/gh/Hyuto/yolov8-onnxruntime-web@master/public/model/yolov8n.onnx'];
-let DET=null, vDet=null;
+let DET=null, vDet=null, DET_BUF=null;
 async function detLoad(say){
   if(DET) return DET;
   if(!window.ort) await loadScript(ORT_BASE+'ort.min.js');
-  ort.env.wasm.wasmPaths=ORT_BASE;
-  let buf=null;
-  for(const u of DET_URLS){ try{ say&&say('인물 찾기 프로그램 받는 중… (약 13MB, 처음 한 번)'); const r=await fetch(u); if(r.ok){ const b=await r.arrayBuffer(); if(b.byteLength>1e6){ buf=b; break; } } }catch(e){} }
+  ort.env.wasm.wasmPaths=ORT_BASE; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
+  let buf=DET_BUF;
+  if(!buf) for(const u of DET_URLS){ try{ say&&say('인물 찾기 프로그램 받는 중… (약 13MB, 처음 한 번)'); const r=await fetch(u); if(r.ok){ const b=await r.arrayBuffer(); if(b.byteLength>1e6){ buf=b; break; } } }catch(e){} }
   if(!buf) throw new Error('인물 찾기 프로그램을 받지 못했어요. 인터넷 연결을 확인해 주세요.');
-  DET=await ort.InferenceSession.create(buf,{executionProviders:['wasm']});
+  DET_BUF=buf; DET=await ort.InferenceSession.create(buf,{executionProviders:['wasm'],graphOptimizationLevel:'basic',enableCpuMemArena:false});
   return DET;
 }
 const detC=document.createElement('canvas'); detC.width=640; detC.height=640; const detX=detC.getContext('2d',{willReadFrequently:true});
@@ -1347,6 +1351,11 @@ function centerOf(ps,vf){ if(!ps.length) return null; ps=[...ps].sort((a,b)=>b.a
   if(x2-x1>vf*0.95){ x1=big.x1; x2=big.x2; } return (Math.max(0,x1)+Math.min(1,x2))/2; }
 async function autoFocus(say){
   if(!S.url||!S.scenes.length) return 0;
+  ffRelease();
+  try{ return await autoFocusRun(say); }
+  finally{ try{ DET&&DET.release&&await DET.release(); }catch(e){} DET=null; if(vDet){ try{ vDet.removeAttribute('src'); vDet.load(); }catch(e){} } }
+}
+async function autoFocusRun(say){
   const b=band(); await detLoad(say);
   if(!vDet){ vDet=document.createElement('video'); vDet.muted=true; vDet.preload='auto'; vDet.playsInline=true; }
   if(vDet.src!==S.url){ vDet.src=S.url; await new Promise(r=>{ vDet.onloadedmetadata=r; vDet.onerror=r; setTimeout(r,8000); }); }
