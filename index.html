@@ -1026,6 +1026,19 @@ ${lang==='ja'?'- 일본어, 공백 없이 10~16자, 호기심 자극.':'- 정상
 function parseJSON(t){ t=t.replace(/```json|```/g,''); const a=t.indexOf('{'), b=t.lastIndexOf('}'); if(a<0||b<0) throw new Error('AI 응답 형식을 읽지 못했어요. 다시 눌러 주세요.'); return JSON.parse(t.slice(a,b+1)); }
 function splitTitle(t){ t=String(t||'').trim(); const words=t.split(' '); if(words.length<2){ const a=[...t]; if(a.length<9) return [t,'']; const h=Math.ceil(a.length/2); return [a.slice(0,h).join(''),a.slice(h).join('')]; } let best=1, bd=1e9; for(let i=1;i<words.length;i++){ const d=Math.abs(words.slice(0,i).join(' ').length - words.slice(i).join(' ').length); if(d<bd){bd=d;best=i;} } return [words.slice(0,best).join(' '), words.slice(best).join(' ')]; }
 const newScene = o => ({type:o.type, text:o.text, src_start:o.src_start, src_end:o.src_end, lines:o.lines||null, speaker:o.speaker||'other', fx:isFinite(o.fx)?o.fx:0.5, guide:o.guide||'', audio:null, audioDur:0, audioEl:null, srcNode:null, aState:''});
+function dedupeFootage(d){
+  const used=[]; const ov=(a,b)=>used.some(u=>a<u[1]-0.1&&b>u[0]+0.1);
+  S.scenes=S.scenes.filter(sc=>{ if(sc.type!=='clip') return true;
+    let a=sc.src_start, b=sc.src_end;
+    for(const u of used){ if(a<u[1]&&b>u[0]){ if(a>=u[0]) a=Math.max(a,u[1]); else b=Math.min(b,u[0]); } }
+    if(b-a<1.5) return false;
+    if(a!==sc.src_start||b!==sc.src_end){ sc.src_start=a; sc.src_end=b; sc.lines=(sc.lines||[]).filter(l=>l.start>=a-0.1&&l.end<=b+0.3); sc.text=sc.lines.map(l=>l.text).join(' / ')||sc.text; }
+    used.push([a,b]); return true; });
+  S.scenes.forEach(sc=>{ if(sc.type!=='narration') return; const len=est(sc.text)*1.25+0.8;
+    if(!ov(sc.src_start,sc.src_start+len)){ used.push([sc.src_start,sc.src_start+len]); return; }
+    for(let k=1;k<=20;k++){ for(const sg of [-1,1]){ const t=sc.src_start+sg*k*1.5; if(t<0||t+len>d) continue; if(!ov(t,t+len)){ sc.src_start=+t.toFixed(1); used.push([t,t+len]); return; } } }
+    used.push([sc.src_start,sc.src_start+len]); });
+}
 function normalize(o){
   S.titles=(o.titles||[]).map(t=>String(t).replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,10);
   let tl=o.title_lines; if(!Array.isArray(tl)||!tl[0]) tl=splitTitle(S.titles[0]||'');
@@ -1049,8 +1062,8 @@ function normalize(o){
     return newScene({type:'narration',text:clean(s.text),src_start:st,fx,guide:s.guide});
   }).flat().filter(s=>s.text);
   if(!S.scenes.length) throw new Error('장면이 비어 있어요. 다시 눌러 주세요.');
-  // 같은 장면이 연달아 반복되지 않게 살짝 옮겨요
-  const used=[]; S.scenes.forEach(sc=>{ if(sc.type!=='narration') return; let k=0; while(used.some(u=>Math.abs(u-sc.src_start)<1.2) && k<4){ sc.src_start=Math.min(d-0.5,sc.src_start+2.5); k++; } used.push(sc.src_start); });
+  // 같은 화면이 두 번 나오지 않게: 원본 장면(clip)끼리 겹치면 겹친 부분을 빼고, 나레이션 화면은 clip이 안 쓰는 곳으로 옮겨요
+  dedupeFootage(d);
 }
 
 /* ================= 제목 따로 만들기 ================= */
@@ -1369,10 +1382,19 @@ async function autoFocusRun(say){
     say&&say(`인물 위치 찾는 중… ${i+1}/${S.scenes.length}`);
     const a=sc.src_start, z=(sc.type==='clip'||sc.type==='dialogue')? sc.src_end : sc.src_start+Math.max(2.5,(sc.audioDur||est(sc.text))+0.5);
     // 1) 장면 안에서 카메라가 바뀌는 곳(컷)을 찾아요
-    const step=0.4, cuts=[a]; let prev=null;
+    // 사람이 움직이거나 카메라가 천천히 도는 건 컷이 아니에요: 픽셀 차이와 색 분포 차이가 둘 다 커야 컷으로 봐요
+    const isCut=(p,d)=>{ let df=0; const h1=new Float32Array(64), h2=new Float32Array(64);
+      for(let k=0;k<d.length;k+=4){ df+=Math.abs(d[k]-p[k])+Math.abs(d[k+1]-p[k+1])+Math.abs(d[k+2]-p[k+2]); h1[(p[k]>>6)*16+(p[k+1]>>6)*4+(p[k+2]>>6)]++; h2[(d[k]>>6)*16+(d[k+1]>>6)*4+(d[k+2]>>6)]++; }
+      const n=d.length/4; df/=n*3; let hd=0; for(let k=0;k<64;k++) hd+=Math.abs(h1[k]-h2[k]); hd/=2*n;
+      return (df>30 && hd>0.15) || df>45; };
+    const step=0.4, cuts=[a]; let prev=null, prevT=a;
     for(let t=a+0.05;t<z-0.05;t+=step){ await seekTo(vDet,t); const d=sig();
-      if(prev){ let df=0; for(let k=0;k<d.length;k+=4) df+=Math.abs(d[k]-prev[k])+Math.abs(d[k+1]-prev[k+1])+Math.abs(d[k+2]-prev[k+2]); df/=(d.length/4)*3; if(df>28 && t-cuts[cuts.length-1]>0.6) cuts.push(t-step/2); }
-      prev=d; }
+      if(prev && isCut(prev,d)){
+        // 정확한 컷 프레임을 찾아서 그 순간에만 화면 위치를 바꿔요 (순간 이동처럼 보이지 않게)
+        let lo=prevT, hi=t, lp=prev; for(let it=0;it<4;it++){ const m=(lo+hi)/2; await seekTo(vDet,m); const md=sig(); if(isCut(lp,md)) hi=m; else { lo=m; lp=md; } }
+        if(hi-cuts[cuts.length-1]>0.8) cuts.push(hi);
+        await seekTo(vDet,t); }
+      prev=sig(); prevT=t; }
     // 2) 컷마다 사람을 찾아서 그 컷의 화면 위치를 정해요
     const shots=[];
     for(let k=0;k<cuts.length;k++){ const s0=cuts[k], s1=k+1<cuts.length?cuts[k+1]:z; const ts=s1-s0>1.6? [s0+0.4,(s0+s1)/2,s1-0.3] : [(s0+s1)/2];
@@ -1380,7 +1402,9 @@ async function autoFocusRun(say){
       cs.sort((x,y)=>x-y); shots.push({t:s0, fx: cs.length? toFx(cs[Math.floor(cs.length/2)]) : null}); }
     const known=shots.filter(x=>x.fx!=null); if(!known.length){ sc.shots=null; continue; }
     shots.forEach((x,k)=>{ if(x.fx==null){ const nb=shots.slice(k).find(y=>y.fx!=null)||[...shots.slice(0,k)].reverse().find(y=>y.fx!=null); x.fx=nb.fx; } });
-    sc.shots=shots; sc.fx=shots[0].fx; n++;
+    // 위치 차이가 작으면 움직이지 않아요 (살짝씩 흔들리는 느낌 방지)
+    const merged=[shots[0]]; for(let k=1;k<shots.length;k++){ const last=merged[merged.length-1]; if(Math.abs(shots[k].fx-last.fx)<0.22) continue; merged.push(shots[k]); }
+    sc.shots=merged; shots.length=0; shots.push(...merged); sc.fx=shots[0].fx; n++;
   }
   return n;
 }
