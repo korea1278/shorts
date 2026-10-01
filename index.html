@@ -235,6 +235,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
           <div><label for="title2">상단 제목 2줄 (노란색)</label><input id="title2" type="text"></div>
         </div>
         <p class="note">썸네일을 누르면 그 장면이 미리보기에 나와요. 시작 시간(초)을 고치거나 ±버튼으로 장면을 옮길 수 있어요. <span style="color:var(--dlg)">파란 번호</span>는 나레이션을 멈추고 원본 대사를 크게 들려주는 장면이에요.</p>
+        <div class="row" style="margin:6px 0"><button type="button" class="small" id="focusBtn">인물 위치 자동 맞추기</button><span class="note" id="focusNote" style="margin:0">정사각형 화면에서 사람이 잘리면 눌러 보세요. 장면마다 사람을 찾아서 화면을 맞춰요.</span></div>
         <div id="scenes"></div>
         <div class="row" style="margin-top:12px">
           <button class="primary" id="ttsBtn" type="button" disabled>나레이션 목소리 만들기</button>
@@ -1139,6 +1140,7 @@ ${otherShots()}
     }
     setStatus('anaStatus','제목 만드는 중…'); bar(0.95);
     try{ await genTitles(provider); }catch(e){}
+    try{ await autoFocus(m=>setStatus('anaStatus',m)); }catch(e){}
     saveVer();
     S.work=$('work').value;
     bar(1); renderAll();
@@ -1292,6 +1294,58 @@ function renderClipRow(box,sc,i){
   d.querySelector('.playOne').addEventListener('click',()=>{ if(!busy) run(false,[i]); });
   renderStat(i);
 }
+/* ================= 인물 자동 찾기 (YOLOv8n, 브라우저에서 실행) ================= */
+const DET_URLS=['yolov8n.onnx','https://cdn.jsdelivr.net/gh/Hyuto/yolov8-onnxruntime-web@master/public/model/yolov8n.onnx'];
+let DET=null, vDet=null;
+async function detLoad(say){
+  if(DET) return DET;
+  if(!window.ort) await loadScript(ORT_BASE+'ort.min.js');
+  ort.env.wasm.wasmPaths=ORT_BASE;
+  let buf=null;
+  for(const u of DET_URLS){ try{ say&&say('인물 찾기 프로그램 받는 중… (약 13MB, 처음 한 번)'); const r=await fetch(u); if(r.ok){ const b=await r.arrayBuffer(); if(b.byteLength>1e6){ buf=b; break; } } }catch(e){} }
+  if(!buf) throw new Error('인물 찾기 프로그램을 받지 못했어요. 인터넷 연결을 확인해 주세요.');
+  DET=await ort.InferenceSession.create(buf,{executionProviders:['wasm']});
+  return DET;
+}
+const detC=document.createElement('canvas'); detC.width=640; detC.height=640; const detX=detC.getContext('2d',{willReadFrequently:true});
+async function detPersons(v){
+  const vw=v.videoWidth, vh=v.videoHeight*(1-hsFrac()); if(!vw) return [];
+  const r=640/Math.max(vw,vh), nw=Math.round(vw*r), nh=Math.round(vh*r);
+  detX.fillStyle='#727272'; detX.fillRect(0,0,640,640); detX.drawImage(v,0,0,vw,vh,0,0,nw,nh);
+  const px=detX.getImageData(0,0,640,640).data, N=640*640, f=new Float32Array(3*N);
+  for(let i=0;i<N;i++){ f[i]=px[i*4]/255; f[N+i]=px[i*4+1]/255; f[2*N+i]=px[i*4+2]/255; }
+  const out=await DET.run({[DET.inputNames[0]]:new ort.Tensor('float32',f,[1,3,640,640])}); const o=out[DET.outputNames[0]].data, A=o.length/84;
+  const bx=[]; for(let i=0;i<A;i++){ const sc=o[4*A+i]; if(sc>0.35){ const cx=o[i]/r, cy=o[A+i]/r, w=o[2*A+i]/r, h=o[3*A+i]/r; bx.push({x1:(cx-w/2)/vw,x2:(cx+w/2)/vw,y1:(cy-h/2)/vh,y2:(cy+h/2)/vh,s:sc}); } }
+  bx.sort((a,b)=>b.s-a.s); const keep=[];
+  const iou=(a,b)=>{ const ix=Math.max(0,Math.min(a.x2,b.x2)-Math.max(a.x1,b.x1)), iy=Math.max(0,Math.min(a.y2,b.y2)-Math.max(a.y1,b.y1)), I=ix*iy; return I/((a.x2-a.x1)*(a.y2-a.y1)+(b.x2-b.x1)*(b.y2-b.y1)-I); };
+  for(const b of bx){ if(keep.every(k=>iou(k,b)<0.45)) keep.push(b); if(keep.length>=8) break; }
+  keep.forEach(k=>k.area=(k.x2-k.x1)*(k.y2-k.y1)); return keep;
+}
+function centerOf(ps,vf){ if(!ps.length) return null; ps=[...ps].sort((a,b)=>b.area-a.area); const big=ps[0];
+  const grp=ps.filter(p=>p.area>=big.area*0.3); let x1=Math.min(...grp.map(p=>p.x1)), x2=Math.max(...grp.map(p=>p.x2));
+  if(x2-x1>vf*0.95){ x1=big.x1; x2=big.x2; } return (Math.max(0,x1)+Math.min(1,x2))/2; }
+async function autoFocus(say){
+  if(!S.url||!S.scenes.length) return 0;
+  const b=band(); await detLoad(say);
+  if(!vDet){ vDet=document.createElement('video'); vDet.muted=true; vDet.preload='auto'; vDet.playsInline=true; }
+  if(vDet.src!==S.url){ vDet.src=S.url; await new Promise(r=>{ vDet.onloadedmetadata=r; vDet.onerror=r; setTimeout(r,8000); }); }
+  const vw=vDet.videoWidth, vh=vDet.videoHeight*(1-hsFrac()); if(!vw) return 0;
+  const sc0=Math.max(b.w/vw,b.h/vh), vf=b.w/(vw*sc0); if(vf>=0.98) return 0;
+  let n=0;
+  for(let i=0;i<S.scenes.length;i++){ const sc=S.scenes[i];
+    say&&say(`인물 위치 찾는 중… ${i+1}/${S.scenes.length}`);
+    let ts; if(sc.type==='clip'&&sc.lines&&sc.lines.length) ts=sc.lines.slice(0,4).map(l=>(l.start+l.end)/2);
+    else if(sc.type==='clip'||sc.type==='dialogue') ts=[sc.src_start+0.3,(sc.src_start+sc.src_end)/2,sc.src_end-0.3];
+    else ts=[sc.src_start+0.3,sc.src_start+1.5,sc.src_start+3];
+    const cs=[]; for(const t of ts){ await seekTo(vDet,t); const c=centerOf(await detPersons(vDet),vf); if(c!=null) cs.push(c); }
+    if(!cs.length) continue; cs.sort((a,b)=>a-b); const cx=cs[Math.floor(cs.length/2)];
+    sc.fx=Math.max(0,Math.min(1,(cx-vf/2)/(1-vf))); n++;
+  }
+  return n;
+}
+$('focusBtn').addEventListener('click',async()=>{ if(busy||!S.scenes.length) return; const b=$('focusBtn'); b.disabled=true; const say=m=>{ $('focusNote').textContent=m; };
+  try{ const n=await autoFocus(say); renderScenes(); redrawPreview(); say(n? `${n}개 장면에서 인물 위치를 맞췄어요. 그래도 어긋난 장면은 각 장면의 위치 칸에서 바꿔 주세요.` : '맞출 게 없어요. (영상 크기가 "원본 비율 그대로"이거나 사람을 못 찾았어요)'); }
+  catch(e){ say(e.message); } b.disabled=false; });
 function queueThumb(c,t){
   thumbQueue=thumbQueue.then(async()=>{ if(!S.url) return; await seekTo(vThumb,t); const x=c.getContext('2d'); x.fillStyle='#000'; x.fillRect(0,0,320,180);
     const vw=vThumb.videoWidth, vh=vThumb.videoHeight; if(!vw) return; const s=Math.min(320/vw,180/vh); x.drawImage(vThumb,(320-vw*s)/2,(180-vh*s)/2,vw*s,vh*s); }).catch(()=>{});
