@@ -64,6 +64,11 @@ details summary{cursor:pointer;color:var(--mute);font-size:13px;margin-top:8px}
 .scene:first-child{border-top:0}
 @media (max-width:620px){.scene{grid-template-columns:30px minmax(0,1fr)}.scene .th{grid-column:2}}
 .snum{font:400 17px var(--display);color:var(--accent);padding-top:4px}
+.scene.clip .snum{color:var(--good)}
+.scene.clip .tag{color:var(--good);border-color:#2d5a3e}
+.ln{display:grid;grid-template-columns:62px minmax(0,1fr) 92px;gap:6px;align-items:center;margin-top:5px}
+.ln span{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.ln input,.ln select{padding:5px 7px;font-size:13px}
 .scene.dlg .snum{color:var(--dlg)}
 .th canvas{width:160px;max-width:100%;aspect-ratio:16/9;background:#000;border-radius:6px;border:1px solid var(--line);display:block;cursor:pointer}
 .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;border:1px solid var(--line);color:var(--mute);margin-bottom:4px}
@@ -207,6 +212,10 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
         </div>
         <label for="memo">메모 (선택): 줄거리, 등장인물 이름, 강조하고 싶은 장면</label>
         <textarea id="memo" rows="3" placeholder="예) 여주 릴리가 노숙하는 남학생 아틀라스를 몰래 도와주는 이야기. 폐건물에 사는 걸 알게 되는 장면을 강조"></textarea>
+        <div class="cols">
+          <div><label for="structMode">영상 구성</label><select id="structMode"><option value="clip">명화관식: 도입 나레이션 → 원본 장면 + 대사 자막 (추천)</option><option value="narr">나레이션 중심: 처음부터 끝까지 해설</option></select></div>
+          <div><label for="targetLen">목표 길이</label><select id="targetLen"><option value="60">약 1분</option><option value="90" selected>약 1분 30초</option><option value="150">약 2분 30초</option></select></div>
+        </div>
         <div class="row" style="margin-top:10px">
           <button class="primary" id="analyzeBtn" type="button" disabled>분석하고 대본 만들기</button>
           <button id="testBtn" type="button" disabled>API 없이 편집 테스트</button>
@@ -293,87 +302,102 @@ function seekTo(v,t){ return new Promise(res=>{ t=Math.max(0,Math.min(t,(v.durat
   let done=false; const fin=()=>{ if(done) return; done=true; v.removeEventListener('seeked',fin); res(); };
   v.addEventListener('seeked',fin); v.currentTime=t; setTimeout(fin,4000); }); }
 
-/* ================= 무료 목소리: Supertonic 3 (브라우저에서 직접 실행) ================= */
+/* ================= 무료 목소리: Supertonic 3 (별도 작업 공간에서 실행) =================
+   목소리 모델은 화면과 분리된 작업 공간(Worker)에서 돌려요. 메모리가 부족해 멈춰도
+   작업 공간만 새로 띄워 이어서 만들 수 있어요. */
 const ST_REV='aafc6e32416a594460b32413efc49d7fe4ce6d46';
 const ST_BASE=`https://huggingface.co/supertone-oss-archive/supertonic-3/resolve/${ST_REV}`;
 const ORT_BASE='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
-const ST_FILES=[['dp','duration_predictor.onnx',3.7],['te','text_encoder.onnx',36.4],['ve','vector_estimator.onnx',257],['vo','vocoder.onnx',101]];
-const ST={ready:false, loading:null, sess:null, cfg:null, indexer:null, styles:{}, backend:'', bufs:null, lock:Promise.resolve()};
-async function stFetch(url){ let r; try{ r=await fetch(url); }catch(e){ throw new Error('목소리 모델 서버(huggingface.co)에 연결하지 못했어요. 인터넷 연결이나 회사·PC방 차단 여부를 확인해 주세요.'); } if(!r.ok) throw new Error(`목소리 모델 파일을 받지 못했어요 (${r.status}). 잠시 뒤 다시 시도해 주세요.`); return r; }
-function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('목소리 프로그램을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.')); document.head.appendChild(s); }); }
-async function fetchBuf(url,onProg){
-  const r=await stFetch(url);
-  const total=+r.headers.get('content-length')||0;
-  if(!r.body){ const b=await r.arrayBuffer(); onProg&&onProg(b.byteLength); return b; }
-  const rd=r.body.getReader(), parts=[]; let got=0;
-  for(;;){ const {done,value}=await rd.read(); if(done) break; parts.push(value); got+=value.length; onProg&&onProg(got,total); }
+const ST_WORKER_SRC = `
+let cfg=null, indexer=null, sess=null, backend='', styles={};
+function say(t){ postMessage({type:'status', text:t}); }
+async function f(url){ let r; try{ r=await fetch(url); }catch(e){ throw new Error('NET'); } if(!r.ok) throw new Error('HTTP '+r.status); return r; }
+async function getBuf(url,done,total){
+  const r=await f(url), rd=r.body.getReader(), parts=[]; let got=0, last=0;
+  for(;;){ const x=await rd.read(); if(x.done) break; parts.push(x.value); got+=x.value.length;
+    const mb=Math.round(done+got/1048576); if(mb!==last){ last=mb; say('PROG '+mb+' '+total); } }
   const out=new Uint8Array(got); let o=0; for(const p of parts){ out.set(p,o); o+=p.length; } return out;
 }
-async function stGetBufs(onStatus){
-  if(ST.bufs) return ST.bufs;
-  const bufs={}; let doneMB=0; const totalMB=398;
-  for(const [k,f,mb] of ST_FILES){
-    bufs[k]=await fetchBuf(`${ST_BASE}/onnx/${f}`,g=>onStatus&&onStatus(`무료 목소리 모델 받는 중… ${Math.min(totalMB,Math.round(doneMB+g/1048576))}/${totalMB}MB (처음 한 번만)`));
-    doneMB+=mb;
-  }
-  return ST.bufs=bufs;
+async function init(m){
+  importScripts(m.ortBase+'ort.all.min.js'); ort.env.wasm.wasmPaths=m.ortBase; ort.env.wasm.numThreads=1;
+  cfg=await (await f(m.base+'/onnx/tts.json')).json();
+  indexer=await (await f(m.base+'/onnx/unicode_indexer.json')).json();
+  const eps=(m.forceWasm||!self.navigator.gpu)?['wasm']:['webgpu'];
+  const opt={executionProviders:eps, graphOptimizationLevel:'all', enableCpuMemArena:false, enableMemPattern:false, executionMode:'sequential'};
+  const files=[['dp','duration_predictor.onnx',3.7],['te','text_encoder.onnx',36.4],['ve','vector_estimator.onnx',257],['vo','vocoder.onnx',101]];
+  sess={}; let done=0;
+  for(const [k,fn,mb] of files){ let b=await getBuf(m.base+'/onnx/'+fn,done,398); done+=mb; say('LOAD'); sess[k]=await ort.InferenceSession.create(b,opt); b=null; }
+  backend=eps[0];
 }
-async function stMakeSessions(eps,onStatus){
-  const bufs=await stGetBufs(onStatus); onStatus&&onStatus('무료 목소리 모델 준비 중…');
-  const opt={executionProviders:eps, graphOptimizationLevel:'all'}; const s={};
-  for(const [k] of ST_FILES) s[k]=await ort.InferenceSession.create(bufs[k],opt);
-  return s;
-}
-async function stLoad(onStatus){
-  if(ST.ready) return;
-  if(!ST.loading) ST.loading=(async()=>{
-    if(!window.ort) await loadScript(ORT_BASE+'ort.all.min.js');
-    ort.env.wasm.wasmPaths=ORT_BASE;
-    onStatus&&onStatus('무료 목소리 설정 받는 중…');
-    ST.cfg=await (await stFetch(`${ST_BASE}/onnx/tts.json`)).json();
-    ST.indexer=await (await stFetch(`${ST_BASE}/onnx/unicode_indexer.json`)).json();
-    try{ if(!navigator.gpu) throw new Error('no webgpu'); ST.sess=await stMakeSessions(['webgpu'],onStatus); ST.backend='webgpu'; }
-    catch(e){ ST.sess=await stMakeSessions(['wasm'],onStatus); ST.backend='wasm'; }
-    ST.ready=true;
-  })().catch(e=>{ ST.loading=null; throw e; });
-  return ST.loading;
-}
-async function stStyle(name){
-  if(ST.styles[name]) return ST.styles[name];
-  const j=await (await stFetch(`${ST_BASE}/voice_styles/${name}.json`)).json();
+async function style(base,name){
+  if(styles[name]) return styles[name];
+  const j=await (await f(base+'/voice_styles/'+name+'.json')).json();
   const mk=o=>new ort.Tensor('float32',Float32Array.from(o.data.flat(Infinity)),o.dims);
-  return ST.styles[name]={ttl:mk(j.style_ttl),dp:mk(j.style_dp)};
+  return styles[name]={ttl:mk(j.style_ttl),dp:mk(j.style_dp)};
 }
-function stPre(text,lang){
+function pre(text,lang){
   text=text.normalize('NFKD');
-  text=text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]+/gu,'');
-  const rep={'–':'-','‑':'-','—':'-','_':' ','“':'"','”':'"','‘':"'",'’':"'",'´':"'",'`':"'",'[':' ',']':' ','|':' ','/':' ','#':' ','→':' ','←':' '};
-  for(const [k,v] of Object.entries(rep)) text=text.replaceAll(k,v);
-  text=text.replace(/[♥☆♡©\\]/g,'').replaceAll('@',' at ');
-  text=text.replace(/ ,/g,',').replace(/ \./g,'.').replace(/ !/g,'!').replace(/ \?/g,'?').replace(/ ;/g,';').replace(/ :/g,':').replace(/ '/g,"'");
-  while(text.includes('""')) text=text.replace('""','"'); while(text.includes("''")) text=text.replace("''","'");
-  text=text.replace(/\s+/g,' ').trim();
-  if(!/[.!?;:,'"')\]}…。」』】〉》›»]$/.test(text)) text+='.';
-  return `<${lang}>${text}</${lang}>`;
+  text=text.replace(/[\\u{1F600}-\\u{1F64F}\\u{1F300}-\\u{1F5FF}\\u{1F680}-\\u{1F6FF}\\u{1F700}-\\u{1F77F}\\u{1F780}-\\u{1F7FF}\\u{1F800}-\\u{1F8FF}\\u{1F900}-\\u{1F9FF}\\u{1FA00}-\\u{1FA6F}\\u{1FA70}-\\u{1FAFF}\\u{2600}-\\u{26FF}\\u{2700}-\\u{27BF}\\u{1F1E6}-\\u{1F1FF}]+/gu,'');
+  const rep={'–':'-','‑':'-','—':'-','_':' ','\\u201C':'"','\\u201D':'"','\\u2018':"'",'\\u2019':"'",'´':"'",'\`':"'",'[':' ',']':' ','|':' ','/':' ','#':' ','→':' ','←':' '};
+  for(const k in rep) text=text.split(k).join(rep[k]);
+  text=text.replace(/[♥☆♡©\\\\]/g,'').split('@').join(' at ');
+  text=text.replace(/ ,/g,',').replace(/ \\./g,'.').replace(/ !/g,'!').replace(/ \\?/g,'?').replace(/ ;/g,';').replace(/ :/g,':').replace(/ '/g,"'");
+  text=text.replace(/\\s+/g,' ').trim();
+  if(!/[.!?;:,'")\\]}…。」』】〉》›»]$/.test(text)) text+='.';
+  return '<'+lang+'>'+text+'</'+lang+'>';
 }
-async function stInfer(text,style,steps,speed,lang='ko'){
-  const T=ort.Tensor, p=stPre(text,lang), L=p.length, ids=new BigInt64Array(L);
-  for(let j=0;j<L;j++){ const cp=p.codePointAt(j); ids[j]=BigInt(cp<ST.indexer.length? ST.indexer[cp] : -1); }
+async function speak(m){
+  const T=ort.Tensor, st=await style(m.base,m.voice), p=pre(m.text,m.lang||'ko'), L=p.length, ids=new BigInt64Array(L);
+  for(let j=0;j<L;j++){ const cp=p.codePointAt(j); ids[j]=BigInt(cp<indexer.length? indexer[cp] : -1); }
   const idsT=new T('int64',ids,[1,L]), maskT=new T('float32',new Float32Array(L).fill(1),[1,1,L]);
-  const dpo=await ST.sess.dp.run({text_ids:idsT,style_dp:style.dp,text_mask:maskT});
-  const dur=dpo.duration.data[0]/speed;
-  const teo=await ST.sess.te.run({text_ids:idsT,style_ttl:style.ttl,text_mask:maskT});
-  const sr=ST.cfg.ae.sample_rate, chunk=ST.cfg.ae.base_chunk_size*ST.cfg.ttl.chunk_compress_factor, dim=ST.cfg.ttl.latent_dim*ST.cfg.ttl.chunk_compress_factor;
+  const dpo=await sess.dp.run({text_ids:idsT,style_dp:st.dp,text_mask:maskT});
+  const dur=dpo.duration.data[0]/m.speed;
+  const teo=await sess.te.run({text_ids:idsT,style_ttl:st.ttl,text_mask:maskT});
+  const sr=cfg.ae.sample_rate, chunk=cfg.ae.base_chunk_size*cfg.ttl.chunk_compress_factor, dim=cfg.ttl.latent_dim*cfg.ttl.chunk_compress_factor;
   const wavLen=Math.floor(dur*sr), latLen=Math.max(1,Math.floor((wavLen+chunk-1)/chunk));
   let xt=new Float32Array(dim*latLen);
   for(let i=0;i<xt.length;i++){ const u1=Math.max(1e-4,Math.random()), u2=Math.random(); xt[i]=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2); }
-  const lmT=new T('float32',new Float32Array(latLen).fill(1),[1,1,latLen]), totT=new T('float32',new Float32Array([steps]),[1]);
-  for(let s=0;s<steps;s++){
-    const o=await ST.sess.ve.run({noisy_latent:new T('float32',xt,[1,dim,latLen]),text_emb:teo.text_emb,style_ttl:style.ttl,latent_mask:lmT,text_mask:maskT,current_step:new T('float32',new Float32Array([s]),[1]),total_step:totT});
+  const lmT=new T('float32',new Float32Array(latLen).fill(1),[1,1,latLen]), totT=new T('float32',new Float32Array([m.steps]),[1]);
+  for(let s=0;s<m.steps;s++){
+    const o=await sess.ve.run({noisy_latent:new T('float32',xt,[1,dim,latLen]),text_emb:teo.text_emb,style_ttl:st.ttl,latent_mask:lmT,text_mask:maskT,current_step:new T('float32',new Float32Array([s]),[1]),total_step:totT});
     xt=new Float32Array(o.denoised_latent.data);
   }
-  const vo=await ST.sess.vo.run({latent:new T('float32',xt,[1,dim,latLen])});
-  const w=vo.wav_tts.data; return {wav:w.slice(0,Math.min(w.length,wavLen)), sr};
+  const vo=await sess.vo.run({latent:new T('float32',xt,[1,dim,latLen])});
+  const w=vo.wav_tts.data; return {wav:Float32Array.from(w.subarray(0,Math.min(w.length,wavLen))), sr};
+}
+self.onmessage=async ev=>{ const m=ev.data;
+  try{
+    if(m.type==='init'){ await init(m); postMessage({type:'ready',backend}); }
+    else if(m.type==='speak'){ const r=await speak(m); postMessage({type:'done',id:m.id,wav:r.wav,sr:r.sr},[r.wav.buffer]); }
+  }catch(e){ postMessage({type:'error',id:m.id,init:m.type==='init',message:String((e&&e.message)||e)}); }
+};`;
+const ST={worker:null, ready:null, backend:'', forceWasm:false, seq:0, pending:{}, lock:Promise.resolve(), say:null};
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('프로그램을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.')); document.head.appendChild(s); }); }
+function stKill(reason){
+  if(ST.worker){ try{ ST.worker.terminate(); }catch(e){} }
+  ST.worker=null; ST.ready=null;
+  for(const k in ST.pending){ ST.pending[k].rej(new Error(reason||'Aborted')); } ST.pending={};
+}
+function stMsg(t){ if(t==='NET') return '목소리 모델 서버(huggingface.co)에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.'; if(/^HTTP/.test(t)) return '목소리 모델 파일을 받지 못했어요 ('+t+'). 잠시 뒤 다시 시도해 주세요.'; return t; }
+function stSpawn(){
+  const w=new Worker(URL.createObjectURL(new Blob([ST_WORKER_SRC],{type:'text/javascript'})));
+  let rs, rj; ST.ready=new Promise((a,b)=>{ rs=a; rj=b; }); ST.ready.catch(()=>{});
+  w.onmessage=e=>{ const m=e.data;
+    if(m.type==='status'){ if(!ST.say) return; if(m.text.startsWith('PROG')){ const [,g,t]=m.text.split(' '); ST.say(`무료 목소리 모델 받는 중… ${g}/${t}MB (처음 한 번)`); } else if(m.text==='LOAD') ST.say('무료 목소리 모델 준비 중…'); }
+    else if(m.type==='ready'){ ST.backend=m.backend; rs(); }
+    else if(m.type==='done'){ const p=ST.pending[m.id]; delete ST.pending[m.id]; p&&p.res(m); }
+    else if(m.type==='error'){ if(m.init) rj(new Error(m.message)); else { const p=ST.pending[m.id]; delete ST.pending[m.id]; p&&p.rej(new Error(m.message)); } }
+  };
+  w.onerror=e=>{ e.preventDefault&&e.preventDefault(); rj(new Error('Aborted')); stKill('Aborted'); };
+  ST.worker=w; w.postMessage({type:'init',ortBase:ORT_BASE,base:ST_BASE,forceWasm:ST.forceWasm});
+}
+async function stLoad(say){
+  ST.say=say||null;
+  for(let attempt=0;attempt<2;attempt++){
+    if(!ST.worker) stSpawn();
+    try{ await ST.ready; return; }
+    catch(e){ const msg=stMsg(e.message); stKill(msg); if(e.message==='NET'||/^HTTP/.test(e.message)) throw new Error(msg); if(ST.forceWasm) throw new Error('무료 목소리를 준비하지 못했어요: '+msg); ST.forceWasm=true; }
+  }
 }
 function wavBlob(f32,sr){
   const buf=new ArrayBuffer(44+f32.length*2), v=new DataView(buf), w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
@@ -382,14 +406,20 @@ function wavBlob(f32,sr){
   for(let i=0;i<f32.length;i++){ const s=Math.max(-1,Math.min(1,f32[i])); v.setInt16(44+i*2,s<0?s*0x8000:s*0x7fff,true); }
   return new Blob([buf],{type:'audio/wav'});
 }
-/* 한 번에 하나씩만 실행 (같은 모델을 동시에 돌리면 오류가 나요) */
+/* 한 번에 하나씩 · 멈추면 작업 공간을 새로 띄워 한 번 더 시도 */
 function stSpeak(text,voice,steps,speed,onStatus,lang='ko'){
   const job=ST.lock.then(async()=>{
-    await stLoad(onStatus); const style=await stStyle(voice); let r;
-    try{ r=await stInfer(text,style,steps,speed,lang); }
-    catch(e){ if(ST.backend!=='webgpu') throw e; ST.sess=await stMakeSessions(['wasm'],onStatus); ST.backend='wasm'; r=await stInfer(text,style,steps,speed,lang); }
-    ST.bufs=null;
-    return wavBlob(r.wav,r.sr);
+    for(let attempt=0;attempt<2;attempt++){
+      await stLoad(onStatus);
+      const id=++ST.seq;
+      try{
+        const r=await new Promise((res,rej)=>{ ST.pending[id]={res,rej}; ST.worker.postMessage({type:'speak',id,text,voice,steps,speed,lang,base:ST_BASE}); });
+        return wavBlob(r.wav,r.sr);
+      }catch(e){
+        if(attempt===1) throw new Error('무료 목소리를 만들지 못했어요 ('+stMsg(e.message)+'). 목소리 엔진을 OpenAI로 바꿔서 해 보세요.');
+        onStatus&&onStatus('목소리 프로그램을 다시 시작하는 중…'); if(ST.backend==='webgpu') ST.forceWasm=true; stKill('restart');
+      }
+    }
   });
   ST.lock=job.catch(()=>{});
   return job;
@@ -413,7 +443,7 @@ function setupEngineUI(sample){
 const useST=()=>$('engine').value==='supertonic';
 
 /* ================= 설정 ================= */
-const SET_IDS=['subPos','bgStyle','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
+const SET_IDS=['structMode','targetLen','subPos','bgStyle','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
 function loadSettings(){
   try{
     const s=JSON.parse(localStorage.getItem('mrm_settings')||'{}');
@@ -866,7 +896,7 @@ const SYSTEM = `너는 유튜브 영화·드라마 짜깁기 쇼츠 작가 겸 �
 - 의미 단위(한 호흡)마다 한 구절. 구절 하나가 화면 한 컷(2~4초)에 대응.
 - 종결어미는 전문 나레이터처럼 자연스럽게: ~했죠, ~했습니다, ~것이었죠, ~했으나, ~것입니다, ~는데. "~했지", "~였지" 남발 금지.
 - 문장부호(마침표, 쉼표, 느낌표, 물음표, 따옴표) 전혀 쓰지 않음.
-- 마지막 구절은 엔딩 유도(다음 내용 궁금증 또는 구독 유도).
+- 마지막 구절은 여운이 남는 한마디. 구독·좋아요·다음 편 유도 멘트는 절대 넣지 않는다.
 
 ## 3. 초정밀 편집점
 - 구절마다 캡처 시트에 적힌 시간 중 그 구절 내용과 가장 맞는 장면의 시간을 src_start로 지정(소수점 1자리).
@@ -904,7 +934,7 @@ const SYSTEM_JA = `너는 일본 유튜브의 영화·드라마 짜깁기 쇼츠
 - 한 호흡마다 한 구절, 구절 하나가 화면 한 컷(2~4초). 구절 길이 10~22자.
 - 일본 나레이터의 자연스러운 말투: 〜だった / 〜していた / 〜のだ / 〜なのです / 〜が… 등을 섞어 단조롭지 않게.
 - 문장부호(、。！？「」…) 쓰지 않음. 띄어쓰기도 넣지 않음.
-- 마지막 구절은 엔딩 유도(続きが気になる、チャンネル登録 등).
+- 마지막 구절은 여운이 남는 한마디. チャンネル登録・いいね 같은 유도 멘트는 절대 넣지 않는다.
 
 # 3. 초정밀 편집점
 - 구절마다 캡처 시트의 시간 중 내용과 가장 맞는 장면의 시간을 src_start로 지정(소수점 1자리).
@@ -925,9 +955,40 @@ const SYSTEM_JA = `너는 일본 유튜브의 영화·드라마 짜깁기 쇼츠
 {"titles":["...10개"],"title_lines":["上の行","下の行"],"scenes":[{"type":"narration","text":"...","src_start":12.5,"guide":"..."},{"type":"dialogue","subtitle":"...","src_start":45.2,"src_end":47.8,"speaker":"female","guide":"..."}]}
 title_lines는 가장 좋은 제목을 두 줄로 나눈 것(한 줄 8~10자).`;
 
+const CLIP_RULES = (lang) => `너는 유튜브 영화 쇼츠 채널 '명화관' 스타일의 편집자 겸 작가다. 사용자가 준 영상 구간의 장면 캡처 시트(각 칸 노란 숫자 = 초)와 원본 대사 자료(각 줄 [시작~끝] 초)를 보고 쇼츠를 설계한다.${lang==='ja'?' 제목·나레이션·대사 자막은 모두 일본 쇼츠 시청자에게 자연스러운 일본어로 쓴다(번역투 금지). guide만 한국어.':''}
+
+# 구성
+1) 도입 나레이션 (type "narration") 2~4구절, 합계 8~15초.
+ - 이 구간에서 벌어질 핵심 상황과 궁금증을 던져 시청자를 붙잡는다.
+ - 이 영상 구간 밖의 사건(이후 전개, 결말)은 절대 말하지 않는다.
+ - 각 구절의 src_start는 그 구절 내용과 정확히 맞는 장면의 시간(캡처 시트 기준). 뒤에 나올 강렬한 장면을 미리 보여 주는 티저도 좋다.
+2) 본편 (type "clip"): 원본 장면을 그대로 이어 붙인다.
+ - clip 하나는 3~15초. src_start/src_end는 대사 자료의 실제 시간을 기준으로 첫 대사 0.3초 전부터 마지막 대사 끝 0.5초 뒤까지. 대사 없는 강렬한 장면(사고 순간, 비명 등)도 clip으로 쓸 수 있다.
+ - 시간 순서대로, 이야기가 이해되는 핵심만 골라 지루한 부분은 건너뛴다.
+ - lines: 그 clip 안에 들어가는 대사를 빠짐없이, 대사 자료의 시간 그대로 start/end(초)로 적는다. text는 바로 읽기 쉬운 짧고 자연스러운 ${lang==='ja'?'일본어':'한국어'} 자막(문장부호 최소). speaker는 female, male, other 중 화면과 대사로 판단.
+3) 장면이 크게 건너뛰어 이해가 어려울 때만 clip 사이에 짧은 연결 나레이션 1구절(type narration)을 넣는다. 최대 3개.
+4) 마지막은 감정이 가장 터지는 clip으로 끝낸다. 구독·좋아요·다음 편 유도 멘트는 절대 넣지 않는다.
+
+# 나레이션 말투
+${lang==='ja'?'- 일본 나레이터의 자연스러운 말투(〜だった / 〜していた / 〜のです). 문장부호·띄어쓰기 없이. 구절당 10~22자.':'- 전문 나레이터의 자연스러운 구어체(~했죠, ~했습니다, ~것이었죠, ~는데). 문장부호 없이. 구절당 10~22자.'}
+
+# 사실 규칙
+- 캡처, 대사 자료, 메모에 근거한 내용만 쓴다. 지어내지 않는다.
+
+# 제목 10개
+${lang==='ja'?'- 일본어, 공백 없이 10~16자, 호기심 자극.':'- 정상 띄어쓰기, 공백 제외 12~14자, 호기심 자극.'} title_lines는 그중 가장 좋은 제목을 두 줄로 나눈 것.
+
+# 길이
+- 전체 길이(나레이션 + clip 합계)는 사용자가 준 목표 길이 ±15초.
+
+# 출력 (JSON만, 설명·코드블록 금지)
+{"titles":["...10개"],"title_lines":["윗줄","아랫줄"],"scenes":[
+ {"type":"narration","text":"...","src_start":12.5,"guide":"..."},
+ {"type":"clip","src_start":40.2,"src_end":51.0,"lines":[{"start":40.5,"end":42.1,"text":"...","speaker":"male"}],"guide":"..."}]}`;
+
 function parseJSON(t){ t=t.replace(/```json|```/g,''); const a=t.indexOf('{'), b=t.lastIndexOf('}'); if(a<0||b<0) throw new Error('AI 응답 형식을 읽지 못했어요. 다시 눌러 주세요.'); return JSON.parse(t.slice(a,b+1)); }
 function splitTitle(t){ t=String(t||'').trim(); const words=t.split(' '); if(words.length<2){ const a=[...t]; if(a.length<9) return [t,'']; const h=Math.ceil(a.length/2); return [a.slice(0,h).join(''),a.slice(h).join('')]; } let best=1, bd=1e9; for(let i=1;i<words.length;i++){ const d=Math.abs(words.slice(0,i).join(' ').length - words.slice(i).join(' ').length); if(d<bd){bd=d;best=i;} } return [words.slice(0,best).join(' '), words.slice(best).join(' ')]; }
-const newScene = o => ({type:o.type, text:o.text, src_start:o.src_start, src_end:o.src_end, speaker:o.speaker||'other', guide:o.guide||'', audio:null, audioDur:0, audioEl:null, srcNode:null, aState:''});
+const newScene = o => ({type:o.type, text:o.text, src_start:o.src_start, src_end:o.src_end, lines:o.lines||null, speaker:o.speaker||'other', guide:o.guide||'', audio:null, audioDur:0, audioEl:null, srcNode:null, aState:''});
 function normalize(o){
   S.titles=(o.titles||[]).map(t=>String(t).replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,10);
   let tl=o.title_lines; if(!Array.isArray(tl)||!tl[0]) tl=splitTitle(S.titles[0]||'');
@@ -935,11 +996,18 @@ function normalize(o){
   const d=S.videoDur||1e9;
   S.scenes=(o.scenes||[]).map(s=>{
     const st=Math.max(0,Math.min(+s.src_start||0,d-0.5));
+    if(s.type==='clip'){ let en=+s.src_end||st+6; en=Math.min(Math.max(en,st+1.5),st+25,d);
+      const SP=['female','male','other'];
+      const lines=(s.lines||[]).map(l=>({start:+l.start,end:+l.end,text:clean(l.text),speaker:SP.includes(l.speaker)?l.speaker:'other'})).filter(l=>l.text)
+        .map(l=>{ let a=isFinite(l.start)?l.start:st, z=isFinite(l.end)?l.end:a+2; a=Math.max(st,Math.min(a,en-0.3)); z=Math.max(a+0.6,Math.min(z,en)); return {...l,start:a,end:z}; });
+      return newScene({type:'clip',text:lines.map(l=>l.text).join(' / ')||'(대사 없음)',src_start:st,src_end:en,lines,guide:s.guide}); }
     if(s.type==='dialogue'){ let en=+s.src_end||st+2.5; en=Math.min(Math.max(en,st+1),st+6,d); const sp=['female','male','other'].includes(s.speaker)?s.speaker:'other';
       return newScene({type:'dialogue',text:clean(s.subtitle||s.text),src_start:st,src_end:en,speaker:sp,guide:s.guide}); }
     return newScene({type:'narration',text:clean(s.text),src_start:st,guide:s.guide});
   }).filter(s=>s.text);
   if(!S.scenes.length) throw new Error('장면이 비어 있어요. 다시 눌러 주세요.');
+  // 같은 장면이 연달아 반복되지 않게 살짝 옮겨요
+  const used=[]; S.scenes.forEach(sc=>{ if(sc.type!=='narration') return; let k=0; while(used.some(u=>Math.abs(u-sc.src_start)<1.2) && k<4){ sc.src_start=Math.min(d-0.5,sc.src_start+2.5); k++; } used.push(sc.src_start); });
 }
 
 /* ================= 분석 실행 ================= */
@@ -979,14 +1047,16 @@ $('analyzeBtn').addEventListener('click', async ()=>{
 ${txLabel}:
 ${tx||'(없음)'}
 ${otherShots()}
+목표 길이: 약 ${$('targetLen').value}초
 지침서대로 JSON을 만들어 줘.`;
-    const SYS = JA()? SYSTEM_JA : SYSTEM;
+    let mode=$('structMode').value; if(mode==='clip' && !transcript.length){ mode='narr'; sttNote+=' (대사 자료가 없어 나레이션 중심으로 만들었어요. 자막을 넣거나 받아쓰기를 켜면 명화관식이 돼요)'; }
+    const SYS = mode==='clip'? CLIP_RULES(JA()?'ja':'ko') : (JA()? SYSTEM_JA : SYSTEM);
     const out = provider==='claude' ? await callClaude(SYS,sheets,text) : await callGPT(SYS,sheets,text);
     normalize(parseJSON(out)); saveVer();
     S.work=$('work').value;
     bar(1); renderAll();
-    const nd=S.scenes.filter(s=>s.type==='dialogue').length;
-    setStatus('anaStatus',`완성: 제목 ${S.titles.length}개, 장면 ${S.scenes.length}개 (원본 대사 ${nd}개). 편집점을 확인하고 목소리를 만드세요. ${sttNote}`, !!sttNote);
+    const nd=S.scenes.filter(s=>s.type!=='narration').length, nn=S.scenes.length-nd;
+    setStatus('anaStatus',`완성: 제목 ${S.titles.length}개, 나레이션 ${nn}개 · 원본 장면 ${nd}개 · 약 ${Math.round(buildTL().total)}초. 확인 후 목소리를 만드세요. ${sttNote}`, /못|없어/.test(sttNote));
   }catch(e){ setStatus('anaStatus',e.message,true); }
   busy=false; updateButtons(); $('analyzeBtn').disabled=!S.file;
 });
@@ -995,6 +1065,13 @@ ${otherShots()}
 $('testBtn').addEventListener('click', ()=>{
   const d=S.videoDur, lines= JA()? ['この男は毎日同じ時間に','同じ場所を通っていた','ところがその日だけは何かが違った','誰かが彼を見ていたのだ','しかし本当のどんでん返しは別にあった','その人物の正体は','彼が一番信じていた人だったのです','彼はこの事実に気づくのか'] : ['이 남자는 매일 같은 시간에','같은 장소를 지나갔습니다','그런데 그날따라 이상한 게 보였죠','누군가 그를 지켜보고 있었던 것','하지만 진짜 반전은 따로 있었습니다','그 사람의 정체는','바로 그가 가장 믿던 사람이었죠','과연 그는 이 사실을 알게 될까요'];
   const n=lines.length+1; S.scenes=[];
+  if($('structMode').value==='clip'){
+    const intro= JA()? ['平凡な冬の日だった','しかしその選択がすべてを変えたのです'] : ['평범한 겨울날이었습니다','하지만 그 선택이 모든 걸 바꿔 놓았죠'];
+    intro.forEach((t,k)=>S.scenes.push(newScene({type:'narration',text:t,src_start:+(d*(0.7+k*0.1)).toFixed(1),guide:'티저'})));
+    [[0.1,0.25],[0.35,0.5],[0.6,0.78]].forEach(([a,z],k)=>{ const st=+(d*a).toFixed(1), en=+(d*z).toFixed(1);
+      S.scenes.push(newScene({type:'clip',src_start:st,src_end:en,text:'',guide:'원본 장면 예시',lines:[{start:st+0.5,end:st+2.5,text:JA()?'どこにいるの':'너 지금 어디야',speaker:'female'},{start:st+3,end:Math.min(en,st+5),text:JA()?'すぐ行く':'금방 갈게',speaker:'male'}]})); });
+    S.scenes.forEach(x=>{ if(x.type==='clip') x.text=x.lines.map(l=>l.text).join(' / '); });
+  } else
   lines.forEach((t,i)=>{ S.scenes.push(newScene({type:'narration',text:t,src_start:+(d*(i+0.3)/n).toFixed(1),guide:'예시 장면'})); if(i===4) S.scenes.push(newScene({type:'dialogue',text:'너 지금 어디야',src_start:+(d*0.62).toFixed(1),src_end:+(d*0.62+2.5).toFixed(1),speaker:'female',guide:'원본 대사 예시'})); });
   S.titles=['믿었던 사람의 소름 돋는 정체','매일 지나가던 길의 비밀'];
   if(JA()){ S.titles=['信じていた人の正体','毎日通る道の秘密']; S.title1='優等生が隠していた'; S.title2='衝撃の秘密'; }
@@ -1049,6 +1126,7 @@ let thumbQueue=Promise.resolve();
 function renderScenes(){
   const box=$('scenes'); box.innerHTML='';
   S.scenes.forEach((sc,i)=>{
+    if(sc.type==='clip'){ renderClipRow(box,sc,i); return; }
     const d=document.createElement('div'); d.className='scene'+(sc.type==='dialogue'?' dlg':''); d.dataset.i=i;
     const isD=sc.type==='dialogue';
     d.innerHTML=`
@@ -1088,6 +1166,38 @@ function renderScenes(){
     renderStat(i);
   });
 }
+function renderClipRow(box,sc,i){
+  const d=document.createElement('div'); d.className='scene clip'; d.dataset.i=i;
+  const spk=v=>`<option value="female"${v==='female'?' selected':''}>여자</option><option value="male"${v==='male'?' selected':''}>남자</option><option value="other"${v==='other'?' selected':''}>기타</option>`;
+  d.innerHTML=`<div class="snum">${i+1}</div>
+    <div class="th"><canvas width="320" height="180" title="눌러서 미리보기"></canvas></div>
+    <div style="min-width:0">
+      <span class="tag">원본 장면 + 대사 자막 (나레이션 없음)</span>
+      <div class="tc"><span>원본</span><input type="number" step="0.1" class="st" aria-label="시작 초"><span>~</span><input type="number" step="0.1" class="en" aria-label="끝 초">
+        <button type="button" class="small mv" data-d="-1">-1초</button><button type="button" class="small mv" data-d="1">+1초</button><button type="button" class="small del">삭제</button></div>
+      <div class="lns"></div>
+      <div class="guide"></div><div class="sstat"></div>
+    </div>`;
+  d.querySelector('.st').value=sc.src_start.toFixed(1); d.querySelector('.en').value=sc.src_end.toFixed(1);
+  d.querySelector('.guide').textContent=sc.guide?('연출: '+sc.guide):'';
+  const lns=d.querySelector('.lns');
+  (sc.lines||[]).forEach((l,k)=>{ const r=document.createElement('div'); r.className='ln';
+    r.innerHTML=`<span>${fmt(l.start)}</span><input type="text" aria-label="대사 자막"><select aria-label="말하는 사람">${spk(l.speaker)}</select>`;
+    r.querySelector('input').value=l.text;
+    r.querySelector('input').addEventListener('change',e=>{ l.text=clean(e.target.value); e.target.value=l.text; sc.text=sc.lines.map(x=>x.text).join(' / '); buildGuide(); showScene(i,l.start+0.3); });
+    r.querySelector('input').addEventListener('focus',()=>showScene(i,l.start+0.3));
+    r.querySelector('select').addEventListener('change',e=>{ l.speaker=e.target.value; showScene(i,l.start+0.3); });
+    lns.appendChild(r); });
+  if(!(sc.lines||[]).length) lns.innerHTML='<p class="note" style="margin:4px 0 0">대사 없는 장면이에요.</p>';
+  box.appendChild(d);
+  const tcv=d.querySelector('canvas'); queueThumb(tcv, sc.lines&&sc.lines[0]? sc.lines[0].start : sc.src_start); tcv.addEventListener('click',()=>showScene(i));
+  const shift=dt=>{ dt=Math.max(-sc.src_start,Math.min(dt,S.videoDur-sc.src_end)); sc.src_start+=dt; sc.src_end+=dt; (sc.lines||[]).forEach(l=>{ l.start+=dt; l.end+=dt; }); renderScenes(); buildGuide(); showScene(i); };
+  d.querySelectorAll('.mv').forEach(b=>b.addEventListener('click',()=>shift(+b.dataset.d)));
+  d.querySelector('.st').addEventListener('change',e=>{ const v=Math.max(0,Math.min(+e.target.value||0,sc.src_end-1)); sc.src_start=v; e.target.value=v.toFixed(1); buildGuide(); renderStat(i); showScene(i,v+0.2); });
+  d.querySelector('.en').addEventListener('change',e=>{ const v=Math.max(sc.src_start+1,Math.min(+e.target.value||0,S.videoDur)); sc.src_end=v; e.target.value=v.toFixed(1); buildGuide(); renderStat(i); });
+  d.querySelector('.del').addEventListener('click',()=>{ S.scenes.splice(i,1); renderScenes(); buildGuide(); updateButtons(); });
+  renderStat(i);
+}
 function queueThumb(c,t){
   thumbQueue=thumbQueue.then(async()=>{ if(!S.url) return; await seekTo(vThumb,t); const x=c.getContext('2d'); x.fillStyle='#000'; x.fillRect(0,0,320,180);
     const vw=vThumb.videoWidth, vh=vThumb.videoHeight; if(!vw) return; const s=Math.min(320/vw,180/vh); x.drawImage(vThumb,(320-vw*s)/2,(180-vh*s)/2,vw*s,vh*s); }).catch(()=>{});
@@ -1096,6 +1206,7 @@ function renderStat(i){
   const sc=S.scenes[i]; const el=document.querySelector(`.scene[data-i="${i}"] .sstat`); if(!el) return;
   const sp=+$('speed').value;
   if(sc.type==='dialogue'){ el.innerHTML=`원본 소리로 ${(sc.src_end-sc.src_start).toFixed(1)}초`; return; }
+  if(sc.type==='clip'){ el.innerHTML=`원본 소리로 ${(sc.src_end-sc.src_start).toFixed(1)}초 · 대사 ${(sc.lines||[]).length}줄`; return; }
   el.innerHTML = sc.audio? `<span class="ok">목소리 ✓ ${(sc.audioDur/rateOf(sc)).toFixed(1)}초</span>` : (sc.aState? `<span class="${sc.aState==='실패'?'no':''}">목소리 ${sc.aState}</span>` : `목소리 없음 (예상 ${(est(sc.text)/sp).toFixed(1)}초)`);
 }
 function refreshStats(){ S.scenes.forEach((_,i)=>renderStat(i)); }
@@ -1104,7 +1215,7 @@ function updateButtons(){
   $('ttsBtn').disabled=!has||busy; $('playBtn').disabled=!has||busy||!S.url; $('renderBtn').disabled=!has||busy||!S.url; $('stopBtn').disabled=!busy;
 }
 let previewIdx=-1;
-async function showScene(i){ previewIdx=i; const sc=S.scenes[i]; if(!sc||!S.url){ drawComposite(i,null); return; } await seekTo(vThumb,sc.src_start+0.2); if(previewIdx===i && !busy) drawComposite(i,vThumb); }
+async function showScene(i,at){ previewIdx=i; const sc=S.scenes[i]; if(!sc||!S.url){ drawComposite(i,null); return; } const T= at!=null? at : (sc.type==='clip'&&sc.lines&&sc.lines[0]? sc.lines[0].start+0.3 : sc.src_start+0.2); await seekTo(vThumb,T); if(previewIdx===i && !busy) drawComposite(i,vThumb,1,T); }
 function redrawPreview(){ if(!busy) showScene(previewIdx<0?0:previewIdx); }
 
 /* ================= 목소리 ================= */
@@ -1130,7 +1241,7 @@ $('ttsBtn').addEventListener('click', async ()=>{
 function buildTL(){
   const sp=+$('speed').value; let t=0.05; const tl=[]; const vd=S.videoDur||1e9;
   S.scenes.forEach((sc,i)=>{
-    let d = sc.type==='dialogue' ? Math.max(0.8, sc.src_end-sc.src_start) : (sc.audioDur? sc.audioDur/rateOf(sc) : est(sc.text)/sp) + 0.06;
+    let d = (sc.type==='dialogue'||sc.type==='clip') ? Math.max(0.8, sc.src_end-sc.src_start) : (sc.audioDur? sc.audioDur/rateOf(sc) : est(sc.text)/sp) + 0.06;
     let src=sc.src_start; if(src+d>vd-0.05) src=Math.max(0,vd-0.05-d);
     tl.push({i,start:t,end:t+d,src,type:sc.type}); t+=d;
   });
@@ -1199,7 +1310,7 @@ function drawBrand(b){
   g.fillStyle='rgba(0,0,0,.72)'; g.beginPath(); g.roundRect? g.roundRect(px,py,pw,ph,20) : g.rect(px,py,pw,ph); g.fill();
   g.fillStyle=ACC(); g.textAlign='center'; g.textBaseline='middle'; g.fillText(name,px+pw/2,py+ph/2+1); g.textBaseline='alphabetic';
 }
-function drawComposite(i, vid, zoom=1){
+function drawComposite(i, vid, zoom=1, srcT=null){
   const b=band();
   drawBg(vid);
   g.save(); g.beginPath(); g.rect(b.x,b.y,b.w,b.h); g.clip();
@@ -1209,7 +1320,8 @@ function drawComposite(i, vid, zoom=1){
   drawTitleLine(S.title1||'', 150, '#ffffff');
   drawTitleLine(S.title2||'', 236, ACC());
   const sc=S.scenes[i];
-  if(sc && sc.text){ sc.type==='dialogue' ? drawDialogue(sc.text,sc.speaker,b) : drawSub(sc.text,b); }
+  if(sc && sc.type==='clip'){ const T=srcT==null? sc.src_start+0.3 : srcT; const l=(sc.lines||[]).find(x=>T>=x.start-0.05 && T<=x.end+0.25); if(l) drawDialogue(l.text,l.speaker,b); }
+  else if(sc && sc.text){ sc.type==='dialogue' ? drawDialogue(sc.text,sc.speaker,b) : drawSub(sc.text,b); }
   const work=S.work||$('work').value; if(work){ g.font='700 25px "Noto Sans KR",sans-serif'; g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+($('subPos').value==='below'?172:46)); }
 }
 
@@ -1254,13 +1366,13 @@ async function run(record){
         const seg=TL.tl[k], el=els[k%2], gn=gains[k%2], other=els[(k+1)%2], og=gains[(k+1)%2], now=c.currentTime;
         og.gain.cancelScheduledValues(now); og.gain.setTargetAtTime(0,now,0.01); other.pause();
         if(Math.abs(el.currentTime-seg.src)>0.35) el.currentTime=seg.src;
-        gn.gain.cancelScheduledValues(now); gn.gain.setTargetAtTime(seg.type==='dialogue'?dlg:duck, now, 0.02);
+        gn.gain.cancelScheduledValues(now); gn.gain.setTargetAtTime((seg.type==='dialogue'||seg.type==='clip')?dlg:duck, now, 0.02);
         el.play().catch(()=>{});
         const sc=S.scenes[seg.i]; if(sc.audioEl){ sc.audioEl.currentTime=0; sc.audioEl.play().catch(()=>{}); }
         const nx=TL.tl[k+1]; if(nx) setTimeout(()=>{ other.pause(); other.currentTime=nx.src; },40);
         cur=k;
       }
-      if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], JA()? 1.045-0.04*p : 1+0.035*p); }
+      if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], seg.type==='clip'?1:(JA()? 1.045-0.04*p : 1+0.035*p), seg.src+(t-seg.start)); }
       else drawComposite(0, VA);
       $('renderBar').style.width=Math.min(100,Math.max(0,t)/TL.total*100)+'%';
       if(t>=TL.total||stopFlag) res(); else requestAnimationFrame(tick);
@@ -1295,11 +1407,11 @@ function buildGuide(){
   S.titles.forEach((t,i)=>out.push(`${i+1}. ${t} (공백 제외 ${noSpaceLen(t)}자)`));
   out.push('', `상단 표시: ${S.title1} / ${S.title2}`, '');
   out.push('### 2. 고농도 도파민 쇼츠 대본 (의미 단위 줄바꿈, 자연스러운 종결어미 적용)');
-  S.scenes.forEach(s=>out.push(s.type==='dialogue'? `(원본 대사) ${s.text}` : s.text));
+  S.scenes.forEach(s=>{ if(s.type==='clip') (s.lines||[]).forEach(l=>out.push(`(원본 대사) ${l.text}`)); else out.push(s.type==='dialogue'? `(원본 대사) ${s.text}` : s.text); });
   out.push('', '### 3. 초정밀 타임코드 미세 편집 가이드 (단일 장면 2~4초 단위 매칭)');
   tl.forEach(seg=>{ const s=S.scenes[seg.i];
-    const src = s.type==='dialogue'? `원본 ${fmt(seg.src)}~${fmt(seg.src+(seg.end-seg.start))} 원본 소리 크게` : `원본 ${fmt(seg.src)}부터`;
-    out.push(`* **${fmt(seg.start)} ~ ${fmt(seg.end)}** | "${s.text}" | ${src}${s.guide?' · '+s.guide:''}`); });
+    const src = s.type!=='narration'? `원본 ${fmt(seg.src)}~${fmt(seg.src+(seg.end-seg.start))} 원본 소리 그대로` : `원본 ${fmt(seg.src)}부터`;
+    out.push(`* **${fmt(seg.start)} ~ ${fmt(seg.end)}** | "${s.type==='clip'?'(원본 장면) '+s.text:s.text}" | ${src}${s.guide?' · '+s.guide:''}`); });
   out.push('', `총 길이 약 ${total.toFixed(1)}초${S.work?' · '+S.work:''}`);
   $('guideOut').value=out.join('\n');
 }
