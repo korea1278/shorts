@@ -47,6 +47,8 @@ details summary{cursor:pointer;color:var(--mute);font-size:13px;margin-top:8px}
 .status.err{color:var(--bad)}
 .bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:10px}
 .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.cutbox{border:1.5px solid var(--accent);border-radius:10px;padding:14px;margin-top:12px;background:var(--panel2)}
+.cutbox h3{font:400 17px var(--display);margin:0 0 6px;color:var(--accent)}
 .drop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;text-align:center;color:var(--mute);cursor:pointer}
 .drop.has{border-style:solid;color:var(--fg)}
 /* 제목 후보 */
@@ -143,9 +145,9 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
       <!-- 1. 영상 -->
       <section class="card">
         <h2><span class="step">1</span>원본 영상 올리기</h2>
-        <label class="drop" id="drop" for="videoFile">여기를 눌러 영화·드라마 영상 파일(mp4)을 고르세요<br><small>핵심 갈등 장면이 담긴 3~13분 클립을 추천해요</small></label>
+        <label class="drop" id="drop" for="videoFile">여기를 눌러 영화·드라마 파일을 고르세요<br><small>전체 영화(mkv·mp4)를 넣으면 필요한 구간만 잘라서 써요. 3~13분 클립은 바로 열려요.</small></label>
         <input id="videoFile" type="file" accept="video/*" hidden>
-        <div class="row" style="margin-top:10px"><button type="button" id="driveBtn">구글 드라이브에서 가져오기</button><span class="note" style="margin:0">드라이브에 올려 둔 영상을 골라서 바로 불러와요. mp4(H.264) 영상만 열려요.</span></div>
+        <div class="row" style="margin-top:10px"><button type="button" id="driveBtn">구글 드라이브에서 가져오기</button><span class="note" style="margin:0">드라이브에 올려 둔 영화를 골라 불러와요. 전체 영화(mkv)도 돼요.</span></div>
         <div class="row" style="margin-top:8px">
           <label for="subFile" style="margin:0"><span style="display:inline-block;border:1px solid var(--line);border-radius:7px;padding:9px 14px;color:var(--fg);background:var(--panel2);cursor:pointer;font-size:14px">내 PC에서 자막 (smi·srt)</span></label>
           <input id="subFile" type="file" accept=".smi,.sami,.srt,.txt" hidden>
@@ -154,6 +156,18 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
         </div>
         <div class="cols">
           <div><label for="subOffset">자막 시간 맞추기: 이 영상이 원본 영화의 몇 분부터인지 (자른 클립일 때)</label><input id="subOffset" type="text" value="0:00:00" placeholder="예) 1:05:30"></div>
+        </div>
+        <div id="cutBox" class="cutbox" hidden>
+          <h3>전체 영화에서 구간 자르기</h3>
+          <p class="note" id="cutInfo" style="margin-top:0"></p>
+          <div class="row"><button class="primary" type="button" id="aiPickBtn" disabled>AI가 가장 자극적인 구간 고르기</button><span class="note" id="aiPickNote" style="margin:0">자막(smi·srt)이 있어야 AI가 고를 수 있어요.</span></div>
+          <div class="cols">
+            <div><label for="cutStart">시작 (시:분:초)</label><input id="cutStart" type="text" value="0:00:00"></div>
+            <div><label for="cutEnd">끝 (시:분:초)</label><input id="cutEnd" type="text" value="0:10:00"></div>
+          </div>
+          <div class="row" style="margin-top:10px"><button class="primary" type="button" id="cutBtn" disabled>이 구간 잘라서 불러오기</button><button type="button" id="cutCancel">취소</button></div>
+          <div class="bar"><i id="cutBar"></i></div>
+          <div class="status" id="cutStatus"></div>
         </div>
         <details id="driveSetup"><summary>구글 드라이브 연결 설정 (이미 넣어 두었어요. 바꿀 때만 열기)</summary>
           <div class="cols">
@@ -397,14 +411,20 @@ $('bgm').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f){
   try{ bgmBuf=await getCtx().decodeAudioData(await f.arrayBuffer()); }catch(err){ bgmBuf=null; setStatus('renderStatus','배경음악 파일을 읽지 못했어요.',true); } });
 
 /* ================= 영상 올리기 ================= */
-$('videoFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(!f) return; if(looksBad(f.name)) setStatus('anaStatus','이 파일은 크롬에서 안 열릴 수 있어요. 열어 볼게요…',true); loadVideoFile(f); });
-async function loadVideoFile(f){
+$('videoFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleSource(f); e.target.value=''; });
+async function handleSource(f){
+  if(looksBad(f.name) || f.size>900*1048576){ await openCutter(f); return; }
+  const ok=await loadVideoFile(f,true);
+  if(!ok){ await openCutter(f); return; }
+  if(S.videoDur>20*60 && !f.__cut){ await openCutter(f); setStatus('anaStatus','영상이 20분보다 길어요. 아래에서 쓸 구간만 잘라 주세요.'); }
+}
+async function loadVideoFile(f,quiet=false){
   if(S.url) URL.revokeObjectURL(S.url);
   S.file=f; S.url=URL.createObjectURL(f);
   vThumb.src=S.url;
   if(VA){ VA.src=S.url; VB.src=S.url; }
-  await new Promise(r=>{ vThumb.onloadedmetadata=r; vThumb.onerror=r; });
-  if(!vThumb.duration || !isFinite(vThumb.duration) || !vThumb.videoWidth){ setStatus('anaStatus',BAD_FMT_MSG,true); return; }
+  await new Promise(r=>{ vThumb.onloadedmetadata=r; vThumb.onerror=r; setTimeout(r,15000); });
+  if(!vThumb.duration || !isFinite(vThumb.duration) || !vThumb.videoWidth || vThumb.error){ if(!quiet) setStatus('anaStatus',BAD_FMT_MSG,true); return false; }
   S.videoDur=vThumb.duration;
   const mb=(f.size/1048576).toFixed(0);
   $('drop').classList.add('has');
@@ -414,7 +434,10 @@ async function loadVideoFile(f){
   if(S.videoDur>15*60) msg+=' 영상이 15분보다 길어서 장면을 드문드문 보게 돼요. 핵심 장면만 잘라 올리면 편집점이 더 정확해져요.';
   setStatus('anaStatus',msg, S.videoDur>15*60);
   $('analyzeBtn').disabled=false; $('testBtn').disabled=false;
-  await seekTo(vThumb, Math.min(5, S.videoDur/3)); drawComposite(-1, vThumb);
+  await seekTo(vThumb, Math.min(5, S.videoDur/3));
+  if(vThumb.error){ if(!quiet) setStatus('anaStatus',BAD_FMT_MSG,true); return false; }
+  drawComposite(-1, vThumb);
+  return true;
 }
 
 const BAD_FMT_MSG='이 영상은 크롬에서 열 수 없는 형식이에요. 파일 이름에 mkv, x265, HEVC, 10bit가 있으면 대부분 안 열려요. mp4(H.264) 영상으로 바꿔서 올려 주세요.';
@@ -448,12 +471,120 @@ async function loadSubFile(file){
   if(!subs.length) throw new Error('자막을 읽지 못했어요. smi나 srt 파일인지 확인해 주세요.');
   S.subs=subs;
   $('subNote').textContent=`자막 "${file.name}" 불러옴 (${subs.length}줄). 대사 받아쓰기 대신 이 자막을 써요.`;
+  if(!$('cutBox').hidden && S.srcPath){ $('aiPickBtn').disabled=false; $('aiPickNote').textContent='자막이 준비됐어요. AI가 구간을 고를 수 있어요.'; }
 }
 function subsForClip(){
   if(!S.subs) return null; const off=parseTimeStr($('subOffset').value), d=S.videoDur||1e9;
   return S.subs.map(x=>({start:x.start-off,end:x.end-off,text:x.text})).filter(x=>x.end>0&&x.start<d).map(x=>({...x,start:Math.max(0,x.start)}));
 }
 $('subFile').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return; try{ await loadSubFile(f); }catch(err){ $('subNote').textContent=err.message; } });
+
+/* ================= 전체 영화에서 구간 자르기 (브라우저용 ffmpeg) ================= */
+const FF_VER='0.12.15', FFC_VER='0.12.10';
+let FF=null, FFLOG=[], ffOnLog=null, ffMounted=false;
+const hms = t => { t=Math.max(0,Math.round(t)); const h=Math.floor(t/3600), m=Math.floor(t%3600/60), s=t%60; return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; };
+async function ffGet(say){
+  if(FF) return FF;
+  if(!window.FFmpegWASM) await loadScript(`https://unpkg.com/@ffmpeg/ffmpeg@${FF_VER}/dist/umd/ffmpeg.js`);
+  say&&say('자르기 프로그램 받는 중… (약 30MB, 처음 한 번)');
+  const blobURL=async(u,t)=>{ let r; try{ r=await fetch(u); }catch(e){ throw new Error('자르기 프로그램을 받지 못했어요. 인터넷 연결을 확인해 주세요.'); } return URL.createObjectURL(new Blob([await r.arrayBuffer()],{type:t})); };
+  const B=`https://unpkg.com/@ffmpeg/core@${FFC_VER}/dist/esm`;
+  const ff=new FFmpegWASM.FFmpeg();
+  ff.on('log',({message})=>{ FFLOG.push(message); if(FFLOG.length>600) FFLOG.shift(); if(ffOnLog) ffOnLog(message); });
+  await ff.load({coreURL:await blobURL(B+'/ffmpeg-core.js','text/javascript'), wasmURL:await blobURL(B+'/ffmpeg-core.wasm','application/wasm'),
+    classWorkerURL:URL.createObjectURL(new Blob([`import "https://unpkg.com/@ffmpeg/ffmpeg@${FF_VER}/dist/esm/worker.js";`],{type:'text/javascript'}))});
+  return FF=ff;
+}
+async function ffMount(file){
+  if(ffMounted){ try{ await FF.unmount('/in'); }catch(e){} } else { try{ await FF.createDir('/in'); }catch(e){} }
+  await FF.mount('WORKERFS',{files:[file]},'/in'); ffMounted=true; return '/in/'+file.name;
+}
+async function ffProbe(path){
+  FFLOG=[]; try{ await FF.exec(['-hide_banner','-i',path]); }catch(e){}
+  const L=FFLOG.join('\n');
+  const dm=L.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  const vm=L.match(/Stream #0:\d+[^:]*: Video: (\w+)/);
+  const subs=[...L.matchAll(/Stream #0:(\d+)(?:\[\w+\])?(?:\((\w+)\))?: Subtitle: (\w+)/g)].map(m=>({idx:+m[1],lang:m[2]||'',codec:m[3]}));
+  return {dur: dm?(+dm[1])*3600+(+dm[2])*60+(+dm[3]):0, vcodec: vm?vm[1]:'', pix10:/p10(le|be)?/.test(L), subs};
+}
+function canPlayCodec(v,p10){
+  if(v==='h264'||v==='vp9'||v==='av1') return true;
+  if(v==='hevc'){ const c=p10?'hvc1.2.4.L123.B0':'hvc1.1.6.L123.B0'; try{ if(window.MediaSource&&MediaSource.isTypeSupported(`video/mp4; codecs="${c}"`)) return true; }catch(e){} return document.createElement('video').canPlayType(`video/mp4; codecs="${c}"`)!==''; }
+  return false;
+}
+async function ffCut(path,start,end,copy,onProg){
+  const dur=end-start, args=['-ss',String(start),'-i',path,'-t',String(dur),'-map','0:v:0','-map','0:a:0?','-sn','-dn'];
+  if(copy){ args.push('-c:v','copy'); if(S.srcInfo.vcodec==='hevc') args.push('-tag:v','hvc1'); }
+  else args.push('-vf','scale=-2:720','-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p');
+  args.push('-c:a','aac','-b:a','160k','-ac','2','-movflags','+faststart','/cut.mp4');
+  ffOnLog=m=>{ const t=m.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/); if(t) onProg(Math.min(1,((+t[1])*3600+(+t[2])*60+(+t[3]))/dur)); };
+  try{ await FF.exec(args); } finally { ffOnLog=null; }
+  let data; try{ data=await FF.readFile('/cut.mp4'); }catch(e){ throw new Error('자르기에 실패했어요. 시작·끝 시간을 확인해 주세요.'); }
+  try{ await FF.deleteFile('/cut.mp4'); }catch(e){}
+  const f=new File([data], S.source.name.replace(/\.[^.]+$/,'')+`_${hms(start).replace(/:/g,'')}.mp4`, {type:'video/mp4'}); f.__cut=true; return f;
+}
+async function openCutter(file){
+  S.source=file; $('cutBox').hidden=false; $('cutBtn').disabled=true; $('aiPickBtn').disabled=true;
+  const say=m=>{ $('cutInfo').textContent=m; };
+  setStatus('anaStatus','전체 영화나 크롬에서 바로 못 여는 파일이라, 필요한 구간만 잘라서 쓸게요. (아래 노란 칸)');
+  $('cutBox').scrollIntoView({behavior:'smooth',block:'center'});
+  try{
+    await ffGet(say); say('영화 파일 확인 중…');
+    S.srcPath=await ffMount(file); const pr=await ffProbe(S.srcPath); S.srcInfo=pr;
+    if(!pr.dur || !pr.vcodec) throw new Error('영화 파일을 읽지 못했어요. 파일이 손상됐거나 지원하지 않는 형식이에요.');
+    pr.copy=canPlayCodec(pr.vcodec,pr.pix10);
+    let info=`${file.name}\n전체 ${hms(pr.dur)} · 영상 ${pr.vcodec.toUpperCase()}${pr.pix10?' 10bit':''} · `+(pr.copy?'빠른 자르기 가능 (10분 구간에 1~2분)':'이 PC의 크롬에서 바로 못 여는 형식이라 화질을 720p로 바꿔 변환해요 (느림: 10분 구간에 10~20분)');
+    if(!S.subs){
+      const ts=pr.subs.filter(x=>/subrip|ass|ssa|mov_text|webvtt|text/.test(x.codec));
+      const pick=ts.find(x=>/kor|ko/i.test(x.lang))||null;
+      if(pick){ say(info+'\n영화 안에 든 한국어 자막을 꺼내는 중…'); FFLOG=[];
+        try{ await FF.exec(['-i',S.srcPath,'-map','0:'+pick.idx,'-f','srt','/sub.srt']); const d=await FF.readFile('/sub.srt'); await FF.deleteFile('/sub.srt');
+          const subs=parseSRT(decodeText(d)); if(subs.length){ S.subs=subs; $('subNote').textContent=`영화 안에 든 한국어 자막을 꺼냈어요 (${subs.length}줄).`; } }catch(e){}
+      }
+    }
+    info+= S.subs? '\n자막 있음: AI가 구간을 고를 수 있어요.' : '\n자막 없음: smi 자막을 넣으면 AI가 구간을 골라 줘요. 아니면 시작·끝 시간을 직접 넣으세요.';
+    say(info);
+    $('cutEnd').value=hms(Math.min(pr.dur,600)); $('cutStart').value='0:00:00';
+    $('cutBtn').disabled=false; $('aiPickBtn').disabled=!S.subs;
+  }catch(e){ say(e.message); }
+}
+$('cutCancel').addEventListener('click',()=>{ $('cutBox').hidden=true; });
+$('aiPickBtn').addEventListener('click',async()=>{
+  if(!S.subs){ $('aiPickNote').textContent='자막을 먼저 넣어 주세요.'; return; }
+  let provider=$('provider').value; if(provider==='claude'&&!key('anthropicKey')) provider='openai';
+  if(provider==='openai'&&!key('openaiKey')){ $('aiPickNote').textContent='API 키를 먼저 넣어 주세요.'; return; }
+  const b=$('aiPickBtn'); b.disabled=true; $('aiPickNote').textContent='AI가 영화 전체 자막을 읽고 있어요… (20초~1분)';
+  try{
+    let lines=S.subs.map(x=>`${Math.round(x.start)} ${x.text}`).join('\n'); if(lines.length>90000) lines=lines.slice(0,90000);
+    const sys='너는 유튜브 영화 짜깁기 쇼츠 편집자다. 영화 전체 자막(각 줄 앞 숫자 = 초)을 읽고, 60초 쇼츠로 만들기 가장 좋은 연속 구간 하나를 고른다. 불륜, 약점 협박, 비밀 폭로, 배신, 반전처럼 시청자의 호기심과 분노가 폭발하는 최대 갈등 구간을 고른다. 구간 길이는 6~12분. JSON만 출력: {"start":초,"end":초,"reason":"왜 이 구간인지 한 줄"}';
+    const user=`작품명: ${$('work').value||'(모름)'}\n메모: ${$('memo').value||'(없음)'}\n영화 길이: ${Math.round(S.srcInfo?S.srcInfo.dur:0)}초\n\n자막:\n${lines}`;
+    const out= provider==='claude'? await callClaude(sys,[],user) : await callGPT(sys,[],user);
+    const j=parseJSON(out); let st=Math.max(0,+j.start||0), en=+j.end||st+600; if(en-st>13*60) en=st+12*60; if(en-st<120) en=st+360;
+    if(S.srcInfo&&S.srcInfo.dur) en=Math.min(en,S.srcInfo.dur);
+    $('cutStart').value=hms(st); $('cutEnd').value=hms(en);
+    $('aiPickNote').textContent=`추천: ${hms(st)} ~ ${hms(en)} · ${j.reason||''}`;
+  }catch(e){ $('aiPickNote').textContent=e.message; }
+  b.disabled=false;
+});
+$('cutBtn').addEventListener('click',async()=>{
+  if(!S.srcPath) return;
+  const st=parseTimeStr($('cutStart').value), en=parseTimeStr($('cutEnd').value), len=en-st;
+  if(len<20||len>20*60){ setStatus('cutStatus','구간은 20초~20분 사이로 정해 주세요.',true); return; }
+  const b=$('cutBtn'); b.disabled=true; $('aiPickBtn').disabled=true;
+  const prog=p=>{ $('cutBar').style.width=(p*100)+'%'; };
+  try{
+    let copy=S.srcInfo.copy;
+    setStatus('cutStatus', copy?'구간 자르는 중… (1~2분)':'화질을 바꿔 변환 중… 시간이 오래 걸려요. 이 탭을 띄워 두세요.');
+    let f=await ffCut(S.srcPath,st,en,copy,prog);
+    let ok=await loadVideoFile(f,true);
+    if(!ok && copy){ setStatus('cutStatus','이 PC에서는 원본 화질로 재생이 안 돼서, 720p로 다시 변환할게요. 시간이 좀 걸려요…'); prog(0); S.srcInfo.copy=false; f=await ffCut(S.srcPath,st,en,false,prog); ok=await loadVideoFile(f,true); }
+    if(!ok) throw new Error(BAD_FMT_MSG);
+    $('subOffset').value=hms(st); prog(1);
+    setStatus('cutStatus',`완료! ${hms(st)} ~ ${hms(en)} 구간을 불러왔어요. 자막 시간도 자동으로 맞췄어요.`);
+    setStatus('anaStatus','구간을 불러왔어요. 이제 "분석하고 대본 만들기"를 누르세요.');
+  }catch(e){ setStatus('cutStatus',e.message||'자르기에 실패했어요.',true); }
+  b.disabled=false; $('aiPickBtn').disabled=!S.subs;
+});
 
 /* ================= 구글 드라이브 ================= */
 const G_DEFAULT={clientId:'652397697845-6m7egqnuu058l36kehov1q47kpvoimt4.apps.googleusercontent.com', apiKey:'AIzaSyC6bYbguRn_r9_tz1iJN96-P_TzgxqLcgE'};
@@ -498,11 +629,10 @@ $('driveBtn').addEventListener('click',async()=>{
     setStatus('anaStatus','③ 드라이브 파일 목록을 여는 중… 위쪽 탭에서 "모든 파일"도 확인해 보세요.'); const f=await gPick(tok);
     if(!f) setStatus('anaStatus','파일 고르기를 취소했어요.');
     if(f){
-      if(looksBad(f.name)) throw new Error(`"${f.name}"\n${BAD_FMT_MSG}`);
-      if(f.size>1.5*1024**3) throw new Error('영상이 1.5GB보다 커요. 핵심 장면만 잘라서 올려 주세요.');
+      if(f.size>4*1024**3) throw new Error('영상이 4GB보다 커요. 더 작은 파일(720p나 1080p)로 받아 주세요.');
       setStatus('anaStatus',`④ "${f.name}" 받는 중…`);
       const file=await gDownload(f,tok,(g,t)=>{ setStatus('anaStatus',`구글 드라이브에서 받는 중… ${(g/1048576).toFixed(0)}${t?' / '+(t/1048576).toFixed(0):''}MB`); $('anaBar').style.width=(t?g/t*100:0)+'%'; });
-      $('anaBar').style.width='0%'; await loadVideoFile(file);
+      $('anaBar').style.width='0%'; await handleSource(file);
     }
   }catch(e){ setStatus('anaStatus',e.message,true); }
   b.disabled=false;
