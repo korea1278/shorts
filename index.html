@@ -154,7 +154,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
             <div><label for="dlgVol">원본 대사 구간 소리 <b id="dlgVolVal">100</b>%</label><input id="dlgVol" type="range" min="30" max="150" value="100" style="width:100%"></div>
             <div><label for="bgStyle">배경</label><select id="bgStyle"><option value="blur">장면 블러 배경 (추천)</option><option value="black">검은 배경</option></select></div>
             <div><label for="accentBar" style="margin-top:10px">&nbsp;</label><label style="margin:0;display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="accentBar" checked> 영상 위아래 노란 띠</label></div>
-            <div><label for="bandMode">영상 크기</label><select id="bandMode"><option value="fit">원본 비율 그대로 (인물이 안 잘림, 추천)</option><option value="crop">크게 (좌우를 잘라서 꽉 채움)</option></select></div>
+            <div><label for="bandMode">영상 크기</label><select id="bandMode"><option value="square">명화관식 크게 (정사각형, 장면마다 위치 조절, 추천)</option><option value="fit">원본 비율 그대로 (작게, 안 잘림)</option><option value="crop">세로로 꽉 채움 (많이 잘림)</option></select></div>
           </div>
           <div class="cols">
             <div><label for="bgm">배경음악 (선택)</label><input id="bgm" type="file" accept="audio/*"></div>
@@ -208,12 +208,12 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
           <input id="hsCut" type="range" min="0" max="30" step="1" value="0" style="width:100%">
           <div class="row" style="margin-top:6px"><button type="button" class="small" id="hsAuto">자막 위치 자동으로 찾기</button><span class="note" id="hsNote" style="margin:0">영상을 불러온 뒤 누르세요. 오른쪽 미리보기에서 원래 자막이 안 보이는지 확인하세요.</span></div>
           <label for="subPos">내 자막 위치·모양</label>
-          <select id="subPos"><option value="below">영상 아래 (장면을 안 가리고 잘 읽힘, 추천)</option><option value="box">영상 안 + 반투명 검은 띠</option><option value="inside">영상 안 + 그림자 (레퍼런스 방식)</option></select>
+          <select id="subPos"><option value="below">영상 아래 (장면을 안 가리고 잘 읽힘, 추천)</option><option value="box">영상 안 + 반투명 검은 띠</option><option value="inside">영상 안 + 테두리 글자 (명화관 방식)</option></select>
         </div>
         <label for="memo">메모 (선택): 줄거리, 등장인물 이름, 강조하고 싶은 장면</label>
         <textarea id="memo" rows="3" placeholder="예) 여주 릴리가 노숙하는 남학생 아틀라스를 몰래 도와주는 이야기. 폐건물에 사는 걸 알게 되는 장면을 강조"></textarea>
         <div class="cols">
-          <div><label for="structMode">영상 구성</label><select id="structMode"><option value="clip">명화관식: 도입 나레이션 → 원본 장면 + 대사 자막 (추천)</option><option value="narr">나레이션 중심: 처음부터 끝까지 해설</option></select></div>
+          <div><label for="structMode">영상 구성</label><select id="structMode"><option value="clip">명화관식: 원본 장면·대사 + 사이사이 이야기 나레이션 (추천)</option><option value="narr">나레이션 중심: 처음부터 끝까지 해설</option></select></div>
           <div><label for="targetLen">목표 길이</label><select id="targetLen"><option value="60">약 1분</option><option value="90" selected>약 1분 30초</option><option value="150">약 2분 30초</option></select></div>
         </div>
         <div class="row" style="margin-top:10px">
@@ -457,7 +457,7 @@ function loadSettings(){
     const k=JSON.parse(localStorage.getItem('mrm_keys')||'null');
     if(k){ $('openaiKey').value=k.o||''; $('anthropicKey').value=k.a||''; $('remember').checked=true; }
   }catch(e){}
-  try{ if(!localStorage.getItem('mrm_fit_v2')){ $('bandMode').value='fit'; localStorage.setItem('mrm_fit_v2','1'); } }catch(e){ $('bandMode').value='fit'; }
+  try{ if(!localStorage.getItem('mrm_sq_v3')){ $('bandMode').value='square'; $('subPos').value='inside'; localStorage.setItem('mrm_sq_v3','1'); } }catch(e){ $('bandMode').value='square'; $('subPos').value='inside'; }
   ['speed','duckVol','dlgVol','bgmVol'].forEach(id=>syncVal(id));
 }
 function syncVal(id){ const v=$(id).value; $(id+'Val').textContent = id==='speed'? (+v).toFixed(2) : v; }
@@ -964,24 +964,30 @@ title_lines는 가장 좋은 제목을 두 줄로 나눈 것(한 줄 8~10자).`;
 
 const CLIP_RULES = (lang) => `너는 유튜브 영화 쇼츠 채널 '명화관' 스타일의 편집자 겸 작가다. 사용자가 준 영상 구간의 장면 캡처 시트(각 칸 노란 숫자 = 초)와 원본 대사 자료(각 줄 [시작~끝] 초)를 보고 쇼츠를 설계한다.${lang==='ja'?' 제목·나레이션·대사 자막은 모두 일본 쇼츠 시청자에게 자연스러운 일본어로 쓴다(번역투 금지). guide만 한국어.':''}
 
-# 구성 (쇼츠는 첫 3초에 이탈이 결정된다)
-1) 훅 (첫 장면, type "clip", 2~4초): 이 구간에서 가장 충격적이거나 감정이 터지는 순간(비명, 사고, 오열 등)을 원본 소리 그대로 맨 앞에 먼저 보여 준다. 나중에 본편에 다시 나와도 된다.
-2) 질문 나레이션 (type "narration") 1~2구절: 시청자가 "왜? 어떻게 된 거지?" 하게 만드는 짧은 질문이나 한마디. 예: "이 소년은 왜 얼음 속에 갇혔을까" "모든 건 장난에서 시작됐죠"
-3) 본편 기승전결 (type "clip", 시간 순서):
- - 기: 인물과 상황을 짧게 (1~2 clip)
- - 승: 갈등이 커지는 장면
- - 전: 위기나 반전이 터지는 장면
- - 결: 감정이 가장 폭발하는 장면으로 끝낸다
- - clip 하나는 3~12초. 대사가 이어지는 부분만 고르고, 대사 없이 조용한 구간(2초 이상)은 넣지 않는다. src_start는 첫 대사 0.2초 전, src_end는 마지막 대사 끝 0.4초 뒤.
- - lines: 그 clip 안의 대사를 빠짐없이, 대사 자료의 시간 그대로 start/end(초)로 적는다. text는 짧고 자연스러운 ${lang==='ja'?'일본어':'한국어'} 자막(문장부호 최소). speaker는 말하는 등장인물 이름(알면 이름, 모르면 '엄마', '친구1', '구조대원'처럼 역할). 같은 인물은 끝까지 같은 이름, 한국어로.
-4) 연결 나레이션: 장면이 건너뛸 때만 clip 사이에 짧은 한마디(type narration)를 넣는다. 최대 4개. 예: "그때였습니다" "하지만 존은 대답이 없었죠"
-5) 이 영상 구간 밖의 사건(이후 전개, 결말)은 절대 말하지 않는다. 구독·좋아요·다음 편 유도 멘트는 절대 넣지 않는다.
+# 명화관 쇼츠의 실제 구조 (레퍼런스 분석)
+- 영상의 70% 이상은 원본 장면 + 원본 대사(인물마다 다른 색 자막)다. 나레이션은 장면 사이사이에 들어가 줄거리를 이어 주는 이야기꾼이다.
+- 나레이션이 나오는 동안에도 화면은 그 말에 맞는 원본 장면이 계속 움직인다(원본 소리는 작게).
+- 나레이션은 질문을 던지지 않는다. 3인칭으로 담담하게 이야기를 들려준다.
+  좋은 예: "자신이 10살이라고 말하는 중년의 남자" / "친구들은 언제나 그를 이상한 눈으로 바라봤습니다" / "머지않아 잭은 특유의 유쾌함으로 조금씩 친구들과 섞이기 시작합니다" / "하지만 그에게는 피할 수 없는 현실이 있었죠"
+  나쁜 예(금지): "왜 비명을 질렀을까?" "빙판 아래 무슨 일이 있었던 걸까?" "과연 어떻게 될까요?" "충격적인 결말!" 같은 질문·낚시·감탄형.
 
-# 나레이션은 짧게 치고 빠진다
-- 모든 나레이션 구절은 화면 한 줄에 들어가게 ${lang==='ja'?'6~14자':'공백 포함 6~14자'}, 말하는 시간 1.5~3초. 긴 설명 금지.
-${lang==='ja'?'- 일본 나레이터의 자연스러운 말투(〜だった / 〜のです 등). 문장부호·띄어쓰기 없이.':'- 자연스러운 구어체(~했죠, ~였습니다, ~는데). 문장부호 없이.'}
-- 나레이션 전체 합계는 15초를 넘지 않는다. 영상의 주인공은 원본 장면과 대사다.
-- 각 나레이션의 src_start는 그 말과 맞는 장면의 시간(캡처 시트 기준).
+# 구성
+1) 오프닝 (type "clip", 3~6초): 첫 화면부터 바로 원본 대사가 나오는 장면. 인물이 이상하거나 궁금해지는 대화, 갈등이 보이는 순간. 조용한 풍경·설명으로 시작하지 않는다.
+2) 소개 나레이션 1~2개: 주인공이 누구이고 어떤 상황인지 한 문장씩. 예: "얼어붙은 호수 위에서 장난을 치던 세 소년"
+3) 본편 기승전결 (시간 순서): clip 2~3개마다 나레이션 1개를 넣어 다음 장면으로 이어 준다.
+ - 기: 인물과 일상 / 승: 갈등이 커짐 / 전: 사고·위기·반전 / 결: 감정이 가장 터지는 원본 대사 장면으로 끝낸다. 마지막은 나레이션이 아니라 원본 대사다.
+ - clip 하나는 3~10초. 대사가 이어지는 부분만 고르고, 대사 없이 조용한 구간(2초 이상)은 넣지 않는다. src_start는 첫 대사 0.2초 전, src_end는 마지막 대사 끝 0.4초 뒤.
+ - lines: 그 clip 안의 대사를 빠짐없이, 대사 자료의 시간 그대로 start/end(초)로 적는다. text는 짧고 자연스러운 ${lang==='ja'?'일본어':'한국어'} 자막(한 줄, 문장부호 최소). speaker는 말하는 등장인물 이름(알면 이름, 모르면 '엄마', '친구1', '구조대원'처럼 역할). 같은 인물은 끝까지 같은 이름, 한국어로.
+4) 이 영상 구간 밖의 사건(이후 전개, 결말)은 절대 말하지 않는다. 구독·좋아요·다음 편 유도, "여러분은 어떻게 생각하세요" 같은 마무리 멘트는 절대 넣지 않는다.
+
+# 나레이션 문장
+- 한 나레이션 = 자연스러운 한 문장, ${lang==='ja'?'12~30자':'공백 포함 12~30자'}, 말하는 시간 2~5초. 화면 자막은 프로그램이 2~3어절씩 끊어서 보여 주니 문장을 억지로 줄이지 않는다.
+${lang==='ja'?'- 일본 나레이터의 담담한 말투(〜でした / 〜のです / 〜始めます). 문장부호 없이.':'- 담담한 이야기체(~합니다, ~했습니다, ~였죠, ~는데). 문장부호 없이.'}
+- 나레이션 개수는 목표 길이 1분 30초 기준 6~10개, 나레이션 합계는 전체의 30% 이하.
+- 각 나레이션의 src_start는 그 말과 맞는 장면, 인물이 움직이는 장면의 시간(캡처 시트 기준). 앞뒤 clip과 같은 장면을 반복하지 않는다.
+
+# 화면 위치 (focus)
+- 화면은 정사각형으로 잘린다. 모든 장면(clip, narration)에 focus를 넣는다: 그 장면에서 말하는 인물/주인공이 원본 화면의 어디에 있는지 "left" / "center" / "right".
 
 # 사실 규칙
 - 캡처, 대사 자료, 메모에 근거한 내용만 쓴다. 지어내지 않는다.
@@ -994,31 +1000,33 @@ ${lang==='ja'?'- 일본어, 공백 없이 10~16자, 호기심 자극.':'- 정상
 
 # 출력 (JSON만, 설명·코드블록 금지)
 {"titles":["...10개"],"title_lines":["윗줄","아랫줄"],"scenes":[
- {"type":"narration","text":"...","src_start":12.5,"guide":"..."},
- {"type":"clip","src_start":40.2,"src_end":51.0,"lines":[{"start":40.5,"end":42.1,"text":"...","speaker":"male"}],"guide":"..."}]}`;
+ {"type":"clip","src_start":40.2,"src_end":45.0,"focus":"left","lines":[{"start":40.5,"end":42.1,"text":"...","speaker":"잭"}],"guide":"..."},
+ {"type":"narration","text":"...","src_start":12.5,"focus":"center","guide":"..."}]}`;
 
 function parseJSON(t){ t=t.replace(/```json|```/g,''); const a=t.indexOf('{'), b=t.lastIndexOf('}'); if(a<0||b<0) throw new Error('AI 응답 형식을 읽지 못했어요. 다시 눌러 주세요.'); return JSON.parse(t.slice(a,b+1)); }
 function splitTitle(t){ t=String(t||'').trim(); const words=t.split(' '); if(words.length<2){ const a=[...t]; if(a.length<9) return [t,'']; const h=Math.ceil(a.length/2); return [a.slice(0,h).join(''),a.slice(h).join('')]; } let best=1, bd=1e9; for(let i=1;i<words.length;i++){ const d=Math.abs(words.slice(0,i).join(' ').length - words.slice(i).join(' ').length); if(d<bd){bd=d;best=i;} } return [words.slice(0,best).join(' '), words.slice(best).join(' ')]; }
-const newScene = o => ({type:o.type, text:o.text, src_start:o.src_start, src_end:o.src_end, lines:o.lines||null, speaker:o.speaker||'other', guide:o.guide||'', audio:null, audioDur:0, audioEl:null, srcNode:null, aState:''});
+const newScene = o => ({type:o.type, text:o.text, src_start:o.src_start, src_end:o.src_end, lines:o.lines||null, speaker:o.speaker||'other', fx:isFinite(o.fx)?o.fx:0.5, guide:o.guide||'', audio:null, audioDur:0, audioEl:null, srcNode:null, aState:''});
 function normalize(o){
   S.titles=(o.titles||[]).map(t=>String(t).replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,10);
   let tl=o.title_lines; if(!Array.isArray(tl)||!tl[0]) tl=splitTitle(S.titles[0]||'');
   S.title1=clean(tl[0]); S.title2=clean(tl[1]);
   const d=S.videoDur||1e9;
+  const FX={left:0.15,center:0.5,right:0.85};
   S.scenes=(o.scenes||[]).map(s=>{
+    const fx=FX[String(s.focus||'').toLowerCase()] ?? (isFinite(+s.focus)&&s.focus!==''&&s.focus!=null? Math.max(0,Math.min(1,+s.focus)) : 0.5);
     const st=Math.max(0,Math.min(+s.src_start||0,d-0.5));
     if(s.type==='clip'){ let en=+s.src_end||st+6; en=Math.min(Math.max(en,st+1.5),st+25,d);
       const lines=(s.lines||[]).map(l=>({start:+l.start,end:+l.end,text:clean(l.text),speaker:String(l.speaker||'기타').trim().slice(0,12)||'기타'})).filter(l=>l.text)
         .map(l=>{ let a=isFinite(l.start)?l.start:st, z=isFinite(l.end)?l.end:a+2; a=Math.max(st,Math.min(a,en-0.3)); z=Math.max(a+0.6,Math.min(z,en)); return {...l,start:a,end:z}; });
-      if(!lines.length) return [newScene({type:'clip',text:'(대사 없음)',src_start:st,src_end:Math.min(en,st+4),lines:[],guide:s.guide})];
+      if(!lines.length) return [newScene({type:'clip',text:'(대사 없음)',src_start:st,src_end:Math.min(en,st+4),lines:[],fx,guide:s.guide})];
       // 대사 사이가 2초 넘게 비면 그 부분을 잘라 내고, 앞뒤 무음도 줄여요
       lines.sort((p,q)=>p.start-q.start); const groups=[[lines[0]]];
       for(let k=1;k<lines.length;k++){ const prev=groups[groups.length-1]; if(lines[k].start-prev[prev.length-1].end>2.0) groups.push([lines[k]]); else prev.push(lines[k]); }
       return groups.map(gp=>{ const a=Math.max(st,gp[0].start-0.2), z=Math.min(en,gp[gp.length-1].end+0.4);
-        return newScene({type:'clip',text:gp.map(l=>l.text).join(' / '),src_start:a,src_end:Math.max(z,a+1),lines:gp,guide:s.guide}); }); }
+        return newScene({type:'clip',text:gp.map(l=>l.text).join(' / '),src_start:a,src_end:Math.max(z,a+1),lines:gp,fx,guide:s.guide}); }); }
     if(s.type==='dialogue'){ let en=+s.src_end||st+2.5; en=Math.min(Math.max(en,st+1),st+6,d); const sp=['female','male','other'].includes(s.speaker)?s.speaker:'other';
       return newScene({type:'dialogue',text:clean(s.subtitle||s.text),src_start:st,src_end:en,speaker:sp,guide:s.guide}); }
-    return newScene({type:'narration',text:clean(s.text),src_start:st,guide:s.guide});
+    return newScene({type:'narration',text:clean(s.text),src_start:st,fx,guide:s.guide});
   }).flat().filter(s=>s.text);
   if(!S.scenes.length) throw new Error('장면이 비어 있어요. 다시 눌러 주세요.');
   // 같은 장면이 연달아 반복되지 않게 살짝 옮겨요
@@ -1209,14 +1217,14 @@ function renderScenes(){
           <button type="button" class="small mv" data-d="-1">-1초</button><button type="button" class="small mv" data-d="1">+1초</button>
           ${isD?`<span>~</span><input type="number" step="0.1" min="0" class="en" id="en${i}" aria-label="끝 초">
           <select class="spk" id="spk${i}"><option value="female">여자 (노랑)</option><option value="male">남자 (파랑)</option><option value="other">기타 (흰색)</option></select>`:''}
-          <button type="button" class="small playOne">▶ 재생</button><button type="button" class="small del">삭제</button>
+          <button type="button" class="small playOne">▶ 재생</button><button type="button" class="small del">삭제</button>${PAN_HTML}
         </div>
         <div class="guide"></div>
         <div class="sstat"></div>
       </div>`;
     d.querySelector('.tx').value=sc.text;
     d.querySelector('.st').value=sc.src_start.toFixed(1);
-    d.querySelector('.guide').textContent=sc.guide?('연출: '+sc.guide):'';
+    d.querySelector('.guide').textContent=sc.guide?('연출: '+sc.guide):''; bindPan(d,sc,i);
     if(isD){ d.querySelector('.en').value=sc.src_end.toFixed(1); d.querySelector('.spk').value=sc.speaker; }
     box.appendChild(d);
     const tcv=d.querySelector('canvas');
@@ -1236,6 +1244,8 @@ function renderScenes(){
     renderStat(i);
   });
 }
+const PAN_HTML='<select class="small pan" aria-label="화면 위치" title="정사각형 화면에서 보여 줄 위치"><option value="0">◀ 왼쪽</option><option value="0.25">왼쪽 조금</option><option value="0.5">가운데</option><option value="0.75">오른쪽 조금</option><option value="1">오른쪽 ▶</option></select>';
+function bindPan(d,sc,i,t){ const el=d.querySelector('.pan'); if(!el) return; const v=[0,0.25,0.5,0.75,1].reduce((a,b)=>Math.abs(b-sc.fx)<Math.abs(a-sc.fx)?b:a,0.5); el.value=String(v); el.addEventListener('change',e=>{ sc.fx=+e.target.value; showScene(i,t); }); }
 function renderClipRow(box,sc,i){
   const d=document.createElement('div'); d.className='scene clip'; d.dataset.i=i;
   d.innerHTML=`<div class="snum">${i+1}</div>
@@ -1243,11 +1253,11 @@ function renderClipRow(box,sc,i){
     <div style="min-width:0">
       <span class="tag">원본 장면 + 대사 자막 (나레이션 없음)</span>
       <div class="tc"><span>원본</span><input type="number" step="0.1" class="st" aria-label="시작 초"><span>~</span><input type="number" step="0.1" class="en" aria-label="끝 초">
-        <button type="button" class="small mv" data-d="-1">-1초</button><button type="button" class="small mv" data-d="1">+1초</button><button type="button" class="small playOne">▶ 재생</button><button type="button" class="small del">삭제</button></div>
+        <button type="button" class="small mv" data-d="-1">-1초</button><button type="button" class="small mv" data-d="1">+1초</button><button type="button" class="small playOne">▶ 재생</button><button type="button" class="small del">삭제</button>${PAN_HTML}</div>
       <div class="lns"></div>
       <div class="guide"></div><div class="sstat"></div>
     </div>`;
-  d.querySelector('.st').value=sc.src_start.toFixed(1); d.querySelector('.en').value=sc.src_end.toFixed(1);
+  d.querySelector('.st').value=sc.src_start.toFixed(1); d.querySelector('.en').value=sc.src_end.toFixed(1); bindPan(d,sc,i,sc.lines&&sc.lines[0]?sc.lines[0].start+0.3:undefined);
   d.querySelector('.guide').textContent=sc.guide?('연출: '+sc.guide):'';
   const lns=d.querySelector('.lns');
   (sc.lines||[]).forEach((l,k)=>{ const r=document.createElement('div'); r.className='ln';
@@ -1323,14 +1333,15 @@ function buildTL(only){
 /* ================= 그리기 ================= */
 const TFONT = s => JA()? `${s}px "Dela Gothic One","Noto Sans JP",sans-serif` : `${s}px "Black Han Sans","Noto Sans KR",sans-serif`;
 const SFONT = s => JA()? `700 ${s}px "Noto Sans JP",sans-serif` : `700 ${s}px "Noto Sans KR",sans-serif`;
-function band(){ return $('bandMode').value==='fit' ? {x:0,y:330,w:720,h:405} : {x:0,y:290,w:720,h:640}; }
+function band(){ const m=$('bandMode').value; return m==='fit' ? {x:0,y:330,w:720,h:405} : m==='square' ? {x:0,y:300,w:720,h:700} : {x:0,y:290,w:720,h:820}; }
 function fit(font, txt, max, size){ g.font=font(size); while(size>16 && g.measureText(txt).width>max){ size-=2; g.font=font(size); } return size; }
 function wrap(font, txt, max, size){ g.font=font(size); const sp=txt.includes(' '), words=sp?txt.split(' '):[...txt], sep=sp?' ':''; const lines=[]; let cur=''; for(const w of words){ const c=cur?cur+sep+w:w; if(cur && g.measureText(c).width>max){ lines.push(cur); cur=w; } else cur=c; } if(cur) lines.push(cur); return lines; }
 const hsFrac=()=>(+$('hsCut').value||0)/100;
-function drawCoverVid(v,b,zoom){ const vw=v.videoWidth, vh0=v.videoHeight; if(!vw) return;
-  const vh=vh0*(1-hsFrac());
+function drawCoverVid(v,b,zoom,fx){ const vw=v.videoWidth, vh0=v.videoHeight; if(!vw) return;
+  const vh=vh0*(1-hsFrac()); if(!isFinite(fx)) fx=0.5;
   const base = $('bandMode').value==='fit' ? Math.min(b.w/vw,b.h/vh) : Math.max(b.w/vw,b.h/vh); const s=base*zoom, dw=vw*s, dh=vh*s;
-  g.drawImage(v, 0,0,vw,vh, b.x+(b.w-dw)/2, b.y+(b.h-dh)/2, dw, dh); }
+  const x = dw>b.w ? b.x-(dw-b.w)*fx : b.x+(b.w-dw)/2;
+  g.drawImage(v, 0,0,vw,vh, x, b.y+(b.h-dh)/2, dw, dh); }
 function drawTitleLine(txt,y,color){
   if(!txt) return; const size=fit(TFONT,txt,640,66);
   g.save(); g.translate(W/2,y); g.transform(1,0,-0.16,1,0,0);
@@ -1345,9 +1356,9 @@ function wrap2(font,txt,max,size){
   for(let i=1;i<u.length;i++){ const a=u.slice(0,i).join(sep), c=u.slice(i).join(sep); const w=Math.max(g.measureText(a).width,g.measureText(c).width); if(w<bw){ bw=w; best=[a,c]; } }
   return best||[txt];
 }
-function subLayout(b,n=2,lh=53){ const pos=$('subPos').value; return pos==='below'? {pos, bottom:b.y+b.h+66+(n-1)*lh, max:660} : {pos, bottom:b.y+b.h-30, max:620}; }
-function drawSub(txt,b){
-  let L=subLayout(b); let size=40; let lines=wrap2(SFONT,txt,L.max,size);
+function subLayout(b,n=2,lh=53){ const pos=$('subPos').value; return pos==='below'? {pos, bottom:b.y+b.h+66+(n-1)*lh, max:660} : {pos, bottom:b.y+b.h-(b.h>=600?95:30), max:640}; }
+function drawSub(txt,b,color){
+  let L=subLayout(b); let size=$('subPos').value==='box'?40:36; let lines=wrap2(SFONT,txt,L.max,size);
   while(lines.length>1 && size>30 && lines.some(l=>{ g.font=SFONT(size); return g.measureText(l).width>L.max; })) size-=2;
   lines=lines.slice(0,2); const lh=size*1.32; L=subLayout(b,lines.length,lh);
   g.textAlign='center'; g.textBaseline='alphabetic'; g.lineJoin='round';
@@ -1356,9 +1367,10 @@ function drawSub(txt,b){
   lines.forEach((ln,k)=>{ const y=L.bottom-(lines.length-1-k)*lh; const s=fit(SFONT,ln,L.max+30,size);
     g.save(); if(L.pos!=='box'){ g.shadowColor='rgba(0,0,0,.85)'; g.shadowBlur=10; g.shadowOffsetY=2; }
     g.lineWidth=s*(L.pos==='box'?0.08:0.16); g.strokeStyle='rgba(0,0,0,.9)'; g.strokeText(ln,W/2,y); g.restore();
-    g.fillStyle='#fff'; g.fillText(ln,W/2,y); });
+    g.fillStyle=color||'#fff'; g.fillText(ln,W/2,y); });
 }
 function drawDialogue(txt,speaker,b){
+  if($('subPos').value!=='box'){ drawSub(txt,b,spkColor(speaker)); return; }
   const size=38, lines=wrap2(SFONT,txt,600,size).slice(0,2), lh=50; g.font=SFONT(size); const L=subLayout(b,lines.length,lh);
   const bw=Math.min(680,Math.max(...lines.map(l=>g.measureText(l).width))+40), bh=lines.length*lh+18;
   const bx=(W-bw)/2, by= L.pos==='below'? b.y+b.h+24 : L.bottom-bh+16;
@@ -1366,6 +1378,18 @@ function drawDialogue(txt,speaker,b){
   g.fillStyle=spkColor(speaker); g.textAlign='center'; g.textBaseline='alphabetic';
   lines.forEach((ln,k)=>g.fillText(ln,W/2,by+14+size+k*lh-4));
 }
+/* 나레이션 자막을 명화관처럼 짧은 덩어리로 나눠서 말하는 속도에 맞춰 바꿔요 */
+function narrChunks(t){
+  t=String(t||'').trim(); if(!t) return [];
+  if(t.includes(' ')){ const w=t.split(/\s+/), out=[]; let cur='';
+    let nw=0; for(const x of w){ const big=noSpaceLen(x)>1, c=cur?cur+' '+x:x; if(cur && (noSpaceLen(c)>9 || (big && nw>=2))){ out.push(cur); cur=x; nw=big?1:0; } else { cur=c; if(big) nw++; } } if(cur) out.push(cur);
+    if(out.length>1 && noSpaceLen(out[out.length-1])<=3){ const z=out.pop(); out[out.length-1]+=' '+z; } return out; }
+  const a=[...t], out=[]; let i=0; while(i<a.length){ let e=Math.min(a.length,i+9);
+    if(e<a.length){ for(let k=e;k>i+3;k--){ if('はがをにでとものへて、。'.includes(a[k-1])){ e=k; break; } } }
+    if(a.length-e<=2) e=a.length; out.push(a.slice(i,e).join('')); i=e; }
+  return out;
+}
+function narrChunkAt(t,p){ const c=narrChunks(t); if(c.length<2) return t; const w=c.map(x=>noSpaceLen(x)+1), tot=w.reduce((x,y)=>x+y,0); let acc=0; for(let k=0;k<c.length;k++){ acc+=w[k]; if(p*1.04<=acc/tot) return c[k]; } return c[c.length-1]; }
 const bgC=document.createElement('canvas'); bgC.width=54; bgC.height=96; const bgX=bgC.getContext('2d');
 function drawBg(vid){
   g.fillStyle='#000'; g.fillRect(0,0,W,H);
@@ -1382,11 +1406,11 @@ function drawBrand(b){
   g.fillStyle='rgba(0,0,0,.72)'; g.beginPath(); g.roundRect? g.roundRect(px,py,pw,ph,20) : g.rect(px,py,pw,ph); g.fill();
   g.fillStyle=ACC(); g.textAlign='center'; g.textBaseline='middle'; g.fillText(name,px+pw/2,py+ph/2+1); g.textBaseline='alphabetic';
 }
-function drawComposite(i, vid, zoom=1, srcT=null){
-  const b=band();
+function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
+  const b=band(); const sc0=S.scenes[i];
   drawBg(vid);
   g.save(); g.beginPath(); g.rect(b.x,b.y,b.w,b.h); g.clip();
-  if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
+  if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom,sc0?sc0.fx:0.5); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
   g.restore();
   drawBrand(b);
   drawTitleLine(S.title1||'', 150, '#ffffff');
@@ -1395,8 +1419,8 @@ function drawComposite(i, vid, zoom=1, srcT=null){
   if(sc && sc.type==='clip'){ const T=srcT==null? sc.src_start+0.3 : srcT; const L=sc.lines||[]; let l=null;
     for(let k=0;k<L.length;k++){ const x=L[k], nx=L[k+1]; const hold=Math.max(x.end+0.3, x.start+Math.max(1.3,noSpaceLen(x.text)/8)); const until=nx? Math.min(hold, nx.start-0.02) : hold; if(T>=x.start-0.05 && T<=until){ l=x; } }
     if(l) drawDialogue(l.text,l.speaker,b); }
-  else if(sc && sc.text){ sc.type==='dialogue' ? drawDialogue(sc.text,sc.speaker,b) : drawSub(sc.text,b); }
-  const work=S.work||$('work').value; if(work){ g.font='700 25px "Noto Sans KR",sans-serif'; g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+($('subPos').value==='below'?172:46)); }
+  else if(sc && sc.text){ if(sc.type==='dialogue') drawDialogue(sc.text,sc.speaker,b); else { const sp=sc.audioDur? sc.audioDur/rateOf(sc) : 0, segLen=sp? sp+0.06 : 0; drawSub(narrChunkAt(sc.text, segLen? Math.min(1,prog*segLen/sp) : prog),b); } }
+  const work=S.work||$('work').value; if(work){ g.font='700 25px "Noto Sans KR",sans-serif'; g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+($('subPos').value==='below'?172:(b.h>=600?-48:46))); }
 }
 
 /* ================= 재생 · 녹화 ================= */
@@ -1446,7 +1470,7 @@ async function run(record,only){
         const nx=TL.tl[k+1]; if(nx) setTimeout(()=>{ other.pause(); other.currentTime=nx.src; },40);
         cur=k;
       }
-      if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], seg.type==='clip'?1:(JA()? 1.045-0.04*p : 1+0.035*p), seg.src+(t-seg.start)); }
+      if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], seg.type==='clip'?1:(JA()? 1.045-0.04*p : 1+0.035*p), seg.src+(t-seg.start), p); }
       else drawComposite(0, VA);
       $('renderBar').style.width=Math.min(100,Math.max(0,t)/TL.total*100)+'%';
       if(t>=TL.total||stopFlag) res(); else requestAnimationFrame(tick);
