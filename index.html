@@ -215,7 +215,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
         <div class="cols">
           <div><label for="structMode">영상 구성</label><select id="structMode"><option value="clip">명화관식: 원본 장면·대사 + 사이사이 이야기 나레이션 (추천)</option><option value="narr">나레이션 중심: 처음부터 끝까지 해설</option></select></div>
           <div><label for="orderMode">편집 순서</label><select id="orderMode"><option value="story">이야기 흐름 순 (명화관처럼 자유롭게, 추천)</option><option value="time">원본 시간 순</option></select></div>
-          <div><label for="targetLen">목표 길이</label><select id="targetLen"><option value="60">약 1분</option><option value="90" selected>약 1분 30초</option><option value="150">약 2분 30초</option></select></div>
+          <div><label for="targetLen">목표 길이</label><select id="targetLen"><option value="auto" selected>자동 (이야기에 맞게 1분~2분 30초, 추천)</option><option value="60">약 1분</option><option value="90">약 1분 30초</option><option value="120">약 2분</option><option value="150">약 2분 30초</option></select></div>
         </div>
         <div class="row" style="margin-top:10px">
           <button class="primary" id="analyzeBtn" type="button" disabled>분석하고 대본 만들기</button>
@@ -461,6 +461,7 @@ function loadSettings(){
     const k=JSON.parse(localStorage.getItem('mrm_keys')||'null');
     if(k){ $('openaiKey').value=k.o||''; $('anthropicKey').value=k.a||''; $('remember').checked=true; }
   }catch(e){}
+  try{ if(!localStorage.getItem('mrm_auto_len')){ $('targetLen').value='auto'; localStorage.setItem('mrm_auto_len','1'); } }catch(e){}
   try{ if(!localStorage.getItem('mrm_sq_v3')){ $('bandMode').value='square'; $('subPos').value='inside'; localStorage.setItem('mrm_sq_v3','1'); } }catch(e){ $('bandMode').value='square'; $('subPos').value='inside'; }
   ['speed','duckVol','dlgVol','bgmVol'].forEach(id=>syncVal(id));
 }
@@ -641,7 +642,7 @@ function freeVideo(){
   [VA,VB,vThumb].forEach(v=>{ if(!v) return; try{ v.pause(); v.removeAttribute('src'); v.load(); }catch(e){} });
   if(S.url){ try{ URL.revokeObjectURL(S.url); }catch(e){} } S.url=''; S.file=null;
 }
-const CUT_MAX_MB=280;
+const CUT_MAX_MB=160;
 async function ffCut(path,start,end,copy,onProg){
   const dur=end-start, args=['-ss',String(start),'-i',path,'-t',String(dur),'-map','0:v:0','-map','0:a:0?','-sn','-dn'];
   if(copy){ args.push('-c:v','copy'); if(S.srcInfo.vcodec==='hevc') args.push('-tag:v','hvc1'); }
@@ -654,7 +655,8 @@ async function ffCut(path,start,end,copy,onProg){
     throw new Error(`${copy?'자르기':'변환'} 중에 멈췄어요: ${why}${tail?' ('+tail+')':''}${/memory|OOM|abort/i.test(why+tail)?'\n→ 브라우저 메모리가 부족해요. 구간을 5분 이하로 줄이고, 다른 탭을 닫은 뒤 다시 해 보세요.':''}`); }
   ffOnLog=null;
   let data; try{ data=await FF.readFile('/cut.mp4'); }catch(e){ const tail=FFLOG.filter(x=>/error|Error|Invalid|memory/i.test(x)).slice(-2).join(' / '); throw new Error(`${copy?'자르기':'변환'}에 실패했어요 (코드 ${rc}). ${tail||'시작·끝 시간을 확인해 주세요.'}`); }
-  try{ await FF.deleteFile('/cut.mp4'); }catch(e){}
+  // 잘라 낸 파일을 받자마자 자르기 프로그램을 꺼서 메모리를 먼저 돌려줘요 (PC방 PC 메모리 부족 방지)
+  ffRelease();
   const f=new File([data], S.source.name.replace(/\.[^.]+$/,'')+`_${hms(start).replace(/:/g,'')}.mp4`, {type:'video/mp4'}); data=null; f.__cut=true; return f;
 }
 async function openCutter(file){
@@ -735,7 +737,7 @@ $('cutBtn').addEventListener('click',async()=>{
   const kbps=(S.srcInfo.kbps||8000)+200, estMB=l=>kbps*l/8/1024; let copy=S.srcInfo.copy, note='';
   if(copy && estMB(len)>CUT_MAX_MB){
     const fitLen=Math.floor(CUT_MAX_MB*8*1024/kbps);
-    if(fitLen>=150){ en=st+fitLen; len=fitLen; $('cutEnd').value=hms(en); note=`원본 화질이 높아서 (${(kbps/1000).toFixed(1)}Mbps) 메모리가 넘치지 않게 ${hms(st)} ~ ${hms(en)} (${Math.round(len/60*10)/10}분)까지만 잘라요. `; }
+    if(fitLen>=100){ en=st+fitLen; len=fitLen; $('cutEnd').value=hms(en); note=`원본 화질이 높아서 (${(kbps/1000).toFixed(1)}Mbps) 메모리가 넘치지 않게 ${hms(st)} ~ ${hms(en)} (${Math.round(len/60*10)/10}분)까지만 잘라요. `; }
     else { copy=false; if(len>4*60){ en=st+240; len=240; $('cutEnd').value=hms(en); } note=`원본 화질이 아주 높아서 (${(kbps/1000).toFixed(1)}Mbps) 720p로 줄여서 4분까지만 변환해요. 시간이 걸려요. `; }
   }
   const b=$('cutBtn'); b.disabled=true; $('aiPickBtn').disabled=true;
@@ -1034,7 +1036,7 @@ ${lang==='ja'?'- 일본 나레이터의 담담한 말투(〜でした / 〜の�
 ${lang==='ja'?'- 일본어, 공백 없이 10~18자, 호기심 자극.':'- 정상 띄어쓰기, 공백 제외 10~20자. 윗줄은 인물·상황, 아랫줄은 "~한 이유 / ~하면 생기는 일 / ~가 한 행동"처럼 궁금증으로 끝낸다.'} title_lines는 그중 가장 좋은 제목을 두 줄로 나눈 것.
 
 # 길이
-- 전체 길이(나레이션 + clip 합계)는 사용자가 준 목표 길이 ±15초. clip을 충분히 골라서 채운다.
+- 전체 길이(나레이션 + clip 합계)는 사용자가 준 목표 길이 ±15초(자동이면 이야기에 맞게). clip을 충분히 골라서 채운다.
 
 # 출력 (JSON만, 설명·코드블록 금지)
 {"titles":["...10개"],"title_lines":["윗줄","아랫줄"],"scenes":[
@@ -1274,13 +1276,13 @@ $('analyzeBtn').addEventListener('click', async ()=>{
 ${txLabel}:
 ${tx||'(없음)'}
 ${otherShots()}
-목표 길이: 약 ${$('targetLen').value}초
+${$('targetLen').value==='auto'? '목표 길이: 자동. 명화관처럼 이야기가 가장 잘 사는 길이로 정한다(60~150초). 이야기가 짧고 굵으면 1분 안팎, 사연·반전이 여러 번 있으면 2분 넘게. 늘어지는 장면으로 억지로 채우지 않는다. 다만 이 영상 구간 길이를 넘을 수는 없다.' : `목표 길이: 약 ${$('targetLen').value}초`}
 지침서대로 JSON을 만들어 줘.`;
     let mode=$('structMode').value; if(mode==='clip' && !transcript.length){ mode='narr'; sttNote+=' (대사 자료가 없어 나레이션 중심으로 만들었어요. 자막을 넣거나 받아쓰기를 켜면 명화관식이 돼요)'; }
     const SYS = mode==='clip'? CLIP_RULES(JA()?'ja':'ko',$('orderMode').value) : (JA()? SYSTEM_JA : SYSTEM);
     const out = provider==='claude' ? await callClaude(SYS,sheets,text) : await callGPT(SYS,sheets,text);
     normalize(parseJSON(out),transcript);
-    const tgt=+$('targetLen').value; let tot=buildTL().total;
+    const tgt= $('targetLen').value==='auto'? 60 : +$('targetLen').value; let tot=buildTL().total;
     if(mode==='clip' && tot<tgt*0.8){
       setStatus('anaStatus',`약 ${Math.round(tot)}초로 짧게 나와서, 장면을 더 넣어 다시 짜는 중…`); bar(0.85);
       try{ const more=text+`\n\n[다시 요청] 직전 결과는 총 약 ${Math.round(tot)}초로 너무 짧았다. 대사 자료에서 clip을 시간 순서에 맞게 더 고르거나 늘려서 총 ${tgt}초(±15초)가 되게 JSON 전체를 다시 출력해.`;
