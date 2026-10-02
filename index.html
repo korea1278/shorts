@@ -998,6 +998,7 @@ const CLIP_RULES = (lang) => `너는 유튜브 영화 쇼츠 채널 '명화관' 
  - 기: 인물과 일상 / 승: 갈등이 커짐 / 전: 사고·위기·반전 / 결: 감정이 가장 터지는 원본 대사 장면으로 끝낸다. 마지막은 나레이션이 아니라 원본 대사다.
  - clip 하나는 3~10초. 대사가 이어지는 부분만 고르고, 대사 없이 조용한 구간(2초 이상)은 넣지 않는다. src_start는 첫 대사 0.2초 전, src_end는 마지막 대사 끝 0.4초 뒤. 다만 인물이 하던 동작(물건을 꺼내기, 넘어지기 등)이 이어지면 그 동작이 끝날 때까지(최대 1.5초 더) 늘린다.
  - clip들은 원본 시간 순서대로, 서로 겹치지 않게 고른다. 같은 장면을 두 번 쓰지 않는다.
+ - 대사가 없어도 이야기의 결정적인 순간(얼음이 깨지며 빠지는 순간, 사고, 구조 등 눈으로 봐야 하는 장면)은 반드시 clip(lines는 빈 배열, 2~4초)으로 보여 준다. 나레이션으로만 말하고 넘어가지 않는다.
  - lines: 그 clip 안의 대사를 빠짐없이, 대사 자료의 시간 그대로 start/end(초)로 적는다. text는 짧고 자연스러운 ${lang==='ja'?'일본어':'한국어'} 자막(한 줄, 문장부호 최소). speaker는 말하는 등장인물 이름(알면 이름, 모르면 '엄마', '친구1', '구조대원'처럼 역할). 같은 인물은 끝까지 같은 이름, 한국어로.
 4) 이 영상 구간 밖의 사건(이후 전개, 결말)은 절대 말하지 않는다. 구독·좋아요·다음 편 유도, "여러분은 어떻게 생각하세요" 같은 마무리 멘트는 절대 넣지 않는다.
 
@@ -1038,6 +1039,7 @@ function dedupeFootage(d){
     if(b-a<1.5) return false;
     if(a!==sc.src_start||b!==sc.src_end){ sc.src_start=a; sc.src_end=b; sc.lines=(sc.lines||[]).filter(l=>l.start>=a-0.1&&l.end<=b+0.3); sc.text=sc.lines.map(l=>l.text).join(' / ')||sc.text; }
     used.push([a,b]); return true; });
+  const lastC=S.scenes[S.scenes.length-1]; if(lastC && lastC.type==='clip') lastC.src_end=Math.min(d, lastC.src_end+0.9);
   assignNarrFootage();
 }
 /* 나레이션 화면 = 앞 장면과 다음 장면 '사이'의 원본 (영화 순서 그대로 이어져요).
@@ -1068,7 +1070,8 @@ function assignNarrFootage(){
     cur=sc.src_start+len*(sc.vrate||1);
   });
 }
-function normalize(o){
+let TX=null;
+function normalize(o,tx){ TX=tx||(typeof subsForClip==='function'? subsForClip() : null)||(S.cache&&S.cache.tx)||null;
   S.titles=(o.titles||[]).map(t=>String(t).replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,10);
   let tl=o.title_lines; if(!Array.isArray(tl)||!tl[0]) tl=splitTitle(S.titles[0]||'');
   S.title1=clean(tl[0]); S.title2=clean(tl[1]);
@@ -1078,7 +1081,11 @@ function normalize(o){
     const fx=FX[String(s.focus||'').toLowerCase()] ?? (isFinite(+s.focus)&&s.focus!==''&&s.focus!=null? Math.max(0,Math.min(1,+s.focus)) : 0.5);
     const st=Math.max(0,Math.min(+s.src_start||0,d-0.5));
     if(s.type==='clip'){ let en=+s.src_end||st+6; en=Math.min(Math.max(en,st+1.5),st+25,d);
-      const lines=(s.lines||[]).map(l=>({start:+l.start,end:+l.end,text:clean(l.text),speaker:String(l.speaker||'기타').trim().slice(0,12)||'기타'})).filter(l=>l.text)
+      let lines=(s.lines||[]).map(l=>({start:+l.start,end:+l.end,text:clean(l.text),speaker:String(l.speaker||'기타').trim().slice(0,12)||'기타'})).filter(l=>l.text);
+      // AI가 적은 대사 시간을 실제 자막 시간에 맞추고, 마지막 대사가 끝까지 나오게 장면 끝을 늘려요
+      lines.forEach(l=>{ if(!isFinite(l.start)) return; let best=null, bd=1.2; (TX||[]).forEach(x=>{ const dd=Math.abs(x.start-l.start); if(dd<bd){ bd=dd; best=x; } }); if(best){ l.start=best.start; l.end=Math.max(best.end, best.start+0.6); } });
+      if(lines.length){ const le=Math.max(...lines.map(l=>isFinite(l.end)?l.end:0)); if(le+0.4>en) en=Math.min(d, le+0.4, st+25); }
+      lines=lines
         .map(l=>{ let a=isFinite(l.start)?l.start:st, z=isFinite(l.end)?l.end:a+2; a=Math.max(st,Math.min(a,en-0.3)); z=Math.max(a+0.6,Math.min(z,en)); return {...l,start:a,end:z}; });
       if(!lines.length) return [newScene({type:'clip',text:'(대사 없음)',src_start:st,src_end:Math.min(en,st+4),lines:[],fx,guide:s.guide})];
       // 대사 사이가 2초 넘게 비면 그 부분을 잘라 내고, 앞뒤 무음도 줄여요
@@ -1136,6 +1143,32 @@ $('retitleBtn').addEventListener('click',async()=>{
 });
 
 /* ================= 분석 실행 ================= */
+/* ================= 나레이션을 실제로 나오는 화면에 맞춰 다듬기 ================= */
+async function fitNarrations(provider){
+  assignNarrFootage();
+  const idx=S.scenes.map((x,i)=>x.type==='narration'?i:-1).filter(i=>i>=0).slice(0,14); if(!idx.length||!S.url) return;
+  const v=document.createElement('video'); v.muted=true; v.preload='auto'; v.src=S.url;
+  await new Promise(r=>{ v.onloadedmetadata=r; v.onerror=r; setTimeout(r,8000); }); if(!v.videoWidth) return;
+  const cw=240, ch=Math.round(240*v.videoHeight/v.videoWidth), lab=26, c=document.createElement('canvas'); c.width=cw*3+60; c.height=idx.length*(ch+lab); const x=c.getContext('2d');
+  x.fillStyle='#000'; x.fillRect(0,0,c.width,c.height);
+  for(let r=0;r<idx.length;r++){ const sc=S.scenes[idx[r]], len=narrLen(sc)*(sc.vrate||1), y=r*(ch+lab);
+    x.fillStyle='#ffd400'; x.font='bold 22px sans-serif'; x.fillText(`${r+1}번`,6,y+lab+ch/2);
+    for(let k=0;k<3;k++){ await seekTo(v, sc.src_start+len*(0.15+0.35*k)); x.drawImage(v,60+k*cw,y+lab,cw-4,ch); } }
+  v.removeAttribute('src'); v.load();
+  const img=c.toDataURL('image/jpeg',0.8).split(',')[1];
+  const ctx=S.scenes.map((sc,i)=> sc.type==='narration'? `[나레이션 ${idx.indexOf(i)+1}번] ${sc.text}` : `[원본 장면] ${(sc.lines||[]).map(l=>l.speaker+': '+l.text).join(' / ')||'(대사 없음)'}`).join('\n');
+  const ja=JA();
+  const sys=`너는 영화 쇼츠 나레이션 작가다. 이미지의 각 줄은 나레이션 N번이 나오는 동안 실제로 화면에 나오는 원본 장면이다(왼쪽→오른쪽 시간 순서).
+각 나레이션을 그 화면과 딱 맞게 다듬는다.
+- 화면에 보이는 일, 또는 바로 다음 원본 장면으로 넘어가는 상황만 말한다. 화면에 안 보이는 사건(예: 물속 화면인데 '어른이 전화를 건다')은 쓰지 않는다.
+- 앞뒤 대사와 이야기 흐름이 자연스럽게 이어지게. 이미 화면과 맞으면 그대로 둔다.
+- ${ja?'자연스러운 일본어 나레이션(〜でした/〜のです), 12~30자, 문장부호 없이.':'담담한 이야기체(~합니다/~했죠), 공백 포함 12~30자, 질문형 금지, 문장부호 없이.'}
+JSON만: {"narrations":[{"n":1,"text":"..."}]}`;
+  const out= provider==='claude'? await callClaude(sys,[img],`쇼츠 전체 흐름:\n${ctx}`) : await callGPT(sys,[img],`쇼츠 전체 흐름:\n${ctx}`);
+  const arr=(parseJSON(out).narrations)||[];
+  arr.forEach(o=>{ const i=idx[(+o.n||0)-1]; const t=clean(o.text||''); if(i!=null && t && t.length>=4) S.scenes[i].text=t; });
+  assignNarrFootage();
+}
 /* ================= 메모 자동 작성 ================= */
 async function autoMemo(provider,transcript){
   const tx=(transcript||[]).map(s=>s.text).join('\n').slice(0,5000);
@@ -1196,15 +1229,16 @@ ${otherShots()}
     let mode=$('structMode').value; if(mode==='clip' && !transcript.length){ mode='narr'; sttNote+=' (대사 자료가 없어 나레이션 중심으로 만들었어요. 자막을 넣거나 받아쓰기를 켜면 명화관식이 돼요)'; }
     const SYS = mode==='clip'? CLIP_RULES(JA()?'ja':'ko') : (JA()? SYSTEM_JA : SYSTEM);
     const out = provider==='claude' ? await callClaude(SYS,sheets,text) : await callGPT(SYS,sheets,text);
-    normalize(parseJSON(out));
+    normalize(parseJSON(out),transcript);
     const tgt=+$('targetLen').value; let tot=buildTL().total;
     if(mode==='clip' && tot<tgt*0.8){
       setStatus('anaStatus',`약 ${Math.round(tot)}초로 짧게 나와서, 장면을 더 넣어 다시 짜는 중…`); bar(0.85);
       try{ const more=text+`\n\n[다시 요청] 직전 결과는 총 약 ${Math.round(tot)}초로 너무 짧았다. 대사 자료에서 clip을 시간 순서에 맞게 더 고르거나 늘려서 총 ${tgt}초(±15초)가 되게 JSON 전체를 다시 출력해.`;
         const out2= provider==='claude' ? await callClaude(SYS,sheets,more) : await callGPT(SYS,sheets,more);
-        const keep={t:S.titles,a:S.title1,b:S.title2,s:S.scenes}; normalize(parseJSON(out2));
+        const keep={t:S.titles,a:S.title1,b:S.title2,s:S.scenes}; normalize(parseJSON(out2),transcript);
         if(buildTL().total<tot){ S.titles=keep.t; S.title1=keep.a; S.title2=keep.b; S.scenes=keep.s; } }catch(e){}
     }
+    if(mode==='clip'){ setStatus('anaStatus','나레이션을 실제 화면에 맞추는 중…'); bar(0.9); try{ await fitNarrations(provider); }catch(e){} }
     setStatus('anaStatus','제목 만드는 중…'); bar(0.95);
     try{ await genTitles(provider); }catch(e){}
     try{ await autoFocus(m=>setStatus('anaStatus',m)); }catch(e){}
@@ -1388,9 +1422,11 @@ async function detPersons(v){
   for(const b of bx){ if(keep.every(k=>iou(k,b)<0.45)) keep.push(b); if(keep.length>=8) break; }
   keep.forEach(k=>k.area=(k.x2-k.x1)*(k.y2-k.y1)); return keep;
 }
-function centerOf(ps,vf){ if(!ps.length) return null; ps=[...ps].sort((a,b)=>b.area-a.area); const big=ps[0];
-  const grp=ps.filter(p=>p.area>=big.area*0.3); let x1=Math.min(...grp.map(p=>p.x1)), x2=Math.max(...grp.map(p=>p.x2));
-  if(x2-x1>vf*0.95){ x1=big.x1; x2=big.x2; } return (Math.max(0,x1)+Math.min(1,x2))/2; }
+/* 화면에 나와야 할 사람들(가장 큰 사람의 15% 이상 크기)의 가운데와 전체 폭 */
+function groupOf(ps){ if(!ps.length) return null; ps=[...ps].sort((a,b)=>b.area-a.area); const big=ps[0];
+  const grp=ps.filter(p=>p.area>=big.area*0.15); const x1=Math.max(0,Math.min(...grp.map(p=>p.x1))), x2=Math.min(1,Math.max(...grp.map(p=>p.x2)));
+  return {c:(x1+x2)/2, w:x2-x1}; }
+function centerOf(ps,vf){ const g0=groupOf(ps); return g0? g0.c : null; }
 async function autoFocus(say){
   if(!S.url||!S.scenes.length) return 0;
   ffRelease();
@@ -1427,12 +1463,19 @@ async function autoFocusRun(say){
     // 2) 컷마다 사람을 찾아서 그 컷의 화면 위치를 정해요
     const shots=[];
     for(let k=0;k<cuts.length;k++){ const s0=cuts[k], s1=k+1<cuts.length?cuts[k+1]:z; const ts=s1-s0>1.6? [s0+0.4,(s0+s1)/2,s1-0.3] : [(s0+s1)/2];
-      const cs=[]; for(const t of ts){ await seekTo(vDet,t); const c=centerOf(await detPersons(vDet),vf); if(c!=null) cs.push(c); }
-      cs.sort((x,y)=>x-y); shots.push({t:s0, fx: cs.length? toFx(cs[Math.floor(cs.length/2)]) : null}); }
+      const gs=[]; for(const t of ts){ await seekTo(vDet,t); const gg=groupOf(await detPersons(vDet)); if(gg) gs.push(gg); }
+      if(!gs.length){ shots.push({t:s0,fx:null,zm:1,len:s1-s0}); continue; }
+      const med=a=>{ a=[...a].sort((x,y)=>x-y); return a[Math.floor(a.length/2)]; };
+      const c=med(gs.map(x=>x.c)), w=Math.max(...gs.map(x=>x.w));
+      // 사람들이 다 안 들어가면 그 컷만 살짝 줌아웃해서 모두 보이게 (최대: 원본 전체 폭)
+      const need=Math.min(1,w+0.06), zm= need>vf ? Math.max(vf, vf/need) : 1, vf2=vf/zm;
+      const fx= vf2>=0.999 ? 0.5 : Math.max(0,Math.min(1,(c-vf2/2)/(1-vf2)));
+      shots.push({t:s0, fx, zm:+zm.toFixed(3), len:s1-s0}); }
     const known=shots.filter(x=>x.fx!=null); if(!known.length){ sc.shots=null; continue; }
-    shots.forEach((x,k)=>{ if(x.fx==null){ const nb=shots.slice(k).find(y=>y.fx!=null)||[...shots.slice(0,k)].reverse().find(y=>y.fx!=null); x.fx=nb.fx; } });
-    // 위치 차이가 작으면 움직이지 않아요 (살짝씩 흔들리는 느낌 방지)
-    const merged=[shots[0]]; for(let k=1;k<shots.length;k++){ const last=merged[merged.length-1]; if(Math.abs(shots[k].fx-last.fx)<0.22) continue; merged.push(shots[k]); }
+    shots.forEach((x,k)=>{ if(x.fx==null){ const nb=shots.slice(k).find(y=>y.fx!=null)||[...shots.slice(0,k)].reverse().find(y=>y.fx!=null); x.fx=nb.fx; x.zm=nb.zm; } });
+    // 위치·크기 차이가 작거나 아주 짧은 컷(0.7초 미만)은 화면을 움직이지 않아요 (급하게 흔들리는 느낌 방지)
+    const merged=[shots[0]]; for(let k=1;k<shots.length;k++){ const last=merged[merged.length-1], x=shots[k];
+      if(x.len<0.7 || (Math.abs(x.fx-last.fx)<0.22 && Math.abs((x.zm||1)-(last.zm||1))<0.12)) continue; merged.push(x); }
     sc.shots=merged; shots.length=0; shots.push(...merged); sc.fx=shots[0].fx; n++;
   }
   return n;
@@ -1570,12 +1613,14 @@ function drawBrand(b){
   g.fillStyle='rgba(0,0,0,.72)'; g.beginPath(); g.roundRect? g.roundRect(px,py,pw,ph,20) : g.rect(px,py,pw,ph); g.fill();
   g.fillStyle=ACC(); g.textAlign='center'; g.textBaseline='middle'; g.fillText(name,px+pw/2,py+ph/2+1); g.textBaseline='alphabetic';
 }
-function fxAt(sc,t){ if(!sc) return 0.5; const sh=sc.shots; if(!sh||!sh.length||t==null) return sc.fx; let f=sh[0].fx; for(const x of sh){ if(t>=x.t-0.02) f=x.fx; else break; } return f; }
+function shotAt(sc,t){ const sh=sc&&sc.shots; if(!sh||!sh.length) return null; if(t==null) return sh[0]; let f=sh[0]; for(const x of sh){ if(t>=x.t-0.02) f=x; else break; } return f; }
+function fxAt(sc,t){ if(!sc) return 0.5; const x=shotAt(sc,t); return x? x.fx : sc.fx; }
+function zmAt(sc,t){ const x=shotAt(sc,t); return x&&x.zm? x.zm : 1; }
 function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
   const b=band(); const sc0=S.scenes[i];
   drawBg(vid);
   g.save(); g.beginPath(); g.rect(b.x,b.y,b.w,b.h); g.clip();
-  if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom,fxAt(sc0,srcT)); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
+  if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom*zmAt(sc0,srcT),fxAt(sc0,srcT)); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
   g.restore();
   drawBrand(b);
   drawTitleLine(S.title1||'', 150, '#ffffff');
