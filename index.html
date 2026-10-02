@@ -154,7 +154,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
             <div><label for="dlgVol">원본 대사 구간 소리 <b id="dlgVolVal">100</b>%</label><input id="dlgVol" type="range" min="30" max="150" value="100" style="width:100%"></div>
             <div><label for="bgStyle">배경</label><select id="bgStyle"><option value="blur">장면 블러 배경 (추천)</option><option value="black">검은 배경</option></select></div>
             <div><label for="accentBar" style="margin-top:10px">&nbsp;</label><label style="margin:0;display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="accentBar" checked> 영상 위아래 노란 띠</label></div>
-            <div><label for="bandMode">영상 크기</label><select id="bandMode"><option value="square">명화관식 크게 (정사각형, 장면마다 위치 조절, 추천)</option><option value="fit">원본 비율 그대로 (작게, 안 잘림)</option><option value="crop">세로로 꽉 채움 (많이 잘림)</option></select></div>
+            <div><label for="bandMode">영상 크기</label><select id="bandMode"><option value="square">명화관식 자동 (정사각형, 사람이 많은 영상은 4:3으로 고정, 추천)</option><option value="r43">4:3 고정 (여러 명이 잘 보임)</option><option value="fit">원본 비율 그대로 (작게, 안 잘림)</option><option value="crop">세로로 꽉 채움 (많이 잘림)</option></select></div>
           </div>
           <div class="cols">
             <div><label for="bgm">배경음악 (선택)</label><input id="bgm" type="file" accept="audio/*"></div>
@@ -488,7 +488,7 @@ async function handleSource(f){
 }
 async function loadVideoFile(f,quiet=false){
   if(S.url) URL.revokeObjectURL(S.url);
-  S.file=f; S.url=URL.createObjectURL(f);
+  S.file=f; S.url=URL.createObjectURL(f); S.wide=false;
   vThumb.src=S.url;
   if(VA){ VA.src=S.url; VB.src=S.url; }
   await new Promise(r=>{ vThumb.onloadedmetadata=r; vThumb.onerror=r; setTimeout(r,15000); });
@@ -1425,7 +1425,7 @@ async function detPersons(v){
 /* 화면에 나와야 할 사람들(가장 큰 사람의 15% 이상 크기)의 가운데와 전체 폭 */
 function groupOf(ps){ if(!ps.length) return null; ps=[...ps].sort((a,b)=>b.area-a.area); const big=ps[0];
   const grp=ps.filter(p=>p.area>=big.area*0.15); const x1=Math.max(0,Math.min(...grp.map(p=>p.x1))), x2=Math.min(1,Math.max(...grp.map(p=>p.x2)));
-  return {c:(x1+x2)/2, w:x2-x1}; }
+  return {c:(x1+x2)/2, w:x2-x1, bc:(Math.max(0,big.x1)+Math.min(1,big.x2))/2}; }
 function centerOf(ps,vf){ const g0=groupOf(ps); return g0? g0.c : null; }
 async function autoFocus(say){
   if(!S.url||!S.scenes.length) return 0;
@@ -1434,12 +1434,13 @@ async function autoFocus(say){
   finally{ try{ DET&&DET.release&&await DET.release(); }catch(e){} DET=null; if(vDet){ try{ vDet.removeAttribute('src'); vDet.load(); }catch(e){} } }
 }
 async function autoFocusRun(say){
-  const b=band(); await detLoad(say);
+  await detLoad(say);
   if(!vDet){ vDet=document.createElement('video'); vDet.muted=true; vDet.preload='auto'; vDet.playsInline=true; }
   if(vDet.src!==S.url){ vDet.src=S.url; await new Promise(r=>{ vDet.onloadedmetadata=r; vDet.onerror=r; setTimeout(r,8000); }); }
   const vw=vDet.videoWidth, vh=vDet.videoHeight*(1-hsFrac()); if(!vw) return 0;
-  const sc0=Math.max(b.w/vw,b.h/vh), vf=b.w/(vw*sc0); if(vf>=0.98) return 0;
-  const toFx=cx=>Math.max(0,Math.min(1,(cx-vf/2)/(1-vf)));
+  const mode=$('bandMode').value; if(mode==='fit') return 0;
+  const vfOf=h=>720/(vw*Math.max(720/vw,h/vh));
+  const all=[];
   const sm=document.createElement('canvas'); sm.width=48; sm.height=27; const smx=sm.getContext('2d',{willReadFrequently:true});
   const sig=()=>{ smx.drawImage(vDet,0,0,48,27); return smx.getImageData(0,0,48,27).data; };
   let n=0;
@@ -1464,20 +1465,24 @@ async function autoFocusRun(say){
     const shots=[];
     for(let k=0;k<cuts.length;k++){ const s0=cuts[k], s1=k+1<cuts.length?cuts[k+1]:z; const ts=s1-s0>1.6? [s0+0.4,(s0+s1)/2,s1-0.3] : [(s0+s1)/2];
       const gs=[]; for(const t of ts){ await seekTo(vDet,t); const gg=groupOf(await detPersons(vDet)); if(gg) gs.push(gg); }
-      if(!gs.length){ shots.push({t:s0,fx:null,zm:1,len:s1-s0}); continue; }
+      if(!gs.length){ shots.push({t:s0,len:s1-s0,c:null}); continue; }
       const med=a=>{ a=[...a].sort((x,y)=>x-y); return a[Math.floor(a.length/2)]; };
-      const c=med(gs.map(x=>x.c)), w=Math.max(...gs.map(x=>x.w));
-      // 사람들이 다 안 들어가면 그 컷만 살짝 줌아웃해서 모두 보이게 (최대: 원본 전체 폭)
-      const need=Math.min(1,w+0.06), zm= need>vf ? Math.max(vf, vf/need) : 1, vf2=vf/zm;
-      const fx= vf2>=0.999 ? 0.5 : Math.max(0,Math.min(1,(c-vf2/2)/(1-vf2)));
-      shots.push({t:s0, fx, zm:+zm.toFixed(3), len:s1-s0}); }
-    const known=shots.filter(x=>x.fx!=null); if(!known.length){ sc.shots=null; continue; }
-    shots.forEach((x,k)=>{ if(x.fx==null){ const nb=shots.slice(k).find(y=>y.fx!=null)||[...shots.slice(0,k)].reverse().find(y=>y.fx!=null); x.fx=nb.fx; x.zm=nb.zm; } });
-    // 위치·크기 차이가 작거나 아주 짧은 컷(0.7초 미만)은 화면을 움직이지 않아요 (급하게 흔들리는 느낌 방지)
-    const merged=[shots[0]]; for(let k=1;k<shots.length;k++){ const last=merged[merged.length-1], x=shots[k];
-      if(x.len<0.7 || (Math.abs(x.fx-last.fx)<0.22 && Math.abs((x.zm||1)-(last.zm||1))<0.12)) continue; merged.push(x); }
-    sc.shots=merged; shots.length=0; shots.push(...merged); sc.fx=shots[0].fx; n++;
+      shots.push({t:s0, len:s1-s0, c:med(gs.map(x=>x.c)), w:Math.max(...gs.map(x=>x.w)), bc:med(gs.map(x=>x.bc))}); }
+    all.push({sc,shots});
   }
+  // 영상 전체에서 칸 크기를 하나로 정해요: 정사각형에 다 안 들어가는 장면이 30% 이상이면 4:3
+  if(mode==='square'){ let tot=0, wide=0; all.forEach(o=>o.shots.forEach(x=>{ if(x.c==null) return; tot+=x.len; if(x.w+0.06>vfOf(700)) wide+=x.len; })); S.wide= tot>0 && wide/tot>=0.3; }
+  const vf=vfOf(band().h), toFx=cx=>vf>=0.999?0.5:Math.max(0,Math.min(1,(cx-vf/2)/(1-vf)));
+  n=0;
+  all.forEach(({sc,shots})=>{
+    shots.forEach(x=>{ if(x.c!=null) x.fx=toFx(x.w+0.04<=vf? x.c : x.bc); });
+    const known=shots.filter(x=>x.fx!=null); if(!known.length){ sc.shots=null; return; }
+    shots.forEach((x,k)=>{ if(x.fx==null){ const nb=shots.slice(k).find(y=>y.fx!=null)||[...shots.slice(0,k)].reverse().find(y=>y.fx!=null); x.fx=nb.fx; } });
+    // 위치 차이가 작거나 아주 짧은 컷(0.7초 미만)은 화면을 움직이지 않아요
+    const merged=[{t:shots[0].t,fx:shots[0].fx}]; for(let k=1;k<shots.length;k++){ const last=merged[merged.length-1], x=shots[k];
+      if(x.len<0.7 || Math.abs(x.fx-last.fx)<0.22) continue; merged.push({t:x.t,fx:x.fx}); }
+    sc.shots=merged; sc.fx=merged[0].fx; n++;
+  });
   return n;
 }
 $('focusBtn').addEventListener('click',async()=>{ if(busy||!S.scenes.length) return; const b=$('focusBtn'); b.disabled=true; const say=m=>{ $('focusNote').textContent=m; };
@@ -1539,7 +1544,10 @@ const FONTS_READY=(async()=>{ try{ const F=window.__FONTS||{}; const mk=(fam,b64
   await Promise.all([F.ohsq&&mk('Cafe24Ohsquare',F.ohsq,'400'), F.gmk&&mk('GmarketSans',F.gmk,'500')]); }catch(e){} })();
 const TFONT = s => JA()? `${s}px "Dela Gothic One","Noto Sans JP",sans-serif` : `${s}px "Cafe24Ohsquare","Black Han Sans","Noto Sans KR",sans-serif`;
 const SFONT = s => JA()? `700 ${s}px "Noto Sans JP",sans-serif` : `500 ${s}px "GmarketSans","Noto Sans KR",sans-serif`;
-function band(){ const m=$('bandMode').value; return m==='fit' ? {x:0,y:330,w:720,h:405} : m==='square' ? {x:0,y:300,w:720,h:700} : {x:0,y:290,w:720,h:820}; }
+/* 영상 칸 크기는 영상 전체에서 하나로 고정해요 (장면마다 커졌다 작아졌다 하면 이탈해요)
+   명화관식(자동): 보통은 정사각형, 여러 사람이 나란히 나오는 장면이 많은 영상이면 처음부터 끝까지 4:3 */
+function band(){ const m=$('bandMode').value; if(m==='fit') return {x:0,y:330,w:720,h:405}; if(m==='crop') return {x:0,y:290,w:720,h:820};
+  const h=(m==='r43'||(m==='square'&&S.wide))?540:700; return {x:0,y:300+(700-h)/2,w:720,h}; }
 function fit(font, txt, max, size){ g.font=font(size); while(size>16 && g.measureText(txt).width>max){ size-=2; g.font=font(size); } return size; }
 function wrap(font, txt, max, size){ g.font=font(size); const sp=txt.includes(' '), words=sp?txt.split(' '):[...txt], sep=sp?' ':''; const lines=[]; let cur=''; for(const w of words){ const c=cur?cur+sep+w:w; if(cur && g.measureText(c).width>max){ lines.push(cur); cur=w; } else cur=c; } if(cur) lines.push(cur); return lines; }
 const hsFrac=()=>(+$('hsCut').value||0)/100;
@@ -1563,7 +1571,7 @@ function wrap2(font,txt,max,size){
   for(let i=1;i<u.length;i++){ const a=u.slice(0,i).join(sep), c=u.slice(i).join(sep); const w=Math.max(g.measureText(a).width,g.measureText(c).width); if(w<bw){ bw=w; best=[a,c]; } }
   return best||[txt];
 }
-function subLayout(b,n=2,lh=53){ const pos=$('subPos').value; return pos==='below'? {pos, bottom:b.y+b.h+66+(n-1)*lh, max:660} : {pos, bottom:b.y+b.h-(b.h>=600?95:30), max:640}; }
+function subLayout(b,n=2,lh=53){ const pos=$('subPos').value; return pos==='below'? {pos, bottom:b.y+b.h+66+(n-1)*lh, max:660} : {pos, bottom:b.y+b.h-(b.h>=500?Math.round(b.h*0.135):30), max:640}; }
 function drawSub(txt,b,color){
   let L=subLayout(b); let size=$('subPos').value==='box'?40:44; let lines=wrap2(SFONT,txt,L.max,size);
   while(lines.length>1 && size>30 && lines.some(l=>{ g.font=SFONT(size); return g.measureText(l).width>L.max; })) size-=2;
@@ -1620,7 +1628,7 @@ function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
   const b=band(); const sc0=S.scenes[i];
   drawBg(vid);
   g.save(); g.beginPath(); g.rect(b.x,b.y,b.w,b.h); g.clip();
-  if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom*zmAt(sc0,srcT),fxAt(sc0,srcT)); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
+  if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom,fxAt(sc0,srcT)); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
   g.restore();
   drawBrand(b);
   drawTitleLine(S.title1||'', 150, '#ffffff');
@@ -1630,7 +1638,7 @@ function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
     for(let k=0;k<L.length;k++){ const x=L[k], nx=L[k+1]; const hold=Math.max(x.end+0.3, x.start+Math.max(1.3,noSpaceLen(x.text)/8)); const until=nx? Math.min(hold, nx.start-0.02) : hold; if(T>=x.start-0.05 && T<=until){ l=x; } }
     if(l) drawDialogue(l.text,l.speaker,b); }
   else if(sc && sc.text){ if(sc.type==='dialogue') drawDialogue(sc.text,sc.speaker,b); else { const sp=sc.audioDur? sc.audioDur/rateOf(sc) : 0, segLen=sp? sp+0.06 : 0; drawSub(narrChunkAt(sc.text, segLen? Math.min(1,prog*segLen/sp) : prog),b); } }
-  const work=S.work||$('work').value; if(work){ g.font=SFONT(25); g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+($('subPos').value==='below'?172:(b.h>=600?-48:46))); }
+  const work=S.work||$('work').value; if(work){ g.font=SFONT(25); g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+($('subPos').value==='below'?172:(b.h>=500?-48:46))); }
 }
 
 /* ================= 재생 · 녹화 ================= */
