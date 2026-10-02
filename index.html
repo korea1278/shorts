@@ -1147,14 +1147,13 @@ $('retitleBtn').addEventListener('click',async()=>{
 async function fitNarrations(provider){
   assignNarrFootage();
   const idx=S.scenes.map((x,i)=>x.type==='narration'?i:-1).filter(i=>i>=0).slice(0,14); if(!idx.length||!S.url) return;
-  const v=document.createElement('video'); v.muted=true; v.preload='auto'; v.src=S.url;
-  await new Promise(r=>{ v.onloadedmetadata=r; v.onerror=r; setTimeout(r,8000); }); if(!v.videoWidth) return;
+  if(!vDet){ vDet=document.createElement('video'); vDet.muted=true; vDet.preload='auto'; vDet.playsInline=true; }
+  const v=vDet; if(v.src!==S.url||!v.getAttribute('src')){ v.src=S.url; await new Promise(r=>{ v.onloadedmetadata=r; v.onerror=r; setTimeout(r,8000); }); } if(!v.videoWidth) return;
   const cw=240, ch=Math.round(240*v.videoHeight/v.videoWidth), lab=26, c=document.createElement('canvas'); c.width=cw*3+60; c.height=idx.length*(ch+lab); const x=c.getContext('2d');
   x.fillStyle='#000'; x.fillRect(0,0,c.width,c.height);
   for(let r=0;r<idx.length;r++){ const sc=S.scenes[idx[r]], len=narrLen(sc)*(sc.vrate||1), y=r*(ch+lab);
     x.fillStyle='#ffd400'; x.font='bold 22px sans-serif'; x.fillText(`${r+1}번`,6,y+lab+ch/2);
     for(let k=0;k<3;k++){ await seekTo(v, sc.src_start+len*(0.15+0.35*k)); x.drawImage(v,60+k*cw,y+lab,cw-4,ch); } }
-  v.removeAttribute('src'); v.load();
   const img=c.toDataURL('image/jpeg',0.8).split(',')[1];
   const ctx=S.scenes.map((sc,i)=> sc.type==='narration'? `[나레이션 ${idx.indexOf(i)+1}번] ${sc.text}` : `[원본 장면] ${(sc.lines||[]).map(l=>l.speaker+': '+l.text).join(' / ')||'(대사 없음)'}`).join('\n');
   const ja=JA();
@@ -1192,7 +1191,7 @@ $('analyzeBtn').addEventListener('click', async ()=>{
   let provider=$('provider').value;
   if(provider==='claude' && !key('anthropicKey')) provider='openai';
   if(!key('openaiKey') && provider==='openai'){ setStatus('anaStatus','OpenAI API 키를 먼저 넣어 주세요.',true); return; }
-  busy=true; updateButtons(); $('analyzeBtn').disabled=true;
+  busy=true; updateButtons(); $('analyzeBtn').disabled=true; releaseForAnalyze();
   const bar=p=>$('anaBar').style.width=(p*100)+'%';
   try{
     let sheets;
@@ -1436,7 +1435,7 @@ async function autoFocus(say){
 async function autoFocusRun(say){
   await detLoad(say);
   if(!vDet){ vDet=document.createElement('video'); vDet.muted=true; vDet.preload='auto'; vDet.playsInline=true; }
-  if(vDet.src!==S.url){ vDet.src=S.url; await new Promise(r=>{ vDet.onloadedmetadata=r; vDet.onerror=r; setTimeout(r,8000); }); }
+  if(vDet.src!==S.url||!vDet.getAttribute('src')){ vDet.src=S.url; await new Promise(r=>{ vDet.onloadedmetadata=r; vDet.onerror=r; setTimeout(r,8000); }); }
   const vw=vDet.videoWidth, vh=vDet.videoHeight*(1-hsFrac()); if(!vw) return 0;
   const mode=$('bandMode').value; if(mode==='fit') return 0;
   const vfOf=h=>720/(vw*Math.max(720/vw,h/vh));
@@ -1642,16 +1641,22 @@ function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
 }
 
 /* ================= 재생 · 녹화 ================= */
+/* 다시 분석하기 전에 미리보기용 영상·이전 목소리·이전 완성 영상이 잡고 있던 메모리를 비워요 */
+function releaseForAnalyze(){
+  [VA,VB].forEach(v=>{ if(!v) return; try{ v.pause(); v.removeAttribute('src'); v.load(); }catch(e){} });
+  S.scenes.forEach(sc=>{ const el=sc.audioEl; if(!el) return; try{ el.pause(); if(sc.srcNode) sc.srcNode.disconnect(); }catch(e){} });
+  const a=document.querySelector('#dlBox a'); if(a){ try{ URL.revokeObjectURL(a.href); }catch(e){} } $('dlBox').innerHTML='';
+}
 function mkVideo(){ const v=document.createElement('video'); v.preload='auto'; v.playsInline=true; v.src=S.url; v.crossOrigin='anonymous'; return v; }
 function pickMime(){ const l=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1,mp4a','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']; return l.find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m))||''; }
 async function run(record,only){
   if(!S.scenes.length||!S.url) return;
   const miss=S.scenes.filter(s=>s.type==='narration'&&!s.audio).length;
-  busy=true; stopFlag=false; updateButtons(); $('dlBox').innerHTML='';
+  busy=true; stopFlag=false; updateButtons(); { const a=document.querySelector('#dlBox a'); if(a){ try{ URL.revokeObjectURL(a.href); }catch(e){} } } $('dlBox').innerHTML='';
   const c=getCtx(); await c.resume();
   try{ await FONTS_READY; await document.fonts.load(TFONT(66),JA()?'日本語の秘密':'한글'); await document.fonts.load(SFONT(40),JA()?'日本語の秘密':'한글'); }catch(e){}
   if(!VA){ VA=mkVideo(); VB=mkVideo(); gA=c.createGain(); gB=c.createGain(); c.createMediaElementSource(VA).connect(gA); c.createMediaElementSource(VB).connect(gB); }
-  if(VA.src!==S.url){ VA.src=S.url; VB.src=S.url; }
+  if(VA.src!==S.url||!VA.getAttribute('src')){ VA.src=S.url; VB.src=S.url; }
   await Promise.all([VA,VB].map(v=>v.readyState>=1?0:new Promise(r=>{ v.onloadedmetadata=r; setTimeout(r,5000); })));
   assignNarrFootage(); const TL=buildTL(only), sp=+$('speed').value, duck=(+$('duckVol').value)/100, dlg=(+$('dlgVol').value)/100;
   const master=c.createGain(); const mon=c.createGain(); mon.gain.value=(record&&!$('monitor').checked)?0:1; master.connect(mon); mon.connect(c.destination);
