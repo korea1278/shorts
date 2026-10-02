@@ -214,6 +214,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
         <textarea id="memo" rows="3" placeholder="예) 여주 릴리가 노숙하는 남학생 아틀라스를 몰래 도와주는 이야기. 폐건물에 사는 걸 알게 되는 장면을 강조"></textarea>
         <div class="cols">
           <div><label for="structMode">영상 구성</label><select id="structMode"><option value="clip">명화관식: 원본 장면·대사 + 사이사이 이야기 나레이션 (추천)</option><option value="narr">나레이션 중심: 처음부터 끝까지 해설</option></select></div>
+          <div><label for="orderMode">편집 순서</label><select id="orderMode"><option value="story">이야기 흐름 순 (명화관처럼 자유롭게, 추천)</option><option value="time">원본 시간 순</option></select></div>
           <div><label for="targetLen">목표 길이</label><select id="targetLen"><option value="60">약 1분</option><option value="90" selected>약 1분 30초</option><option value="150">약 2분 30초</option></select></div>
         </div>
         <div class="row" style="margin-top:10px">
@@ -452,7 +453,7 @@ function setupEngineUI(sample){
 const useST=()=>$('engine').value==='supertonic';
 
 /* ================= 설정 ================= */
-const SET_IDS=['structMode','targetLen','subPos','bgStyle','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
+const SET_IDS=['orderMode','structMode','targetLen','subPos','bgStyle','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
 function loadSettings(){
   try{
     const s=JSON.parse(localStorage.getItem('mrm_settings')||'{}');
@@ -982,33 +983,45 @@ const SYSTEM_JA = `너는 일본 유튜브의 영화·드라마 짜깁기 쇼츠
 {"titles":["...10개"],"title_lines":["上の行","下の行"],"scenes":[{"type":"narration","text":"...","src_start":12.5,"guide":"..."},{"type":"dialogue","subtitle":"...","src_start":45.2,"src_end":47.8,"speaker":"female","guide":"..."}]}
 title_lines는 가장 좋은 제목을 두 줄로 나눈 것(한 줄 8~10자).`;
 
-const CLIP_RULES = (lang) => `너는 유튜브 영화 쇼츠 채널 '명화관' 스타일의 편집자 겸 작가다. 사용자가 준 영상 구간의 장면 캡처 시트(각 칸 노란 숫자 = 초)와 원본 대사 자료(각 줄 [시작~끝] 초)를 보고 쇼츠를 설계한다.${lang==='ja'?' 제목·나레이션·대사 자막은 모두 일본 쇼츠 시청자에게 자연스러운 일본어로 쓴다(번역투 금지). guide만 한국어.':''}
+const CLIP_RULES = (lang,order='story') => `너는 유튜브 영화 쇼츠 채널 '명화관' 스타일의 편집자 겸 작가다. 사용자가 준 영상 구간의 장면 캡처 시트(각 칸 노란 숫자 = 초)와 원본 대사 자료(각 줄 [시작~끝] 초)를 보고 쇼츠를 설계한다.${lang==='ja'?' 제목·나레이션·대사 자막은 모두 일본 쇼츠 시청자에게 자연스러운 일본어로 쓴다(번역투 금지). guide만 한국어.':''}
 
 # 명화관 쇼츠의 실제 구조 (레퍼런스 분석)
 - 영상의 70% 이상은 원본 장면 + 원본 대사(인물마다 다른 색 자막)다. 나레이션은 장면 사이사이에 들어가 줄거리를 이어 주는 이야기꾼이다.
 - 나레이션이 나오는 동안에도 화면은 그 말에 맞는 원본 장면이 계속 움직인다(원본 소리는 작게).
 - 나레이션은 질문을 던지지 않는다. 3인칭으로 담담하게 이야기를 들려준다.
-  좋은 예: "자신이 10살이라고 말하는 중년의 남자" / "친구들은 언제나 그를 이상한 눈으로 바라봤습니다" / "머지않아 잭은 특유의 유쾌함으로 조금씩 친구들과 섞이기 시작합니다" / "하지만 그에게는 피할 수 없는 현실이 있었죠"
+  좋은 예: "자신이 10살이라고 말하는 중년의 남자" / "친구들은 언제나 그를 이상한 눈으로 바라봤습니다" / "머지않아 잭은 특유의 유쾌함으로 조금씩 친구들과 섞이기 시작합니다" / "하지만 그에게는 피할 수 없는 현실이 있었죠" / "장난기가 발동하는데요" / "바로 그때 키스 캠이 남편을 비춥니다" / "악어가 골프공을 삼켜버리자 열이 받은 남자" / "청소부가 칠판에 적힌 어려운 수학 문제에 손을 대고 있습니다"
   나쁜 예(금지): "왜 비명을 질렀을까?" "빙판 아래 무슨 일이 있었던 걸까?" "과연 어떻게 될까요?" "충격적인 결말!" 같은 질문·낚시·감탄형.
 
 # 구성
-1) 오프닝 (type "clip", 3~6초): 첫 화면부터 바로 원본 대사가 나오는 장면. 인물이 이상하거나 궁금해지는 대화, 갈등이 보이는 순간. 조용한 풍경·설명으로 시작하지 않는다.
+1) 오프닝 (첫 3초): 제목이 약속한 이야기가 바로 시작되는 순간. 아래 셋 중 하나.
+   - 궁금해지는 원본 대사 ("TV를 틀었는데… 이럴수가! 아빠잖아?")
+   - 대사 없는 강렬한 행동 장면 2~3초 (악어가 골프공을 삼키는 순간) + 바로 나레이션
+   - 주인공의 특별함이 보이는 장면 위 나레이션 ("청소부가 칠판에 적힌 어려운 수학 문제에 손을 대고 있습니다")
+   조용한 풍경·설명으로 시작하지 않는다.
 2) 소개 나레이션 1~2개: 주인공이 누구이고 어떤 상황인지 한 문장씩. 예: "얼어붙은 호수 위에서 장난을 치던 세 소년"
-3) 본편 기승전결 (시간 순서): clip 2~3개마다 나레이션 1개를 넣어 다음 장면으로 이어 준다.
- - 기: 인물과 일상 / 승: 갈등이 커짐 / 전: 사고·위기·반전 / 결: 감정이 가장 터지는 원본 대사 장면으로 끝낸다. 마지막은 나레이션이 아니라 원본 대사다.
+3) 본편 기승전결: clip 2~3개마다 나레이션 1개를 넣어 다음 장면으로 이어 준다.
+ - 기: 인물과 상황 / 승: 갈등이 커짐 / 전: 사고·위기·반전 / 결: 감정이 터지거나 통쾌한 결과(보상) 장면.
+ - 끝맺음은 둘 중 하나: ① 웃기거나 강한 원본 대사 한마디 + 인물 반응 ("이제 죽었다") ② 결과 장면 위에 15자 안팎의 짧고 재치 있는 마무리 나레이션 ("공 회수와 함께 복수도 성공이네요")
  - clip 하나는 3~10초. 대사가 이어지는 부분만 고르고, 대사 없이 조용한 구간(2초 이상)은 넣지 않는다. src_start는 첫 대사 0.2초 전, src_end는 마지막 대사 끝 0.4초 뒤. 다만 인물이 하던 동작(물건을 꺼내기, 넘어지기 등)이 이어지면 그 동작이 끝날 때까지(최대 1.5초 더) 늘린다.
- - clip들은 원본 시간 순서대로, 서로 겹치지 않게 고른다. 같은 장면을 두 번 쓰지 않는다.
+${order==='time'? ' - clip들은 원본 시간 순서대로, 서로 겹치지 않게 고른다. 같은 장면을 두 번 쓰지 않는다.' : ` - [장면 순서: 이야기 흐름 순] 원본 시간 순서를 꼭 지킬 필요는 없다. 명화관처럼 시청자가 가장 몰입하는 순서로 배치한다.
+   · 가장 흥미로운 순간을 먼저 보여 주고, 나레이션으로 앞 이야기로 돌아갈 수 있다 ("사실 이 모든 건 장난에서 시작됐는데요")
+   · 이야기 중간에 인물의 과거나 이유를 보여 주는 앞쪽 장면을 회상처럼 끼워 넣을 수 있다 (예: 악어와 싸우기 직전, 스승의 손을 악어가 물어뜯었던 과거 장면)
+   · 서로 다른 장소에서 동시에 일어나는 일을 번갈아 보여 줄 수 있다 (집에서 TV를 보는 가족 ↔ 경기장의 아빠)
+   · 순서를 바꿀 때는 바로 앞에 나레이션 한 줄로 이어 줘서, 시청자가 시간·장소가 바뀐 걸 자연스럽게 알게 한다. 순서가 바뀌어도 이야기 앞뒤가 맞아야 한다.
+   · 시간 순으로 두는 게 가장 자연스러우면 그대로 둔다. 억지로 섞지 않는다.
+   · clip끼리 원본 시간이 겹치면 안 된다. 같은 장면을 두 번 쓰지 않는다.`}
  - 대사가 없어도 이야기의 결정적인 순간(얼음이 깨지며 빠지는 순간, 사고, 구조 등 눈으로 봐야 하는 장면)은 반드시 clip(lines는 빈 배열, 2~4초)으로 보여 준다. 나레이션으로만 말하고 넘어가지 않는다.
  - lines: 그 clip 안의 대사를 빠짐없이, 대사 자료의 시간 그대로 start/end(초)로 적는다. text는 짧고 자연스러운 ${lang==='ja'?'일본어':'한국어'} 자막(한 줄, 문장부호 최소). speaker는 말하는 등장인물 이름(알면 이름, 모르면 '엄마', '친구1', '구조대원'처럼 역할). 같은 인물은 끝까지 같은 이름, 한국어로.
 4) 이 영상 구간 밖의 사건(이후 전개, 결말)은 절대 말하지 않는다. 구독·좋아요·다음 편 유도, "여러분은 어떻게 생각하세요" 같은 마무리 멘트는 절대 넣지 않는다.
 
 # 나레이션 문장
 - 한 나레이션 = 자연스러운 한 문장, ${lang==='ja'?'12~30자':'공백 포함 12~30자'}, 말하는 시간 2~5초. 화면 자막은 프로그램이 2~3어절씩 끊어서 보여 주니 문장을 억지로 줄이지 않는다.
-${lang==='ja'?'- 일본 나레이터의 담담한 말투(〜でした / 〜のです / 〜始めます). 문장부호 없이.':'- 담담한 이야기체(~합니다, ~했습니다, ~였죠, ~는데). 문장부호 없이.'}
-- 나레이션 개수는 목표 길이 1분 30초 기준 6~10개, 나레이션 합계는 전체의 30% 이하.
-- 나레이션이 나오는 동안 화면에는 '바로 앞 clip이 끝난 지점부터 다음 clip이 시작하기 전까지'의 원본이 그대로 이어서 나온다. 그러니 나레이션 내용은 반드시 그 사이(건너뛴 부분)에 화면에서 일어나는 일이나, 다음 clip으로 넘어가는 상황을 말해야 한다. 그 사이 화면과 상관없는 말(예: 아저씨가 전화하는 화면에 '친구들의 외침')은 금지.
+${lang==='ja'?'- 일본 나레이터의 담담한 말투(〜でした / 〜のです / 〜始めます). 문장부호 없이.':'- 명화관 말투: 담담한 이야기체(~합니다, ~했습니다, ~였죠)와 친근한 해요체(~는데요, ~네요)를 섞는다. 문장부호 없이(마지막 재치 한마디만 느낌표 허용).'}
+- 나레이션 합계는 전체의 30% 이하.
+- 나레이션 개수는 영상에 따라 4~10개. 대사만으로 이야기가 이해되면 나레이션을 줄인다.
+- 나레이션이 나오는 동안 화면에는 (앞뒤 clip이 원본 시간 순서로 이어질 때) '바로 앞 clip이 끝난 지점부터 다음 clip이 시작하기 전까지'의 원본이 그대로 이어서 나온다. 순서를 바꾼 곳에서는 src_start에 적은 장면이 나온다. 그러니 나레이션 내용은 반드시 그 사이(건너뛴 부분)에 화면에서 일어나는 일이나, 다음 clip으로 넘어가는 상황을 말해야 한다. 그 사이 화면과 상관없는 말(예: 아저씨가 전화하는 화면에 '친구들의 외침')은 금지.
 - 그래서 나레이션을 넣을 곳은 앞 clip과 다음 clip 사이에 3초 이상 원본이 비어 있게 clip을 고른다.
-- 맨 마지막은 반드시 clip(원본 대사)으로 끝낸다. 마지막 나레이션 금지.
+- 마지막 나레이션은 결과 장면 위의 짧은 재치 한마디(공백 제외 15자 이내)일 때만 허용한다.
 - src_start에는 그 사이 구간의 시작 시간을 적는다.
 
 # 화면 위치 (focus)
@@ -1018,7 +1031,7 @@ ${lang==='ja'?'- 일본 나레이터의 담담한 말투(〜でした / 〜の�
 - 캡처, 대사 자료, 메모에 근거한 내용만 쓴다. 지어내지 않는다.
 
 # 제목 10개
-${lang==='ja'?'- 일본어, 공백 없이 10~16자, 호기심 자극.':'- 정상 띄어쓰기, 공백 제외 12~14자, 호기심 자극.'} title_lines는 그중 가장 좋은 제목을 두 줄로 나눈 것.
+${lang==='ja'?'- 일본어, 공백 없이 10~18자, 호기심 자극.':'- 정상 띄어쓰기, 공백 제외 10~20자. 윗줄은 인물·상황, 아랫줄은 "~한 이유 / ~하면 생기는 일 / ~가 한 행동"처럼 궁금증으로 끝낸다.'} title_lines는 그중 가장 좋은 제목을 두 줄로 나눈 것.
 
 # 길이
 - 전체 길이(나레이션 + clip 합계)는 사용자가 준 목표 길이 ±15초. clip을 충분히 골라서 채운다.
@@ -1048,7 +1061,7 @@ const narrLen = sc => (sc.audioDur? sc.audioDur/rateOf(sc) : est(sc.text)/(+$('s
 function assignNarrFootage(){
   const L=S.scenes, d=S.videoDur||1e9; if(!L.length) return;
   // 영상의 끝은 나레이션이 아니라 원본 대사로
-  if(L.some(x=>x.type==='clip')) while(L[L.length-1].type==='narration'){ const n=L.pop(); let k=L.length-1; while(k>0&&L[k].type!=='clip') k--; L.splice(k,0,n); }
+  if(L.some(x=>x.type==='clip')) while(L[L.length-1].type==='narration' && noSpaceLen(L[L.length-1].text)>16){ const n=L.pop(); let k=L.length-1; while(k>0&&L[k].type!=='clip') k--; L.splice(k,0,n); }
   let cur=null;
   L.forEach((sc,i)=>{
     if(sc.type!=='narration'){ cur=sc.src_end; return; }
@@ -1056,7 +1069,13 @@ function assignNarrFootage(){
     const len=narrLen(sc); let nx=null; for(let k=i+1;k<L.length;k++){ if(L[k].type!=='narration'){ nx=L[k]; break; } }
     const nextStart=nx? nx.src_start : d;
     if(sc.manual){ sc.vrate=1; cur=sc.src_start+len; return; }
-    if(cur==null){ sc.src_start=Math.max(0,+(nextStart-len).toFixed(2)); sc.vrate=1; }
+    const story=$('orderMode')&&$('orderMode').value==='story';
+    const aiOut= cur!=null && (sc.aiSrc<cur-2 || sc.aiSrc>nextStart+1);
+    if(story && aiOut){ // 이야기 흐름 순: AI가 일부러 다른 시점(회상·결과 장면)을 고른 곳은 그 장면을 그대로 써요
+      const clips=L.filter(x=>x.type==='clip').map(x=>[x.src_start,x.src_end]); const free=t=>t>=0&&t+len<=d&&!clips.some(u=>t<u[1]-0.1&&t+len>u[0]+0.1);
+      let t=sc.aiSrc; if(!free(t)){ for(let k=1;k<=30;k++){ if(free(sc.aiSrc-k)){ t=sc.aiSrc-k; break; } if(free(sc.aiSrc+k)){ t=sc.aiSrc+k; break; } } }
+      sc.src_start=+t.toFixed(2); sc.vrate=1; }
+    else if(cur==null){ sc.src_start=Math.max(0,+(nextStart-len).toFixed(2)); sc.vrate=1; }
     else { const gap=nextStart-cur;
       if(gap>=len){ sc.src_start=+cur.toFixed(2); sc.vrate=1; }
       else if(gap>=len*0.6){ sc.src_start=+cur.toFixed(2); sc.vrate=Math.max(0.6,gap/len); }
@@ -1110,21 +1129,31 @@ async function genTitles(provider){
 - 자연스러운 일본어, 10~16자. 억지 합성어 금지. 핵심 인물·상황 + 반전·궁금증. 결과 숨기기·대비·구체적 숫자·감정어·대사형을 골고루. 결말 스포 금지.
 - 좋은 예: 「氷の湖に落ちた少年の奇跡」「死んだ息子を呼び戻した母の祈り」「優等生が隠していた衝撃の秘密」
 - 각 제목을 상단 2줄 자막용으로 의미 단위로 나눈다(윗줄 5~9자, 아랫줄 4~8자).
-JSON만: {"titles":[{"t":"전체","l1":"윗줄","l2":"아랫줄"}]}` : `너는 한국 유튜브 영화 쇼츠 제목 전문가다. 아래 쇼츠 대본을 보고 클릭하고 싶어지는 제목 10개를 만든다.
-- 자연스러운 한국어 문장처럼 쓰고 표준 띄어쓰기를 반드시 지킨다. 단어를 붙여 쓰면 실패다.
-- 공백을 뺀 글자 수 12~14자. 출력 전에 직접 센다.
-- "호수비명", "절망의얼음" 같은 억지 합성어나 딱딱한 명사 나열 금지.
-- 스크롤하던 사람이 '이게 무슨 이야기지?' 하고 멈출 수밖에 없게. 아래 클릭 공식을 골고루 섞어 15개를 만든다.
-  1) 결과 숨기기: 무슨 일이 일어났는지는 말하되 결말은 숨긴다 ("장난치던 소년들에게 벌어진 일")
-  2) 대비·반전: 평범한 시작과 끔찍한 결과를 붙인다 ("장난 한 번이 부른 15분의 지옥")
-  3) 구체적인 인물·숫자: 막연한 말보다 '세 소년', '15분', '14살'처럼 구체적으로
-  4) 감정이 담긴 말: 결국, 끝내, 아무도 몰랐던, 소름 돋는 (과장·낚시는 금지, 대본에 있는 사실만)
-  5) 대사형: 영상 속 가장 강한 대사를 그대로 제목으로 ("가르쳐는 줄게 내 앞에선 쓰지마")
-- 결말을 스포하지 않는다. 대본에 없는 사건을 지어내지 않는다.
-- 좋은 예: "전교1등 우등생의 충격적인 비밀", "가르쳐는 줄게 내 앞에선 쓰지마", "얼음 호수에 빠진 소년의 기적", "죽은 아들을 살려낸 엄마의 기도"
-- 각 제목을 상단 2줄 자막용으로 의미 단위로 나눈다(윗줄 7~10자, 아랫줄 5~9자, 띄어쓰기 유지).
+JSON만: {"titles":[{"t":"전체","l1":"윗줄","l2":"아랫줄"}]}` : `너는 한국 유튜브 영화 쇼츠 채널 '명화관'의 제목 담당이다. 아래 쇼츠 대본을 보고 피드를 넘기던 사람이 멈춰서 누를 수밖에 없는 제목 15개를 만든다.
+
+# 명화관 실제 제목 (조회수 높은 것들)
+- "아빠가 / 집에 못 들어간 이유"
+- "아이스 하키 선수가 / 골프로 전향하면 생기는 일"
+- "재능을 썩히는 천재를 위해 / 명문대 교수가 한 행동"
+- "정부에게 도와달라고 요청한 / 암살자들 근황"
+- "시간의 소중함을 / 알게 해주는 명작 영화"
+- "전교1등 우등생의 / 충격적인 비밀"
+- "가르쳐는 줄게 / 내 앞에선 쓰지마" (대사형)
+
+# 이 제목들의 공통점
+- 두 줄 구조. 윗줄(흰색) = 누가·어떤 상황(설정). 아랫줄(노란색) = 궁금증으로 끝나는 결과 부분.
+- 아랫줄 끝은 "~한 이유", "~하면 생기는 일", "~가 한 행동", "~근황", "~의 비밀", "~명작 영화" 같은 궁금증 명사로 끝난다. 결과는 말하지 않는다.
+- 인물은 이름이 아니라 누구나 아는 역할로 부른다: 아빠, 천재, 명문대 교수, 아이스 하키 선수, 우등생, 세 소년.
+- 의외의 조합이나 모순이 있다: 하키 선수가 골프, 천재인데 청소부, 아빠가 집에 못 들어감.
+- 쉬운 일상어. "충격", "소름" 같은 과장 단어는 거의 안 쓴다(써도 한 번).
+- 스포 금지, 대본에 없는 내용 금지.
+
+# 규칙
+- 표준 띄어쓰기. 공백을 뺀 글자 수 10~20자.
+- 위 패턴을 골고루: 이유형 / 생기는 일형 / 한 행동형 / 근황·비밀형 / 대사형 / 주제형(~를 알게 해주는 명작 영화).
+- 각 제목을 두 줄로 나눈다: l1 윗줄(설정, 3~12자), l2 아랫줄(궁금증 결과, 5~13자). 의미 단위로, 띄어쓰기 유지.
 JSON만: {"titles":[{"t":"전체 제목","l1":"윗줄","l2":"아랫줄"}]}`;
-  const ok=x=> ja? (noSpaceLen(x)>=9 && noSpaceLen(x)<=17) : (/\s/.test(x.trim()) && noSpaceLen(x)>=11 && noSpaceLen(x)<=15);
+  const ok=x=> ja? (noSpaceLen(x)>=9 && noSpaceLen(x)<=17) : (/\s/.test(x.trim()) && noSpaceLen(x)>=9 && noSpaceLen(x)<=21);
   let best=[];
   for(let k=0;k<2 && best.length<6;k++){
     const user=`작품명: ${$('work').value||'(모름)'}\n메모: ${$('memo').value||'(없음)'}\n\n쇼츠 대본:\n${body}${k?'\n\n(직전 제목들은 띄어쓰기나 글자 수 규칙을 어겼다. 규칙을 꼭 지켜서 다시.)':''}`;
@@ -1139,7 +1168,8 @@ JSON만: {"titles":[{"t":"전체 제목","l1":"윗줄","l2":"아랫줄"}]}`;
   S.tmeta={};
   try{
     const jsys=`너는 유튜브 쇼츠 썸네일·제목 심사위원이다. 쇼츠 피드를 빠르게 넘기는 ${ja?'일본':'한국'} 시청자가 이 제목을 보고 멈춰서 볼 확률을 매긴다.
-기준: 첫 3단어에서 궁금증이 생기는가 / 무슨 이야기인지 바로 그려지는가 / 결말을 알고 싶어지는가 / 자연스럽게 읽히는가 / 낚시처럼 보여 신뢰를 잃지 않는가.
+기준: 첫 3단어에서 궁금증이 생기는가 / 무슨 이야기인지 바로 그려지는가 / 의외의 조합·모순이 있는가 / 결말을 알고 싶어지는가 / 쉬운 말로 자연스럽게 읽히는가 / 낚시처럼 보여 신뢰를 잃지 않는가.
+참고로 잘 된 제목: "아빠가 집에 못 들어간 이유", "아이스 하키 선수가 골프로 전향하면 생기는 일", "재능을 썩히는 천재를 위해 명문대 교수가 한 행동".
 각 제목에 100점 만점 점수와, 왜 그 점수인지 ${ja?'한국어로':''} 20자 안팎 한 줄 이유를 쓴다.
 JSON만: {"ranks":[{"i":번호,"score":점수,"why":"이유"}]}`;
     const list=best.map((x,i)=>`${i+1}. ${x.t}`).join('\n');
@@ -1247,7 +1277,7 @@ ${otherShots()}
 목표 길이: 약 ${$('targetLen').value}초
 지침서대로 JSON을 만들어 줘.`;
     let mode=$('structMode').value; if(mode==='clip' && !transcript.length){ mode='narr'; sttNote+=' (대사 자료가 없어 나레이션 중심으로 만들었어요. 자막을 넣거나 받아쓰기를 켜면 명화관식이 돼요)'; }
-    const SYS = mode==='clip'? CLIP_RULES(JA()?'ja':'ko') : (JA()? SYSTEM_JA : SYSTEM);
+    const SYS = mode==='clip'? CLIP_RULES(JA()?'ja':'ko',$('orderMode').value) : (JA()? SYSTEM_JA : SYSTEM);
     const out = provider==='claude' ? await callClaude(SYS,sheets,text) : await callGPT(SYS,sheets,text);
     normalize(parseJSON(out),transcript);
     const tgt=+$('targetLen').value; let tot=buildTL().total;
@@ -1324,7 +1354,7 @@ function renderTitles(){
   const box=$('titles'); box.innerHTML='';
   if(!S.titles.length){ box.innerHTML='<p class="note">제목 후보가 없어요.</p>'; return; }
   S.titles.forEach((t,i)=>{
-    const n=noSpaceLen(t), ok= JA()? (n>=8&&n<=16) : (n>=12&&n<=14);
+    const n=noSpaceLen(t), ok= JA()? (n>=8&&n<=18) : (n>=10&&n<=20);
     const l=document.createElement('label');
     const m=(S.tmeta||{})[t];
     l.innerHTML=`<input type="radio" name="tpick" ${i===0?'checked':''}> <span></span><span class="cnt ${ok?'':'bad'}">${m?`${i===0?'★ 추천 · ':''}클릭 점수 ${m.score} · `:''}공백 제외 ${n}자${ok?'':' ⚠'}</span>`;
@@ -1748,7 +1778,7 @@ $('stopBtn').addEventListener('click',()=>{ stopFlag=true; });
 function buildGuide(){
   if(!S.scenes.length){ $('guideOut').value=''; return; }
   const {tl,total}=buildTL(); const out=[];
-  out.push('### 1. 추천 제목 후보 10개 (정상 띄어쓰기 적용, 공백 제외 12~14자 엄수)');
+  out.push('### 1. 추천 제목 후보 10개 (정상 띄어쓰기 적용, 공백 제외 10~20자)');
   S.titles.forEach((t,i)=>out.push(`${i+1}. ${t} (공백 제외 ${noSpaceLen(t)}자)`));
   out.push('', `상단 표시: ${S.title1} / ${S.title2}`, '');
   out.push('### 2. 고농도 도파민 쇼츠 대본 (의미 단위 줄바꿈, 자연스러운 종결어미 적용)');
