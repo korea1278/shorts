@@ -483,6 +483,7 @@ $('bgm').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f){
 /* ================= 영상 올리기 ================= */
 $('videoFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleSource(f); e.target.value=''; });
 async function handleSource(f){
+  if(isMaterial(f.name)) $('subOffset').value='0:00:00';
   if(looksBad(f.name) || f.size>900*1048576){ await openCutter(f); return; }
   const ok=await loadVideoFile(f,true);
   if(!ok){ await openCutter(f); return; }
@@ -535,7 +536,10 @@ function parseSRT(t){
   } return res;
 }
 function parseTimeStr(v){ v=String(v||'').trim(); if(!v) return 0; const p=v.split(':').map(Number); if(p.some(isNaN)) return 0; return p.reduce((a,x)=>a*60+x,0); }
+/* 코랩에서 만든 재료(이름 끝이 _시분초-시분초)는 자막이 0초부터 맞춰져 있어요 */
+const isMaterial = n => /_\d{5,6}-\d{5,6}\.(mp4|srt|smi)$/i.test(n||'');
 async function loadSubFile(file){
+  if(isMaterial(file.name)) $('subOffset').value='0:00:00';
   const txt=decodeText(await file.arrayBuffer());
   const subs=/<sync/i.test(txt)? parseSMI(txt) : parseSRT(txt);
   if(!subs.length) throw new Error('자막을 읽지 못했어요. smi나 srt 파일인지 확인해 주세요.');
@@ -737,7 +741,7 @@ $('cutBtn').addEventListener('click',async()=>{
   const kbps=(S.srcInfo.kbps||8000)+200, estMB=l=>kbps*l/8/1024; let copy=S.srcInfo.copy, note='';
   if(copy && estMB(len)>CUT_MAX_MB){
     const fitLen=Math.floor(CUT_MAX_MB*8*1024/kbps);
-    if(fitLen>=100){ en=st+fitLen; len=fitLen; $('cutEnd').value=hms(en); note=`원본 화질이 높아서 (${(kbps/1000).toFixed(1)}Mbps) 메모리가 넘치지 않게 ${hms(st)} ~ ${hms(en)} (${Math.round(len/60*10)/10}분)까지만 잘라요. `; }
+    if(fitLen>=100){ en=st+fitLen; len=fitLen; $('cutEnd').value=hms(en); note=`원본 화질이 높아서 (${(kbps/1000).toFixed(1)}Mbps) 메모리가 넘치지 않게 ${hms(st)} ~ ${hms(en)} (${Math.round(len/60*10)/10}분)까지만 잘라요. 720p 파일을 쓰면 더 길게 자를 수 있어요. `; }
     else { copy=false; if(len>4*60){ en=st+240; len=240; $('cutEnd').value=hms(en); } note=`원본 화질이 아주 높아서 (${(kbps/1000).toFixed(1)}Mbps) 720p로 줄여서 4분까지만 변환해요. 시간이 걸려요. `; }
   }
   const b=$('cutBtn'); b.disabled=true; $('aiPickBtn').disabled=true;
@@ -1063,7 +1067,8 @@ const narrLen = sc => (sc.audioDur? sc.audioDur/rateOf(sc) : est(sc.text)/(+$('s
 function assignNarrFootage(){
   const L=S.scenes, d=S.videoDur||1e9; if(!L.length) return;
   // 영상의 끝은 나레이션이 아니라 원본 대사로
-  if(L.some(x=>x.type==='clip')) while(L[L.length-1].type==='narration' && noSpaceLen(L[L.length-1].text)>16){ const n=L.pop(); let k=L.length-1; while(k>0&&L[k].type!=='clip') k--; L.splice(k,0,n); }
+  const tailRoom=()=>{ let le=0; L.forEach(x=>{ if(x.type!=='narration') le=Math.max(le,x.src_end); }); return d-le; };
+  if(L.some(x=>x.type==='clip')) while(L[L.length-1].type==='narration' && (noSpaceLen(L[L.length-1].text)>16 || tailRoom()<narrLen(L[L.length-1])+0.3)){ const n=L.pop(); let k=L.length-1; while(k>0&&L[k].type!=='clip') k--; L.splice(k,0,n); }
   let cur=null;
   L.forEach((sc,i)=>{
     if(sc.type!=='narration'){ cur=sc.src_end; return; }
@@ -1088,6 +1093,7 @@ function assignNarrFootage(){
         const clips=L.filter(x=>x.type==='clip').map(x=>[x.src_start,x.src_end]); const free=t=>t>=0&&t+len<=d&&!clips.some(u=>t<u[1]-0.1&&t+len>u[0]+0.1);
         let t=sc.aiSrc; if(!free(t)){ for(let k=1;k<=30;k++){ if(free(sc.aiSrc-k)){ t=sc.aiSrc-k; break; } if(free(sc.aiSrc+k)){ t=sc.aiSrc+k; break; } } }
         sc.src_start=+t.toFixed(2); sc.vrate=1; } }
+    if(sc.src_start+len*(sc.vrate||1)>d-0.1){ sc.src_start=Math.max(0,+(d-0.1-len).toFixed(2)); sc.vrate=1; }
     cur=sc.src_start+len*(sc.vrate||1);
   });
 }
@@ -1628,7 +1634,7 @@ function wrap2(font,txt,max,size){
 }
 function subLayout(b,n=2,lh=53){ const pos=$('subPos').value; return pos==='below'? {pos, bottom:b.y+b.h+66+(n-1)*lh, max:660} : {pos, bottom:b.y+b.h-(b.h>=500?Math.round(b.h*0.135):30), max:640}; }
 function drawSub(txt,b,color){
-  let L=subLayout(b); let size=$('subPos').value==='box'?40:44; let lines=wrap2(SFONT,txt,L.max,size);
+  let L=subLayout(b); let size=$('subPos').value==='box'?40:44; let lines= $('subPos').value==='box'? wrap2(SFONT,txt,L.max,size) : [txt];
   while(lines.length>1 && size>30 && lines.some(l=>{ g.font=SFONT(size); return g.measureText(l).width>L.max; })) size-=2;
   lines=lines.slice(0,2); const lh=size*1.32; L=subLayout(b,lines.length,lh);
   g.textAlign='center'; g.textBaseline='alphabetic'; g.lineJoin='round';
@@ -1659,6 +1665,14 @@ function narrChunks(t){
     if(a.length-e<=2) e=a.length; out.push(a.slice(i,e).join('')); i=e; }
   return out;
 }
+/* 대사 자막은 명화관처럼 항상 한 줄. 길면 의미 단위로 나눠서 말하는 속도에 맞춰 차례로 보여 줘요 */
+function lineChunks(t){ t=String(t||'').trim(); if(noSpaceLen(t)<=13) return [t];
+  const parts=t.split(/(?<=[,.?!…])\s+/).filter(Boolean); const out=[];
+  for(const p of parts){ if(noSpaceLen(p)<=13){ out.push(p); continue; }
+    const w=p.split(/\s+/); let cur=''; for(const x of w){ const c=cur?cur+' '+x:x; if(cur && noSpaceLen(c)>12){ out.push(cur); cur=x; } else cur=c; } if(cur) out.push(cur); }
+  if(out.length>1 && noSpaceLen(out[out.length-1])<=3){ const z=out.pop(); out[out.length-1]+=' '+z; }
+  return out; }
+function lineChunkAt(t,p){ const c=lineChunks(t); if(c.length<2) return t; const w=c.map(x=>noSpaceLen(x)+1), tot=w.reduce((a,b)=>a+b,0); let acc=0; for(let k=0;k<c.length;k++){ acc+=w[k]; if(p*1.02<=acc/tot) return c[k]; } return c[c.length-1]; }
 function narrChunkAt(t,p){ const c=narrChunks(t); if(c.length<2) return t; const w=c.map(x=>noSpaceLen(x)+1), tot=w.reduce((x,y)=>x+y,0); let acc=0; for(let k=0;k<c.length;k++){ acc+=w[k]; if(p*1.04<=acc/tot) return c[k]; } return c[c.length-1]; }
 const bgC=document.createElement('canvas'); bgC.width=54; bgC.height=96; const bgX=bgC.getContext('2d');
 function drawBg(vid){
@@ -1691,7 +1705,9 @@ function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
   const sc=S.scenes[i];
   if(sc && sc.type==='clip'){ const T=srcT==null? sc.src_start+0.3 : srcT; const L=sc.lines||[]; let l=null;
     for(let k=0;k<L.length;k++){ const x=L[k], nx=L[k+1]; const hold=Math.max(x.end+0.3, x.start+Math.max(1.3,noSpaceLen(x.text)/8)); const until=nx? Math.min(hold, nx.start-0.02) : hold; if(T>=x.start-0.05 && T<=until){ l=x; } }
-    if(l) drawDialogue(l.text,l.speaker,b); }
+    if(l){ const until=(()=>{ const k=L.indexOf(l), nx=L[k+1]; const hold=Math.max(l.end+0.3, l.start+Math.max(1.3,noSpaceLen(l.text)/8)); return nx? Math.min(hold,nx.start-0.02) : hold; })();
+      const pr=Math.max(0,Math.min(1,(T-l.start)/Math.max(0.3,Math.min(until,l.end+0.2)-l.start)));
+      drawDialogue(lineChunkAt(l.text,pr),l.speaker,b); } }
   else if(sc && sc.text){ if(sc.type==='dialogue') drawDialogue(sc.text,sc.speaker,b); else { const sp=sc.audioDur? sc.audioDur/rateOf(sc) : 0, segLen=sp? sp+0.06 : 0; drawSub(narrChunkAt(sc.text, segLen? Math.min(1,prog*segLen/sp) : prog),b); } }
   const work=S.work||$('work').value; if(work){ g.font=SFONT(25); g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+($('subPos').value==='below'?172:(b.h>=500?-48:46))); }
 }
