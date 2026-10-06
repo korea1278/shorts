@@ -291,7 +291,7 @@ window.__FONTS={ohsq:'d09GMgABAAAABHvcAAwAAAAacwQABHuDAAIAAAAAAAAAAAAAAAAAAAAAAA
 /* ================= 기본 ================= */
 const $ = id => document.getElementById(id);
 const W=720, H=1280;
-const cv=$('cv'), g=cv.getContext('2d');
+const cv=$('cv'); let g=cv.getContext('2d');
 const YELLOW='#ffd21f', SPEAKER={female:'#ffe066', male:'#8fd3ff', other:'#ffffff'};
 const SPK_PALETTE=['#ffe066','#8fd3ff','#9dff8a','#ff9ad5','#ffb36b','#c9a8ff','#7ff3e6','#ffffff'];
 function spkColor(name){
@@ -525,7 +525,7 @@ function loadSettings(){
     const k=JSON.parse(localStorage.getItem('mrm_keys')||'null');
     if(k){ $('openaiKey').value=k.o||''; $('anthropicKey').value=k.a||''; $('remember').checked=true; }
   }catch(e){}
-  try{ if(!localStorage.getItem('mrm_vb1')){ $('speed').value='1.25'; localStorage.setItem('mrm_vb1','1'); } }catch(e){}
+  try{ if(!localStorage.getItem('mrm_vb2')){ $('speed').value='1.25'; localStorage.setItem('mrm_vb2','1'); setTimeout(()=>{ try{ saveSettings(); }catch(e){} },0); } }catch(e){}
   try{ if(!localStorage.getItem('mrm_auto_len')){ $('targetLen').value='auto'; localStorage.setItem('mrm_auto_len','1'); } }catch(e){}
   try{ if(!localStorage.getItem('mrm_sq_v3')){ $('bandMode').value='square'; $('subPos').value='inside'; localStorage.setItem('mrm_sq_v3','1'); } }catch(e){ $('bandMode').value='square'; $('subPos').value='inside'; }
   ['speed','duckVol','dlgVol','bgmVol'].forEach(id=>syncVal(id));
@@ -1551,9 +1551,13 @@ async function detPersons(v){
   const r=640/Math.max(vw,vh), nw=Math.round(vw*r), nh=Math.round(vh*r);
   detX.fillStyle='#727272'; detX.fillRect(0,0,640,640); detX.drawImage(v,0,0,vw,vh,0,0,nw,nh);
   const px=detX.getImageData(0,0,640,640).data, N=640*640, f=new Float32Array(3*N);
-  for(let i=0;i<N;i++){ f[i]=px[i*4]/255; f[N+i]=px[i*4+1]/255; f[2*N+i]=px[i*4+2]/255; }
+  // 어두운 밤 장면은 밝게 펴서 찾아요 (밝기 하위 2%~상위 2%를 0~1로 늘림)
+  const hist=new Uint32Array(256); let cnt=0; for(let y=0;y<nh;y+=4) for(let x=0;x<nw;x+=4){ const k=(y*640+x)*4; hist[(px[k]*3+px[k+1]*6+px[k+2])/10|0]++; cnt++; }
+  let lo=0, hi=255, acc=0; for(let v=0;v<256;v++){ acc+=hist[v]; if(acc>cnt*0.02){ lo=v; break; } } acc=0; for(let v=255;v>=0;v--){ acc+=hist[v]; if(acc>cnt*0.02){ hi=v; break; } }
+  const span=Math.max(40,hi-lo), gain= span<200 ? 255/span : 1, off= span<200 ? lo : 0;
+  for(let i=0;i<N;i++){ f[i]=Math.min(1,Math.max(0,(px[i*4]-off)*gain/255)); f[N+i]=Math.min(1,Math.max(0,(px[i*4+1]-off)*gain/255)); f[2*N+i]=Math.min(1,Math.max(0,(px[i*4+2]-off)*gain/255)); }
   const out=await DET.run({[DET.inputNames[0]]:new ort.Tensor('float32',f,[1,3,640,640])}); const o=out[DET.outputNames[0]].data, A=o.length/84;
-  const bx=[]; for(let i=0;i<A;i++){ const sc=o[4*A+i]; if(sc>0.35){ const cx=o[i]/r, cy=o[A+i]/r, w=o[2*A+i]/r, h=o[3*A+i]/r; bx.push({x1:(cx-w/2)/vw,x2:(cx+w/2)/vw,y1:(cy-h/2)/vh,y2:(cy+h/2)/vh,s:sc}); } }
+  const bx=[]; for(let i=0;i<A;i++){ const sc=o[4*A+i]; if(sc>0.28){ const cx=o[i]/r, cy=o[A+i]/r, w=o[2*A+i]/r, h=o[3*A+i]/r; bx.push({x1:(cx-w/2)/vw,x2:(cx+w/2)/vw,y1:(cy-h/2)/vh,y2:(cy+h/2)/vh,s:sc}); } }
   bx.sort((a,b)=>b.s-a.s); const keep=[];
   const iou=(a,b)=>{ const ix=Math.max(0,Math.min(a.x2,b.x2)-Math.max(a.x1,b.x1)), iy=Math.max(0,Math.min(a.y2,b.y2)-Math.max(a.y1,b.y1)), I=ix*iy; return I/((a.x2-a.x1)*(a.y2-a.y1)+(b.x2-b.x1)*(b.y2-b.y1)-I); };
   for(const b of bx){ if(keep.every(k=>iou(k,b)<0.45)) keep.push(b); if(keep.length>=8) break; }
@@ -1563,6 +1567,13 @@ async function detPersons(v){
 function groupOf(ps){ if(!ps.length) return null; ps=[...ps].sort((a,b)=>b.area-a.area); const big=ps[0];
   const grp=ps.filter(p=>p.area>=big.area*0.15); const x1=Math.max(0,Math.min(...grp.map(p=>p.x1))), x2=Math.min(1,Math.max(...grp.map(p=>p.x2)));
   return {c:(x1+x2)/2, w:x2-x1, bc:(Math.max(0,big.x1)+Math.min(1,big.x2))/2}; }
+/* 사람을 못 찾았을 때: 화면에서 가장 또렷한(윤곽이 많은) 곳을 중심으로 */
+const salC=document.createElement('canvas'); salC.width=96; salC.height=54; const salX=salC.getContext('2d',{willReadFrequently:true});
+function saliencyCenter(v){ const vw=v.videoWidth, vh=v.videoHeight*(1-hsFrac()); if(!vw) return null;
+  salX.drawImage(v,0,0,vw,vh,0,0,96,54); const d=salX.getImageData(0,0,96,54).data; const L=new Float32Array(96*54);
+  let mx=0; for(let i=0;i<96*54;i++){ L[i]=d[i*4]*0.3+d[i*4+1]*0.59+d[i*4+2]*0.11; if(L[i]>mx) mx=L[i]; } if(mx<8) return null;
+  const col=new Float32Array(96); for(let y=1;y<53;y++) for(let x=1;x<95;x++){ const i=y*96+x; col[x]+=Math.abs(L[i+1]-L[i-1])+Math.abs(L[i+96]-L[i-96]); }
+  let sw=0, sx=0; for(let x=0;x<96;x++){ const w=col[x]*col[x]; sw+=w; sx+=w*(x+0.5)/96; } return sw>0? sx/sw : null; }
 function centerOf(ps,vf){ const g0=groupOf(ps); return g0? g0.c : null; }
 async function autoFocus(say){
   if(!S.url||!S.scenes.length) return 0;
@@ -1602,7 +1613,10 @@ async function autoFocusRun(say){
     const shots=[];
     for(let k=0;k<cuts.length;k++){ const s0=cuts[k], s1=k+1<cuts.length?cuts[k+1]:z; const ts=s1-s0>1.6? [s0+0.4,(s0+s1)/2,s1-0.3] : [(s0+s1)/2];
       const gs=[]; for(const t of ts){ await seekTo(vDet,t); const gg=groupOf(await detPersons(vDet)); if(gg) gs.push(gg); }
-      if(!gs.length){ shots.push({t:s0,len:s1-s0,c:null}); continue; }
+      if(!gs.length){ // 사람을 못 찾은 컷(어두운 장면 등)은 화면에서 가장 또렷한 곳을 따라가요
+        const cs=[]; for(const t of ts){ await seekTo(vDet,t); const c=saliencyCenter(vDet); if(c!=null) cs.push(c); }
+        if(cs.length){ cs.sort((a,b)=>a-b); const c=cs[Math.floor(cs.length/2)]; shots.push({t:s0,len:s1-s0,c,w:0.2,bc:c}); } else shots.push({t:s0,len:s1-s0,c:null});
+        continue; }
       const med=a=>{ a=[...a].sort((x,y)=>x-y); return a[Math.floor(a.length/2)]; };
       shots.push({t:s0, len:s1-s0, c:med(gs.map(x=>x.c)), w:Math.max(...gs.map(x=>x.w)), bc:med(gs.map(x=>x.bc))}); }
     all.push({sc,shots});
@@ -1770,23 +1784,29 @@ function drawBrand(b){
 function shotAt(sc,t){ const sh=sc&&sc.shots; if(!sh||!sh.length) return null; if(t==null) return sh[0]; let f=sh[0]; for(const x of sh){ if(t>=x.t-0.02) f=x; else break; } return f; }
 function fxAt(sc,t){ if(!sc) return 0.5; const x=shotAt(sc,t); return x? x.fx : sc.fx; }
 function zmAt(sc,t){ const x=shotAt(sc,t); return x&&x.zm? x.zm : 1; }
+/* 제목·띠·자막처럼 매 프레임 같은 그림은 한 번만 그려 두고 재사용해요 (그림자 계산이 무거워서 녹화가 버벅거리던 문제) */
+const LAYERS=new Map();
+function layer(key, fn){ let c=LAYERS.get(key);
+  if(!c){ c=document.createElement('canvas'); c.width=W; c.height=H; const og=g; g=c.getContext('2d'); try{ fn(); } finally{ g=og; }
+    if(LAYERS.size>=16) LAYERS.delete(LAYERS.keys().next().value); LAYERS.set(key,c); }
+  g.drawImage(c,0,0); }
 function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
   const b=band(); const sc0=S.scenes[i];
   drawBg(vid);
   g.save(); g.beginPath(); g.rect(b.x,b.y,b.w,b.h); g.clip();
   if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom,fxAt(sc0,srcT)); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
   g.restore();
-  drawBrand(b);
-  drawTitleLine(S.title1||'', 150, '#ffffff');
-  drawTitleLine(S.title2||'', 236, ACC());
+  const work=S.work||$('work').value;
+  layer(JSON.stringify(['top',S.title1,S.title2,b,ACC(),$('channelName').value,$('accentBar').checked,JA(),work,$('subPos').value]),()=>{
+    drawBrand(b); drawTitleLine(S.title1||'', 150, '#ffffff'); drawTitleLine(S.title2||'', 236, ACC());
+    if(work){ g.font=SFONT(25); g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+($('subPos').value==='below'?172:(b.h>=500?-48:46))); } });
   const sc=S.scenes[i];
   if(sc && sc.type==='clip'){ const T=srcT==null? sc.src_start+0.3 : srcT; const L=sc.lines||[]; let l=null;
     for(let k=0;k<L.length;k++){ const x=L[k], nx=L[k+1]; const hold=Math.max(x.end+0.3, x.start+Math.max(1.3,noSpaceLen(x.text)/8)); const until=nx? Math.min(hold, nx.start-0.02) : hold; if(T>=x.start-0.05 && T<=until){ l=x; } }
     if(l){ const until=(()=>{ const k=L.indexOf(l), nx=L[k+1]; const hold=Math.max(l.end+0.3, l.start+Math.max(1.3,noSpaceLen(l.text)/8)); return nx? Math.min(hold,nx.start-0.02) : hold; })();
       const pr=Math.max(0,Math.min(1,(T-l.start)/Math.max(0.3,Math.min(until,l.end+0.2)-l.start)));
-      drawDialogue(lineChunkAt(l.text,pr),l.speaker,b); } }
-  else if(sc && sc.text){ if(sc.type==='dialogue') drawDialogue(sc.text,sc.speaker,b); else { const sp=sc.audioDur? sc.audioDur/rateOf(sc) : 0, segLen=sp? sp+0.06 : 0; drawSub(narrChunkAt(sc.text, segLen? Math.min(1,prog*segLen/sp) : prog),b); } }
-  const work=S.work||$('work').value; if(work){ g.font=SFONT(25); g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+($('subPos').value==='below'?172:(b.h>=500?-48:46))); }
+      const tx=lineChunkAt(l.text,pr); layer(JSON.stringify(['d',tx,l.speaker,spkColor(l.speaker),b,$('subPos').value,JA()]),()=>drawDialogue(tx,l.speaker,b)); } }
+  else if(sc && sc.text){ if(sc.type==='dialogue') drawDialogue(sc.text,sc.speaker,b); else { const sp=sc.audioDur? sc.audioDur/rateOf(sc) : 0, segLen=sp? sp+0.06 : 0; const tx=narrChunkAt(sc.text, segLen? Math.min(1,prog*segLen/sp) : prog); layer(JSON.stringify(['n',tx,b,$('subPos').value,JA()]),()=>drawSub(tx,b)); } }
 }
 
 /* ================= 재생 · 녹화 ================= */
@@ -1810,11 +1830,12 @@ async function run(record,only){
   assignNarrFootage(); const TL=buildTL(only), sp=+$('speed').value, duck=(+$('duckVol').value)/100, dlg=(+$('dlgVol').value)/100;
   const master=c.createGain(); const mon=c.createGain(); mon.gain.value=(record&&!$('monitor').checked)?0:1; master.connect(mon); mon.connect(c.destination);
   [gA,gB].forEach(gn=>{ try{gn.disconnect();}catch(e){} gn.gain.value=0; gn.connect(master); });
-  let rec=null, chunks=[], mime='';
+  let rec=null, chunks=[], mime='', vtrack=null; LAYERS.clear();
   if(record){
     mime=pickMime(); if(!mime){ setStatus('renderStatus','이 브라우저는 영상 녹화를 지원하지 않아요. 크롬 최신 버전을 써 주세요.',true); busy=false; updateButtons(); return; }
     const dest=c.createMediaStreamDestination(); master.connect(dest);
-    rec=new MediaRecorder(new MediaStream([...cv.captureStream(30).getVideoTracks(),...dest.stream.getAudioTracks()]),{mimeType:mime,videoBitsPerSecond:8_000_000,audioBitsPerSecond:192_000});
+    const vstream= ('requestVideoFrameCallback' in HTMLVideoElement.prototype)? cv.captureStream(0) : cv.captureStream(30); vtrack=vstream.getVideoTracks()[0]; if(!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) vtrack=null;
+    rec=new MediaRecorder(new MediaStream([...vstream.getVideoTracks(),...dest.stream.getAudioTracks()]),{mimeType:mime,videoBitsPerSecond:8_000_000,audioBitsPerSecond:192_000});
     rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
   }
   S.scenes.forEach(sc=>{ const el=sc.audioEl; if(!el) return; if(!sc.srcNode) sc.srcNode=c.createMediaElementSource(el); try{sc.srcNode.disconnect();}catch(e){} sc.srcNode.connect(master);
@@ -1829,6 +1850,9 @@ async function run(record,only){
   let cur=-1;
   setStatus('renderStatus', record? `녹화 중이에요. 이 탭을 그대로 두세요…${miss?` (목소리 없는 나레이션 ${miss}개는 자막만 나와요)`:''}` : '미리보기 재생 중…');
   await new Promise(res=>{
+    // 원본 영상에 새 프레임이 나올 때만 그리고 녹화해요 (같은 화면이 불규칙하게 반복되던 끊김 방지)
+    let vNew=true, lastReq=0, rvOn=true; const watch=v=>{ if(!v.requestVideoFrameCallback) return; const cb=()=>{ vNew=true; if(rvOn) v.requestVideoFrameCallback(cb); }; v.requestVideoFrameCallback(cb); };
+    [VA,VB].forEach(watch);
     const tick=()=>{
       const t=c.currentTime-t0;
       let k=cur<0?0:cur; while(k<TL.tl.length-1 && t>=TL.tl[k].end) k++;
@@ -1842,10 +1866,14 @@ async function run(record,only){
         const nx=TL.tl[k+1]; if(nx) setTimeout(()=>{ other.pause(); other.currentTime=nx.src; },40);
         cur=k;
       }
+      const nowR=performance.now(), due= vNew || nowR-lastReq>100 || !('requestVideoFrameCallback' in HTMLVideoElement.prototype);
+      if(!due){ if(t>=TL.total||stopFlag){ rvOn=false; res(); } else requestAnimationFrame(tick); return; }
+      vNew=false; lastReq=nowR;
       if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], seg.type==='clip'?1:(JA()? 1.045-0.04*p : 1+0.035*p), seg.src+(t-seg.start)*(seg.rate||1), p); }
       else drawComposite(0, VA);
+      if(vtrack) vtrack.requestFrame();
       $('renderBar').style.width=Math.min(100,Math.max(0,t)/TL.total*100)+'%';
-      if(t>=TL.total||stopFlag) res(); else requestAnimationFrame(tick);
+      if(t>=TL.total||stopFlag){ rvOn=false; res(); } else requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   });
@@ -1889,7 +1917,7 @@ $('copyGuide').addEventListener('click',()=>{ const t=$('guideOut').value; navig
 $('saveGuide').addEventListener('click',()=>{ const t=$('guideOut').value; if(!t) return; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([t],{type:'text/plain;charset=utf-8'})); a.download=((S.title1+' '+S.title2).trim()||'편집가이드')+'_편집가이드.txt'; a.click(); });
 
 loadSettings(); setupEngineUI(()=>JA()?'平凡に見えた優等生 しかし彼には誰も知らない衝撃の秘密があったのです':'평범해 보이던 전교 일등 우등생 하지만 그에게는 아무도 모르는 충격적인 비밀이 있었습니다'); initVersions(); drawComposite(-1,null);
-document.fonts && document.fonts.ready.then(()=>redrawPreview()); FONTS_READY.then(()=>redrawPreview());
+document.fonts && document.fonts.ready.then(()=>redrawPreview()); FONTS_READY.then(()=>{ LAYERS.clear(); redrawPreview(); });
 </script>
 </body>
 </html>
