@@ -1133,6 +1133,16 @@ function dedupeFootage(d){
     if(b-a<1.5) return false;
     if(a!==sc.src_start||b!==sc.src_end){ sc.src_start=a; sc.src_end=b; sc.lines=(sc.lines||[]).filter(l=>l.start>=a-0.1&&l.end<=b+0.3); sc.text=sc.lines.map(l=>l.text).join(' / ')||sc.text; }
     used.push([a,b]); return true; });
+  // 코랩 재료는 끝부분이 '결과' 장면이에요. AI가 결말 전에 끝냈으면, 재료 마지막 대사들을 마지막 장면으로 꼭 붙여요
+  if(S.file && isMaterial(S.file.name) && TX && TX.length && d<1e8){
+    let le=0; S.scenes.forEach(x=>{ if(x.type==='clip') le=Math.max(le,x.src_end); });
+    const tail=TX.filter(x=>x.start>=le+0.3 && x.start>=d-45);
+    if(le<d-12 && tail.length){
+      const a=Math.max(le+0.1, tail[0].start-0.3), z=Math.min(d, Math.max(...tail.map(x=>x.end))+1.5);
+      const lines=tail.map(x=>({start:x.start,end:x.end,text:clean(x.text),speaker:'기타'}));
+      S.scenes.push(newScene({type:'clip',text:lines.map(l=>l.text).join(' / '),src_start:a,src_end:z,lines,guide:'결말 (재료 끝부분 자동 추가)'}));
+    }
+  }
   const lastC=S.scenes[S.scenes.length-1]; if(lastC && lastC.type==='clip') lastC.src_end=Math.min(d, lastC.src_end+0.9);
   assignNarrFootage();
 }
