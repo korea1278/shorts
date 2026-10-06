@@ -118,7 +118,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
           <div><label for="anthropicKey">Claude API 키 (대본·장면 분석, 선택)</label><input id="anthropicKey" type="password" placeholder="sk-ant-..." autocomplete="off"></div>
         </div>
         <div class="cols">
-          <div><label for="engine">목소리 엔진</label><select id="engine"><option value="voicebox">Voicebox (무료, 내 PC에서 실행, 추천)</option><option value="openai">OpenAI 목소리 (유료, 말투 지시 가능)</option><option value="supertonic">무료 목소리 (Supertonic, 한국어)</option></select></div>
+          <div><label for="engine">목소리 엔진</label><select id="engine"><option value="eleven">일레븐랩스 (유료 플랜, 감정 표현 최고, 추천)</option><option value="voicebox">Voicebox (무료, 내 PC에서 실행)</option><option value="openai">OpenAI 목소리 (유료, 말투 지시 가능)</option><option value="supertonic">무료 목소리 (Supertonic, 한국어)</option></select></div>
           <div><label for="speed">말 속도 <b id="speedVal">1.10</b>배</label><input id="speed" type="range" min="0.9" max="1.5" step="0.05" value="1.1" style="width:100%"></div>
         </div>
         <div id="stBox">
@@ -127,6 +127,17 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
             <div><label for="stSteps">음질</label><select id="stSteps"><option value="5">빠르게</option><option value="8" selected>보통</option><option value="12">고품질 (느림)</option></select></div>
           </div>
           <div class="row" style="margin-top:8px"><button type="button" id="stTry" class="small">▶ 들어보기</button><span class="note" id="stStatus" style="margin:0">처음 누를 때 모델(약 400MB)을 받아요. 이후엔 바로 나와요.</span></div>
+        </div>
+        <div id="elBox">
+          <div class="cols">
+            <div><label for="elKey">일레븐랩스 API 키</label><input id="elKey" type="password" placeholder="sk_..." autocomplete="off"></div>
+            <div><label for="elVoice">목소리</label><select id="elVoice"><option value="">(키 넣고 '목소리 불러오기')</option></select></div>
+          </div>
+          <div class="cols">
+            <div><label for="elModel">모델</label><select id="elModel"><option value="eleven_v3">v3 (감정 연기 최고, 추천)</option><option value="eleven_multilingual_v2">Multilingual v2 (안정적, 문장 이어짐 자연스러움)</option></select></div>
+            <div><label for="elEmo">감정 표현</label><select id="elEmo"><option value="hi">풍부하게 (드라마틱)</option><option value="mid" selected>자연스럽게 (추천)</option><option value="lo">차분하게</option></select></div>
+          </div>
+          <div class="row" style="margin-top:8px"><button type="button" id="elLoad" class="small">목소리 불러오기</button><button type="button" id="elTry" class="small">▶ 들어보기</button><span class="note" id="elStatus" style="margin:0">일레븐랩스 사이트 → 왼쪽 아래 프로필 → API Keys에서 키를 만들어 붙여 넣으세요.</span></div>
         </div>
         <div id="vbBox">
           <div class="cols">
@@ -417,7 +428,7 @@ async function stLoad(say){
   }
 }
 /* 나레이션 앞뒤 무음을 자르고, 문장 사이 긴 쉼(0.3초 넘게)은 0.15초로 줄여요 */
-function trimSilence(buf){
+function trimSilence(buf,inner=true){
   const sr=buf.sampleRate, ch=buf.numberOfChannels, n=buf.length; const d=new Float32Array(n);
   for(let c=0;c<ch;c++){ const x=buf.getChannelData(c); for(let i=0;i<n;i++) d[i]+=x[i]/ch; }
   const win=Math.round(sr*0.01), nw=Math.floor(n/win); if(nw<10) return d;
@@ -430,7 +441,7 @@ function trimSilence(buf){
   const end=Math.min(nw-1,last+8);
   while(w<=end){
     if(rms[w]<th){ let z=w; while(z<=end && rms[z]<th) z++; const len=z-w;
-      const k= len>Math.round(0.3/0.01) ? keep : len; // 긴 쉼만 줄여요
+      const k= (inner && len>Math.round(0.3/0.01)) ? keep : len; // 긴 쉼만 줄여요
       out.push([w*win,(w+Math.floor(k/2))*win],[(z-Math.ceil(k/2))*win,z*win]); w=z; }
     else { let z=w; while(z<=end && rms[z]>=th) z++; out.push([w*win,z*win]); w=z; }
   }
@@ -469,8 +480,19 @@ function setupEngineUI(sample){
   const sel=$('stVoice'); sel.innerHTML=ST_VOICES.map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
   try{ const v=JSON.parse(localStorage.getItem('st_ui')||'{}'); if(v.voice) sel.value=v.voice; if(v.engine) $('engine').value=v.engine; if(v.steps) $('stSteps').value=v.steps; }catch(e){}
   try{ if(!localStorage.getItem('mrm_vb_engine')){ $('engine').value='voicebox'; localStorage.setItem('mrm_vb_engine','1'); } }catch(e){}
+  try{ if(!localStorage.getItem('mrm_el_engine')){ $('engine').value='eleven'; localStorage.setItem('mrm_el_engine','1'); if(!localStorage.getItem('mrm_el_speed')){ $('speed').value='1.1'; localStorage.setItem('mrm_el_speed','1'); setTimeout(()=>{ try{ saveSettings(); }catch(e){} },0); } } }catch(e){}
+  $('elVoice').addEventListener('change',()=>{ try{ localStorage.setItem('mrm_el_voice',$('elVoice').value); }catch(e){} });
+  $('elLoad').addEventListener('click',async()=>{ const b=$('elLoad'); b.disabled=true; const say=m=>{ $('elStatus').textContent=m; };
+    try{ say('불러오는 중…'); const n=await elLoadVoices(); say(`목소리 ${n}개를 불러왔어요. ★는 내가 추가한 목소리예요. 고른 뒤 ▶ 들어보기.`); }catch(e){ say(e.message); } b.disabled=false; });
+  $('elTry').addEventListener('click',async()=>{ const b=$('elTry'); b.disabled=true; const say=m=>{ $('elStatus').textContent=m; };
+    try{ if(!$('elVoice').value) await elLoadVoices(); say('만드는 중…');
+      const t=(window.S&&S.lang==='ja')?'ところが、誰もが諦めかけたその時。信じられないことが起きたんです。':'그런데 모두가 포기하려던 바로 그때, 믿을 수 없는 일이 벌어집니다.';
+      const {blob,rate}=await elSpeak(t,(window.S&&S.lang)||'ko'); const a=new Audio(URL.createObjectURL(blob)); a.playbackRate=rate||+$('speed').value; a.preservesPitch=true; a.play().catch(()=>{});
+      say(`"${$('elVoice').selectedOptions[0].text}" 목소리예요. 한 번 들을 때마다 크레딧이 조금 써져요.`); }
+    catch(e){ say(e.message); } b.disabled=false; });
+  try{ if(key('elKey')) elLoadVoices().catch(()=>{}); }catch(e){}
   const sv=()=>{ $('speedVal').textContent=(+$('speed').value).toFixed(2); }; $('speed').addEventListener('input',sv); sv();
-  const sync=()=>{ const st=$('engine').value==='supertonic', vb=$('engine').value==='voicebox'; $('stBox').hidden=!st; $('vbBox').hidden=!vb; $('oaVoiceBox').hidden=st||vb;
+  const sync=()=>{ const st=$('engine').value==='supertonic', vb=$('engine').value==='voicebox', el=$('engine').value==='eleven'; $('stBox').hidden=!st; $('vbBox').hidden=!vb; $('elBox').hidden=!el; $('oaVoiceBox').hidden=st||vb||el;
     try{ localStorage.setItem('st_ui',JSON.stringify({engine:$('engine').value,voice:sel.value,steps:$('stSteps').value})); }catch(e){} };
   ['engine','stVoice','stSteps'].forEach(id=>$(id).addEventListener('change',sync)); sync();
   $('vbTry').addEventListener('click',async()=>{
@@ -494,6 +516,43 @@ function setupEngineUI(sample){
 }
 const useST=()=>$('engine').value==='supertonic';
 const useVB=()=>$('engine').value==='voicebox';
+const useEL=()=>$('engine').value==='eleven';
+/* ================= 일레븐랩스 ================= */
+const EL_URL='https://api.elevenlabs.io';
+async function elFetch(path,opt={}){
+  const k=key('elKey'); if(!k) throw new Error('일레븐랩스 API 키를 먼저 넣어 주세요.');
+  let r; try{ r=await fetch(EL_URL+path,{...opt,headers:{'xi-api-key':k,...(opt.headers||{})}}); }catch(e){ throw new Error('일레븐랩스에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.'); }
+  if(!r.ok){ let m=''; try{ const j=await r.json(); m=(j.detail&&(j.detail.message||j.detail.status||JSON.stringify(j.detail)))||''; }catch(e){}
+    if(r.status===401) throw new Error('일레븐랩스 API 키가 맞지 않아요. 다시 복사해서 넣어 주세요. '+m);
+    if(/quota|credit/i.test(m)) throw new Error('일레븐랩스 이번 달 크레딧을 다 썼어요. '+m);
+    throw new Error('일레븐랩스 오류 ('+r.status+'): '+m); }
+  return r;
+}
+async function elLoadVoices(){
+  const j=await (await elFetch('/v1/voices')).json(); const list=(j.voices||[]);
+  const sel=$('elVoice'), keep=sel.value||(localStorage.getItem('mrm_el_voice')||'');
+  const lab=v=>{ const L=v.labels||{}; return [L.gender==='male'?'남':L.gender==='female'?'여':'', L.age, L.accent].filter(Boolean).join('·'); };
+  list.sort((a,b)=>(a.category==='premade')-(b.category==='premade'));
+  sel.innerHTML=list.map(v=>`<option value="${v.voice_id}">${v.category==='premade'?'':'★ '}${String(v.name).replace(/</g,'')}${lab(v)?' ('+lab(v)+')':''}</option>`).join('');
+  if(keep && list.some(v=>v.voice_id===keep)) sel.value=keep;
+  return list.length;
+}
+function elSettings(){
+  const v3=$('elModel').value==='eleven_v3', e=$('elEmo').value;
+  return v3? {stability: e==='hi'?0:e==='mid'?0.5:1, similarity_boost:0.75}
+           : {stability: e==='hi'?0.3:e==='mid'?0.45:0.7, similarity_boost:0.75, style: e==='hi'?0.45:e==='mid'?0.25:0.05, use_speaker_boost:true};
+}
+// 반환: {blob, rate} — rate는 미리보기/녹화 때 추가로 곱할 재생 속도
+async function elSpeak(text,lang,prev,next){
+  const vid=$('elVoice').value; if(!vid) throw new Error("일레븐랩스 목소리를 먼저 고르세요. ('목소리 불러오기' 누르기)");
+  const model=$('elModel').value, v3=model==='eleven_v3', sp=+$('speed').value;
+  const vs=elSettings(); let rate=0;
+  const body={text,model_id:model,voice_settings:vs};
+  if(v3) body.language_code= lang==='ja'?'ja':'ko';
+  else { const es=Math.min(1.2,Math.max(0.7,sp)); vs.speed=es; rate=sp/es; if(prev) body.previous_text=prev; if(next) body.next_text=next; }
+  const r=await elFetch(`/v1/text-to-speech/${vid}?output_format=mp3_44100_128`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  return {blob:new Blob([await r.arrayBuffer()],{type:'audio/mpeg'}), rate};
+}
 /* ================= Voicebox (내 PC에서 돌아가는 무료 목소리) ================= */
 const VB_URL='http://127.0.0.1:17493';
 let VB_PROFILE=null;
@@ -517,13 +576,13 @@ async function vbSpeak(text,lang){
 }
 
 /* ================= 설정 ================= */
-const SET_IDS=['vbProfile','vbSize','orderMode','structMode','targetLen','subPos','bgStyle','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
+const SET_IDS=['elModel','elEmo','vbProfile','vbSize','orderMode','structMode','targetLen','subPos','bgStyle','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
 function loadSettings(){
   try{
     const s=JSON.parse(localStorage.getItem('mrm_settings')||'{}');
     SET_IDS.forEach(k=>{ if(s[k]!==undefined){ const el=$(k); el.type==='checkbox'? el.checked=s[k] : el.value=s[k]; } });
     const k=JSON.parse(localStorage.getItem('mrm_keys')||'null');
-    if(k){ $('openaiKey').value=k.o||''; $('anthropicKey').value=k.a||''; $('remember').checked=true; }
+    if(k){ $('openaiKey').value=k.o||''; $('anthropicKey').value=k.a||''; $('elKey').value=k.e||''; $('remember').checked=true; }
   }catch(e){}
   try{ if(!localStorage.getItem('mrm_vb2')){ $('speed').value='1.25'; localStorage.setItem('mrm_vb2','1'); setTimeout(()=>{ try{ saveSettings(); }catch(e){} },0); } }catch(e){}
   try{ if(!localStorage.getItem('mrm_auto_len')){ $('targetLen').value='auto'; localStorage.setItem('mrm_auto_len','1'); } }catch(e){}
@@ -535,7 +594,7 @@ function saveSettings(){
   try{
     const s={}; SET_IDS.forEach(k=>{ const el=$(k); s[k]= el.type==='checkbox'? el.checked : el.value; });
     localStorage.setItem('mrm_settings',JSON.stringify(s));
-    if($('remember').checked) localStorage.setItem('mrm_keys',JSON.stringify({o:key('openaiKey'),a:key('anthropicKey')}));
+    if($('remember').checked) localStorage.setItem('mrm_keys',JSON.stringify({o:key('openaiKey'),a:key('anthropicKey'),e:key('elKey')}));
     else localStorage.removeItem('mrm_keys');
   }catch(e){}
 }
@@ -1165,7 +1224,7 @@ function assignNarrFootage(){
     const aiOut= cur!=null && (sc.aiSrc<cur-2 || sc.aiSrc>nextStart+1);
     if(story && aiOut){ // 이야기 흐름 순: AI가 일부러 다른 시점(회상·결과 장면)을 고른 곳은 그 장면을 그대로 써요
       const clips=L.filter(x=>x.type==='clip').map(x=>[x.src_start,x.src_end]); const free=t=>t>=0&&t+len<=d&&!clips.some(u=>t<u[1]-0.1&&t+len>u[0]+0.1);
-      let t=sc.aiSrc; if(!free(t)){ for(let k=1;k<=30;k++){ if(free(sc.aiSrc-k)){ t=sc.aiSrc-k; break; } if(free(sc.aiSrc+k)){ t=sc.aiSrc+k; break; } } }
+      let t=+sc.aiSrc||0; const a0=t; if(!free(t)){ for(let k=1;k<=30;k++){ if(free(a0-k)){ t=a0-k; break; } if(free(a0+k)){ t=a0+k; break; } } }
       sc.src_start=+t.toFixed(2); sc.vrate=1; }
     else if(cur==null){ sc.src_start=Math.max(0,+(nextStart-len).toFixed(2)); sc.vrate=1; }
     else { const gap=nextStart-cur;
@@ -1176,7 +1235,7 @@ function assignNarrFootage(){
         sc.src_start=+cur.toFixed(2); sc.vrate=1; nx.src_start=Math.min(nx.src_end-1,+(cur+len).toFixed(2)); }
       else { // 순서가 안 맞으면 다른 장면과 겹치지 않는 곳에서 AI가 고른 화면을 써요
         const clips=L.filter(x=>x.type==='clip').map(x=>[x.src_start,x.src_end]); const free=t=>t>=0&&t+len<=d&&!clips.some(u=>t<u[1]-0.1&&t+len>u[0]+0.1);
-        let t=sc.aiSrc; if(!free(t)){ for(let k=1;k<=30;k++){ if(free(sc.aiSrc-k)){ t=sc.aiSrc-k; break; } if(free(sc.aiSrc+k)){ t=sc.aiSrc+k; break; } } }
+        let t=+sc.aiSrc||0; const a0=t; if(!free(t)){ for(let k=1;k<=30;k++){ if(free(a0-k)){ t=a0-k; break; } if(free(a0+k)){ t=a0+k; break; } } }
         sc.src_start=+t.toFixed(2); sc.vrate=1; } }
     if(sc.src_start+len*(sc.vrate||1)>d-0.1){ sc.src_start=Math.max(0,+(d-0.1-len).toFixed(2)); sc.vrate=1; }
     cur=sc.src_start+len*(sc.vrate||1);
@@ -1688,17 +1747,20 @@ function redrawPreview(){ if(!busy) showScene(previewIdx<0?0:previewIdx); }
 const rateOf = sc => sc.rate || +$('speed').value;
 const est = t => Math.max(1.2, noSpaceLen(t)/(JA()?7:5.8));
 $('ttsBtn').addEventListener('click', async ()=>{
-  if(!useST() && !useVB() && !key('openaiKey')){ setStatus('ttsStatus','OpenAI API 키를 먼저 넣어 주세요. (또는 무료 목소리를 고르세요)',true); return; }
+  if(useEL() && (!key('elKey')||!$('elVoice').value)){ setStatus('ttsStatus','일레븐랩스 API 키를 넣고 목소리를 골라 주세요.',true); return; }
+  if(!useST() && !useVB() && !useEL() && !key('openaiKey')){ setStatus('ttsStatus','OpenAI API 키를 먼저 넣어 주세요. (또는 무료 목소리를 고르세요)',true); return; }
   const jobs=S.scenes.map((s,i)=>({s,i})).filter(o=>o.s.type==='narration'&&!o.s.audio);
   if(!jobs.length){ setStatus('ttsStatus','목소리가 이미 다 만들어져 있어요.'); return; }
   busy=true; updateButtons(); let done=0, fails=0, last='';
   const prog=()=>{ $('ttsBar').style.width=(done/jobs.length*100)+'%'; setStatus('ttsStatus',`목소리 만드는 중… ${done}/${jobs.length}${fails?` (실패 ${fails})`:''}`); };
   prog();
-  await pool(jobs,(useST()||useVB())?1:4,async({s,i})=>{ s.aState='만드는 중…'; renderStat(i);
+  const narrs=S.scenes.filter(x=>x.type==='narration');
+  await pool(jobs,(useST()||useVB())?1:(useEL()?2:4),async({s,i})=>{ s.aState='만드는 중…'; renderStat(i);
     try{ let blob, buf; const maxDur=noSpaceLen(s.text)*0.32+2.5; // 글자 수에 비해 너무 긴 목소리(AI 폭주)는 다시 만들어요
       for(let tryN=0;tryN<2;tryN++){
-      if(useVB()){ blob=await vbSpeak(s.text,S.lang); s.rate=0; } else if(useST()){ blob=await stSpeak(s.text,$('stVoice').value,+$('stSteps').value,+$('speed').value,m=>setStatus('ttsStatus',m),S.lang); s.rate=1; } else { blob=await tts(s.text); s.rate=0; } buf=await getCtx().decodeAudioData(await blob.arrayBuffer());
-      { const t=trimSilence(buf); if(t.length>buf.sampleRate*0.3 && t.length<buf.length){ blob=wavBlob(t,buf.sampleRate); buf=await getCtx().decodeAudioData(await blob.arrayBuffer()); } }
+      if(useEL()){ const j=narrs.indexOf(s); const o=await elSpeak(s.text,S.lang,j>0?narrs[j-1].text:'',narrs[j+1]?narrs[j+1].text:''); blob=o.blob; s.rate=o.rate; }
+      else if(useVB()){ blob=await vbSpeak(s.text,S.lang); s.rate=0; } else if(useST()){ blob=await stSpeak(s.text,$('stVoice').value,+$('stSteps').value,+$('speed').value,m=>setStatus('ttsStatus',m),S.lang); s.rate=1; } else { blob=await tts(s.text); s.rate=0; } buf=await getCtx().decodeAudioData(await blob.arrayBuffer());
+      { const t=trimSilence(buf,!useEL()); if(t.length>buf.sampleRate*0.3 && t.length<buf.length){ blob=wavBlob(t,buf.sampleRate); buf=await getCtx().decodeAudioData(await blob.arrayBuffer()); } }
       if(buf.duration<=maxDur) break;
       if(tryN===1) throw new Error(`"${s.text.slice(0,12)}…" 목소리가 ${buf.duration.toFixed(0)}초로 너무 길게 나왔어요 (글자 수에 비해). 다시 눌러 주세요.`);
       }
