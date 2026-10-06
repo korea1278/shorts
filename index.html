@@ -118,7 +118,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
           <div><label for="anthropicKey">Claude API 키 (대본·장면 분석, 선택)</label><input id="anthropicKey" type="password" placeholder="sk-ant-..." autocomplete="off"></div>
         </div>
         <div class="cols">
-          <div><label for="engine">목소리 엔진</label><select id="engine"><option value="supertonic">무료 목소리 (Supertonic, 한국어)</option><option value="openai">OpenAI 목소리 (유료, 말투 지시 가능)</option></select></div>
+          <div><label for="engine">목소리 엔진</label><select id="engine"><option value="voicebox">Voicebox (무료, 내 PC에서 실행, 추천)</option><option value="openai">OpenAI 목소리 (유료, 말투 지시 가능)</option><option value="supertonic">무료 목소리 (Supertonic, 한국어)</option></select></div>
           <div><label for="speed">말 속도 <b id="speedVal">1.10</b>배</label><input id="speed" type="range" min="0.9" max="1.5" step="0.05" value="1.1" style="width:100%"></div>
         </div>
         <div id="stBox">
@@ -127,6 +127,13 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
             <div><label for="stSteps">음질</label><select id="stSteps"><option value="5">빠르게</option><option value="8" selected>보통</option><option value="12">고품질 (느림)</option></select></div>
           </div>
           <div class="row" style="margin-top:8px"><button type="button" id="stTry" class="small">▶ 들어보기</button><span class="note" id="stStatus" style="margin:0">처음 누를 때 모델(약 400MB)을 받아요. 이후엔 바로 나와요.</span></div>
+        </div>
+        <div id="vbBox">
+          <div class="cols">
+            <div><label for="vbProfile">Voicebox 목소리 프로필 이름</label><input id="vbProfile" type="text" value="movie voice" autocomplete="off"></div>
+            <div><label for="vbSize">모델 크기</label><select id="vbSize"><option value="1.7B">1.7B (자연스러움, 추천)</option><option value="0.6B">0.6B (빠름)</option></select></div>
+          </div>
+          <div class="row" style="margin-top:8px"><button type="button" id="vbTry" class="small">연결 확인 + ▶ 들어보기</button><span class="note" id="vbStatus" style="margin:0">Voicebox 프로그램을 먼저 켜 두세요.</span></div>
         </div>
         <div id="oaVoiceBox">
           <div class="cols"><div><label for="voice">목소리</label>
@@ -461,9 +468,21 @@ const ST_VOICES=[['M1','남성 1'],['M2','남성 2'],['M3','남성 3'],['M4','�
 function setupEngineUI(sample){
   const sel=$('stVoice'); sel.innerHTML=ST_VOICES.map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
   try{ const v=JSON.parse(localStorage.getItem('st_ui')||'{}'); if(v.voice) sel.value=v.voice; if(v.engine) $('engine').value=v.engine; if(v.steps) $('stSteps').value=v.steps; }catch(e){}
-  const sync=()=>{ const st=$('engine').value==='supertonic'; $('stBox').hidden=!st; $('oaVoiceBox').hidden=st;
+  try{ if(!localStorage.getItem('mrm_vb_engine')){ $('engine').value='voicebox'; localStorage.setItem('mrm_vb_engine','1'); } }catch(e){}
+  const sv=()=>{ $('speedVal').textContent=(+$('speed').value).toFixed(2); }; $('speed').addEventListener('input',sv); sv();
+  const sync=()=>{ const st=$('engine').value==='supertonic', vb=$('engine').value==='voicebox'; $('stBox').hidden=!st; $('vbBox').hidden=!vb; $('oaVoiceBox').hidden=st||vb;
     try{ localStorage.setItem('st_ui',JSON.stringify({engine:$('engine').value,voice:sel.value,steps:$('stSteps').value})); }catch(e){} };
   ['engine','stVoice','stSteps'].forEach(id=>$(id).addEventListener('change',sync)); sync();
+  $('vbTry').addEventListener('click',async()=>{
+    const b=$('vbTry'); b.disabled=true; const say=m=>{ $('vbStatus').textContent=m; }; VB_PROFILE=null;
+    try{ say('연결하는 중…'); await vbProfileId(); say(`연결됐어요 (프로필: ${VB_PROFILE.name}). 목소리 만드는 중… (처음엔 모델을 불러오느라 1분쯤 걸려요)`);
+      const t=(window.S&&S.lang==='ja')?'その瞬間 信じられないことが起きたのです':'그런데 모두가 포기하려던 그때 믿을 수 없는 일이 일어나는데요';
+      let blob=await vbSpeak(t,(window.S&&S.lang)||'ko'); const buf=await getCtx().decodeAudioData(await blob.arrayBuffer()); const tr=trimSilence(buf); blob=wavBlob(tr,buf.sampleRate);
+      const a=new Audio(URL.createObjectURL(blob)); a.playbackRate=+$('speed').value; a.preservesPitch=true; a.play().catch(()=>{});
+      say(`연결 성공! "${VB_PROFILE.name}" 목소리를 ${$('speed').value}배속으로 들려드려요.`); }
+    catch(e){ say(e.message); }
+    b.disabled=false;
+  });
   $('stTry').addEventListener('click',async()=>{
     const b=$('stTry'); b.disabled=true; const say=m=>{ $('stStatus').textContent=m; };
     try{ const blob=await stSpeak(typeof sample==='function'?sample():sample,sel.value,+$('stSteps').value,+$('speed').value,say,(window.S&&S.lang)||'ko');
@@ -474,9 +493,31 @@ function setupEngineUI(sample){
   });
 }
 const useST=()=>$('engine').value==='supertonic';
+const useVB=()=>$('engine').value==='voicebox';
+/* ================= Voicebox (내 PC에서 돌아가는 무료 목소리) ================= */
+const VB_URL='http://127.0.0.1:17493';
+let VB_PROFILE=null;
+const VB_HELP='Voicebox에 연결하지 못했어요.\n① Voicebox 프로그램이 켜져 있는지 확인\n② 이 PC에서 처음이면: 키보드 윈도우키+R → cmd 입력 → 아래 한 줄 붙여 넣고 Enter → Voicebox를 완전히 끄고(오른쪽 아래 트레이 아이콘에서 종료) 다시 켜기\n   setx VOICEBOX_CORS_ORIGINS "https://korea1278.github.io"\n③ 크롬이 "로컬 네트워크 접근"을 물어보면 허용';
+async function vbProfileId(){
+  const want=($('vbProfile').value||'').trim().toLowerCase();
+  if(VB_PROFILE && VB_PROFILE.name.toLowerCase()===want) return VB_PROFILE.id;
+  let r; try{ r=await fetch(VB_URL+'/profiles'); }catch(e){ throw new Error(VB_HELP); }
+  if(!r.ok) throw new Error('Voicebox 목록을 읽지 못했어요 ('+r.status+').');
+  const list=await r.json(); const p=list.find(x=>String(x.name).trim().toLowerCase()===want) || (want? null : list[0]);
+  if(!p) throw new Error(`Voicebox에 "${$('vbProfile').value}" 프로필이 없어요. 있는 프로필: ${list.map(x=>x.name).join(', ')||'(없음)'}`);
+  VB_PROFILE={id:p.id,name:p.name}; return p.id;
+}
+async function vbSpeak(text,lang){
+  const id=await vbProfileId(); let r;
+  try{ r=await fetch(VB_URL+'/generate/stream',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({profile_id:id,text,language:lang==='ja'?'ja':'ko',engine:'qwen',model_size:$('vbSize').value,normalize:true})}); }
+  catch(e){ throw new Error(VB_HELP); }
+  if(!r.ok){ let m=''; try{ m=(await r.json()).detail; }catch(e){} throw new Error('Voicebox 오류 ('+r.status+'): '+(m||'')); }
+  return new Blob([await r.arrayBuffer()],{type:'audio/wav'});
+}
 
 /* ================= 설정 ================= */
-const SET_IDS=['orderMode','structMode','targetLen','subPos','bgStyle','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
+const SET_IDS=['vbProfile','vbSize','orderMode','structMode','targetLen','subPos','bgStyle','accentBar','subOffset','gClientId','gApiKey','voice','speed','voiceInst','provider','claudeModel','gptModel','ttsModel','sttModel','duckVol','dlgVol','bandMode','bgmVol','monitor','stt'];
 function loadSettings(){
   try{
     const s=JSON.parse(localStorage.getItem('mrm_settings')||'{}');
@@ -484,6 +525,7 @@ function loadSettings(){
     const k=JSON.parse(localStorage.getItem('mrm_keys')||'null');
     if(k){ $('openaiKey').value=k.o||''; $('anthropicKey').value=k.a||''; $('remember').checked=true; }
   }catch(e){}
+  try{ if(!localStorage.getItem('mrm_vb1')){ $('speed').value='1.25'; localStorage.setItem('mrm_vb1','1'); } }catch(e){}
   try{ if(!localStorage.getItem('mrm_auto_len')){ $('targetLen').value='auto'; localStorage.setItem('mrm_auto_len','1'); } }catch(e){}
   try{ if(!localStorage.getItem('mrm_sq_v3')){ $('bandMode').value='square'; $('subPos').value='inside'; localStorage.setItem('mrm_sq_v3','1'); } }catch(e){ $('bandMode').value='square'; $('subPos').value='inside'; }
   ['speed','duckVol','dlgVol','bgmVol'].forEach(id=>syncVal(id));
@@ -1607,14 +1649,14 @@ function redrawPreview(){ if(!busy) showScene(previewIdx<0?0:previewIdx); }
 const rateOf = sc => sc.rate || +$('speed').value;
 const est = t => Math.max(1.2, noSpaceLen(t)/(JA()?7:5.8));
 $('ttsBtn').addEventListener('click', async ()=>{
-  if(!useST() && !key('openaiKey')){ setStatus('ttsStatus','OpenAI API 키를 먼저 넣어 주세요. (또는 무료 목소리를 고르세요)',true); return; }
+  if(!useST() && !useVB() && !key('openaiKey')){ setStatus('ttsStatus','OpenAI API 키를 먼저 넣어 주세요. (또는 무료 목소리를 고르세요)',true); return; }
   const jobs=S.scenes.map((s,i)=>({s,i})).filter(o=>o.s.type==='narration'&&!o.s.audio);
   if(!jobs.length){ setStatus('ttsStatus','목소리가 이미 다 만들어져 있어요.'); return; }
   busy=true; updateButtons(); let done=0, fails=0, last='';
   const prog=()=>{ $('ttsBar').style.width=(done/jobs.length*100)+'%'; setStatus('ttsStatus',`목소리 만드는 중… ${done}/${jobs.length}${fails?` (실패 ${fails})`:''}`); };
   prog();
-  await pool(jobs,useST()?1:4,async({s,i})=>{ s.aState='만드는 중…'; renderStat(i);
-    try{ let blob; if(useST()){ blob=await stSpeak(s.text,$('stVoice').value,+$('stSteps').value,+$('speed').value,m=>setStatus('ttsStatus',m),S.lang); s.rate=1; } else { blob=await tts(s.text); s.rate=0; } let buf=await getCtx().decodeAudioData(await blob.arrayBuffer());
+  await pool(jobs,(useST()||useVB())?1:4,async({s,i})=>{ s.aState='만드는 중…'; renderStat(i);
+    try{ let blob; if(useVB()){ blob=await vbSpeak(s.text,S.lang); s.rate=0; } else if(useST()){ blob=await stSpeak(s.text,$('stVoice').value,+$('stSteps').value,+$('speed').value,m=>setStatus('ttsStatus',m),S.lang); s.rate=1; } else { blob=await tts(s.text); s.rate=0; } let buf=await getCtx().decodeAudioData(await blob.arrayBuffer());
       { const t=trimSilence(buf); if(t.length>buf.sampleRate*0.3 && t.length<buf.length){ blob=wavBlob(t,buf.sampleRate); buf=await getCtx().decodeAudioData(await blob.arrayBuffer()); } }
       s.audio=blob; s.audioDur=buf.duration; s.audioEl=new Audio(URL.createObjectURL(blob)); s.audioEl.preload='auto'; s.srcNode=null; s.aState=''; }
     catch(e){ s.aState='실패'; fails++; last=e.message; }
