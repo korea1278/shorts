@@ -1246,6 +1246,13 @@ JSON만: {"titles":[{"t":"전체","l1":"윗줄","l2":"아랫줄"}]}` : `너는 �
 - 표준 띄어쓰기. 공백을 뺀 글자 수 10~20자.
 - 위 패턴을 골고루: 이유형 / 생기는 일형 / 한 행동형 / 근황·비밀형 / 대사형 / 주제형(~를 알게 해주는 명작 영화).
 
+# 구체적으로 (매우 중요)
+- 반드시 '누가(역할)'와 '무슨 일(구체적인 행동·상황)'이 들어가야 한다. 예: 흑인 피아니스트, 이탈리아 운전사, 경찰, 아빠, 엄마, 14살 소년.
+- 추상적이고 시 같은 말은 금지: 진심, 변화, 위로, 상처, 고백, 밤, 순간, 남긴 것, 찾은 것, 가까워진. 이런 말이 들어가면 실패다.
+- 아랫줄은 되도록 "~한 이유 / ~하면 생기는 일 / ~가 한 행동 / ~의 정체 / ~의 최후"로 끝낸다.
+- 제목 글자에 "/" 나 따옴표를 넣지 않는다(두 줄 나누기는 l1, l2에만).
+- 나쁜 예: "서로의 상처를 이해하게 된 밤", "운전사와 피아니스트가 서로에게 남긴 변화" / 좋은 예: "흑인 피아니스트가 경찰서에서 풀려난 이유", "건달 운전사가 피아니스트를 위해 한 행동"
+
 # 결말이 궁금해지는 제목 (가장 중요)
 - 아래 [결말 장면]이 이 영상의 답이다. 제목은 그 답을 직접 말하지 않으면서, 시청자가 '그래서 어떻게 됐는데?' 하고 끝까지 보게 만드는 질문을 던져야 한다.
 - 제목이 던진 궁금증의 답이 반드시 영상 마지막에 나와야 한다. 영상에 없는 결말을 약속하면 실패다.
@@ -1259,7 +1266,8 @@ JSON만: {"titles":[{"t":"전체 제목","l1":"윗줄","l2":"아랫줄"}]}`;
     const user=`작품명: ${$('work').value||'(모름)'}\n메모: ${$('memo').value||'(없음)'}\n\n쇼츠 대본:\n${body}\n\n[결말 장면] (영상의 마지막, 제목이 던질 궁금증의 답):\n${endScenes}${k?'\n\n(직전 제목들은 띄어쓰기나 글자 수 규칙을 어겼다. 규칙을 꼭 지켜서 다시.)':''}`;
     const out= provider==='claude'? await callClaude(sys,[],user) : await callGPT(sys,[],user);
     const j=parseJSON(out);
-    const items=(j.titles||[]).map(x=> typeof x==='string'? {t:x} : x).filter(x=>x&&x.t).map(x=>({t:String(x.t).replace(/\s+/g,' ').trim(), l1:x.l1, l2:x.l2}));
+    const items=(j.titles||[]).map(x=> typeof x==='string'? {t:x} : x).filter(x=>x&&x.t).map(x=>({t:String(x.t).replace(/\s*\/\s*/g,' ').replace(/["'“”‘’「」]/g,'').replace(/\s+/g,' ').trim(), l1:x.l1&&String(x.l1).replace(/["'“”‘’]/g,''), l2:x.l2&&String(x.l2).replace(/["'“”‘’]/g,'')}))
+      .filter(x=> ja || !/(진심|변화|위로|상처|고백|남긴|찾은|가까워)/.test(x.t));
     best=[...best, ...items.filter(x=>ok(x.t) && !best.some(b=>b.t===x.t))];
   }
   if(!best.length) throw new Error('제목을 만들지 못했어요.');
@@ -1268,7 +1276,7 @@ JSON만: {"titles":[{"t":"전체 제목","l1":"윗줄","l2":"아랫줄"}]}`;
   S.tmeta={};
   try{
     const jsys=`너는 유튜브 쇼츠 썸네일·제목 심사위원이다. 쇼츠 피드를 빠르게 넘기는 ${ja?'일본':'한국'} 시청자가 이 제목을 보고 멈춰서 볼 확률을 매긴다.
-기준(가장 중요한 것부터): 결말을 끝까지 봐야 알 수 있는가(답이 영상 마지막에 있는가) / 첫 3단어에서 궁금증이 생기는가 / 무슨 이야기인지 바로 그려지는가 / 의외의 조합·모순이 있는가 / 쉬운 말로 자연스럽게 읽히는가 / 낚시처럼 보여 신뢰를 잃지 않는가.
+기준(가장 중요한 것부터): 누가·무슨 일인지 구체적으로 보이는가(추상적·시적인 말이면 60점 이하) / 결말을 끝까지 봐야 알 수 있는가(답이 영상 마지막에 있는가) / 첫 3단어에서 궁금증이 생기는가 / 무슨 이야기인지 바로 그려지는가 / 의외의 조합·모순이 있는가 / 쉬운 말로 자연스럽게 읽히는가 / 낚시처럼 보여 신뢰를 잃지 않는가.
 참고로 잘 된 제목: "아빠가 집에 못 들어간 이유", "아이스 하키 선수가 골프로 전향하면 생기는 일", "재능을 썩히는 천재를 위해 명문대 교수가 한 행동".
 각 제목에 100점 만점 점수와, 왜 그 점수인지 ${ja?'한국어로':''} 20자 안팎 한 줄 이유를 쓴다.
 JSON만: {"ranks":[{"i":번호,"score":점수,"why":"이유"}]}`;
@@ -1687,8 +1695,13 @@ $('ttsBtn').addEventListener('click', async ()=>{
   const prog=()=>{ $('ttsBar').style.width=(done/jobs.length*100)+'%'; setStatus('ttsStatus',`목소리 만드는 중… ${done}/${jobs.length}${fails?` (실패 ${fails})`:''}`); };
   prog();
   await pool(jobs,(useST()||useVB())?1:4,async({s,i})=>{ s.aState='만드는 중…'; renderStat(i);
-    try{ let blob; if(useVB()){ blob=await vbSpeak(s.text,S.lang); s.rate=0; } else if(useST()){ blob=await stSpeak(s.text,$('stVoice').value,+$('stSteps').value,+$('speed').value,m=>setStatus('ttsStatus',m),S.lang); s.rate=1; } else { blob=await tts(s.text); s.rate=0; } let buf=await getCtx().decodeAudioData(await blob.arrayBuffer());
+    try{ let blob, buf; const maxDur=noSpaceLen(s.text)*0.32+2.5; // 글자 수에 비해 너무 긴 목소리(AI 폭주)는 다시 만들어요
+      for(let tryN=0;tryN<2;tryN++){
+      if(useVB()){ blob=await vbSpeak(s.text,S.lang); s.rate=0; } else if(useST()){ blob=await stSpeak(s.text,$('stVoice').value,+$('stSteps').value,+$('speed').value,m=>setStatus('ttsStatus',m),S.lang); s.rate=1; } else { blob=await tts(s.text); s.rate=0; } buf=await getCtx().decodeAudioData(await blob.arrayBuffer());
       { const t=trimSilence(buf); if(t.length>buf.sampleRate*0.3 && t.length<buf.length){ blob=wavBlob(t,buf.sampleRate); buf=await getCtx().decodeAudioData(await blob.arrayBuffer()); } }
+      if(buf.duration<=maxDur) break;
+      if(tryN===1) throw new Error(`"${s.text.slice(0,12)}…" 목소리가 ${buf.duration.toFixed(0)}초로 너무 길게 나왔어요 (글자 수에 비해). 다시 눌러 주세요.`);
+      }
       s.audio=blob; s.audioDur=buf.duration; s.audioEl=new Audio(URL.createObjectURL(blob)); s.audioEl.preload='auto'; s.srcNode=null; s.aState=''; }
     catch(e){ s.aState='실패'; fails++; last=e.message; }
     done++; renderStat(i); prog(); });
@@ -1865,12 +1878,25 @@ async function run(record,only){
   if(rec) rec.start(250);
   const t0=c.currentTime+0.12; if(bgmSrc) bgmSrc.start(t0);
   let cur=-1;
-  setStatus('renderStatus', record? `녹화 중이에요. 이 탭을 그대로 두세요…${miss?` (목소리 없는 나레이션 ${miss}개는 자막만 나와요)`:''}` : '미리보기 재생 중…');
+  setStatus('renderStatus', record? `녹화 중이에요. 끝날 때까지 이 탭을 화면에 띄워 두세요 (다른 탭·창으로 가리면 잠깐 멈춰요)…${miss?` (목소리 없는 나레이션 ${miss}개는 자막만 나와요)`:''}` : '미리보기 재생 중…');
   await new Promise(res=>{
     // 원본 영상에 새 프레임이 나올 때만 그리고 녹화해요 (같은 화면이 불규칙하게 반복되던 끊김 방지)
     let vNew=true, lastReq=0, rvOn=true; const watch=v=>{ if(!v.requestVideoFrameCallback) return; const cb=()=>{ vNew=true; if(rvOn) v.requestVideoFrameCallback(cb); }; v.requestVideoFrameCallback(cb); };
     [VA,VB].forEach(watch);
+    // 탭이 가려지거나 창이 내려가면 크롬이 그리기를 멈춰요 → 그동안 녹화·소리·영상을 같이 멈췄다가 돌아오면 이어서 해요
+    let held=null; const msgBase=$('renderStatus').textContent;
+    const onVis=async()=>{
+      if(document.hidden && !held){
+        held=[...els, ...S.scenes.map(s=>s.audioEl).filter(Boolean)].filter(e=>!e.paused);
+        held.forEach(e=>e.pause()); if(rec && rec.state==='recording') rec.pause(); try{ await c.suspend(); }catch(e){}
+      } else if(!document.hidden && held){
+        const h=held; held=null; try{ await c.resume(); }catch(e){} h.forEach(e=>e.play().catch(()=>{})); if(rec && rec.state==='paused') rec.resume();
+        setStatus('renderStatus', msgBase+' (탭을 벗어나서 잠깐 멈췄다가 이어서 만들었어요)');
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
     const tick=()=>{
+      if(held){ requestAnimationFrame(tick); return; }
       const t=c.currentTime-t0;
       let k=cur<0?0:cur; while(k<TL.tl.length-1 && t>=TL.tl[k].end) k++;
       if(k!==cur && t>=0){
@@ -1883,14 +1909,14 @@ async function run(record,only){
         const nx=TL.tl[k+1]; if(nx) setTimeout(()=>{ other.pause(); other.currentTime=nx.src; },40);
         cur=k;
       }
-      const nowR=performance.now(), due= vNew || nowR-lastReq>100 || !('requestVideoFrameCallback' in HTMLVideoElement.prototype);
-      if(!due){ if(t>=TL.total||stopFlag){ rvOn=false; res(); } else requestAnimationFrame(tick); return; }
+      const nowR=performance.now(), due= vNew || nowR-lastReq>50 || !('requestVideoFrameCallback' in HTMLVideoElement.prototype);
+      if(!due){ if(t>=TL.total||stopFlag){ rvOn=false; document.removeEventListener('visibilitychange',onVis); res(); } else requestAnimationFrame(tick); return; }
       vNew=false; lastReq=nowR;
       if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], seg.type==='clip'?1:(JA()? 1.045-0.04*p : 1+0.035*p), seg.src+(t-seg.start)*(seg.rate||1), p); }
       else drawComposite(0, VA);
       if(vtrack) vtrack.requestFrame();
       $('renderBar').style.width=Math.min(100,Math.max(0,t)/TL.total*100)+'%';
-      if(t>=TL.total||stopFlag){ rvOn=false; res(); } else requestAnimationFrame(tick);
+      if(t>=TL.total||stopFlag){ rvOn=false; document.removeEventListener('visibilitychange',onVis); res(); } else requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   });
