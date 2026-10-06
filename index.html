@@ -1857,12 +1857,13 @@ function lineChunks(t){ t=String(t||'').trim(); if(noSpaceLen(t)<=13) return [t]
   return out; }
 function lineChunkAt(t,p){ const c=lineChunks(t); if(c.length<2) return t; const w=c.map(x=>noSpaceLen(x)+1), tot=w.reduce((a,b)=>a+b,0); let acc=0; for(let k=0;k<c.length;k++){ acc+=w[k]; if(p*1.02<=acc/tot) return c[k]; } return c[c.length-1]; }
 function narrChunkAt(t,p){ const c=narrChunks(t); if(c.length<2) return t; const w=c.map(x=>noSpaceLen(x)+1), tot=w.reduce((x,y)=>x+y,0); let acc=0; for(let k=0;k<c.length;k++){ acc+=w[k]; if(p*1.04<=acc/tot) return c[k]; } return c[c.length-1]; }
-const bgC=document.createElement('canvas'); bgC.width=54; bgC.height=96; const bgX=bgC.getContext('2d');
+// 배경용 캔버스가 너무 작으면 크롬이 그래픽카드 대신 CPU로 그려서, 매 장면마다 영상을 CPU로 옮기느라 뚝뚝 끊겨요 → 그래픽카드가 맡는 크기(180x320)로
+const BGW=180, BGH=320; const bgC=document.createElement('canvas'); bgC.width=BGW; bgC.height=BGH; const bgX=bgC.getContext('2d');
 function drawBg(vid){
   g.fillStyle='#000'; g.fillRect(0,0,W,H);
   if($('bgStyle').value!=='blur' || !vid || !vid.videoWidth) return;
-  const vw=vid.videoWidth, vh=vid.videoHeight*(1-hsFrac()), s=Math.max(54/vw,96/vh);
-  bgX.filter='blur(2px)'; bgX.drawImage(vid,0,0,vw,vh,(54-vw*s)/2,(96-vh*s)/2,vw*s,vh*s);
+  const vw=vid.videoWidth, vh=vid.videoHeight*(1-hsFrac()), s=Math.max(BGW/vw,BGH/vh);
+  bgX.filter='blur(7px)'; bgX.drawImage(vid,0,0,vw,vh,(BGW-vw*s)/2,(BGH-vh*s)/2,vw*s,vh*s);
   g.save(); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.drawImage(bgC,-20,-20,W+40,H+40); g.restore();
   g.fillStyle='rgba(0,0,0,.55)'; g.fillRect(0,0,W,H);
 }
@@ -1891,7 +1892,7 @@ function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
   const work=S.work||$('work').value;
   layer(JSON.stringify(['top',S.title1,S.title2,b,ACC(),$('channelName').value,$('accentBar').checked,JA(),work,$('subPos').value]),()=>{
     drawBrand(b); drawTitleLine(S.title1||'', 150, '#ffffff'); drawTitleLine(S.title2||'', 236, ACC());
-    const wk=String(work||'').replace(/^\s*(영화|드라마|애니메이션|映画|ドラマ|アニメ)\s*[:：·\-]?\s*/,'').trim();
+    const wk=cleanWork(work);
     if(wk){ g.save(); g.font=SFONT(27); g.textAlign='center'; g.textBaseline='top'; g.fillStyle='#f2f2f2'; g.shadowColor='rgba(0,0,0,.85)'; g.shadowBlur=6; g.shadowOffsetX=2; g.shadowOffsetY=2;
       g.fillText(wk,W/2,b.y+b.h+($('accentBar').checked?8:0)+($('subPos').value==='below'?150:16)); g.restore(); } });
   const sc=S.scenes[i];
@@ -1903,6 +1904,15 @@ function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
   else if(sc && sc.text){ if(sc.type==='dialogue') drawDialogue(sc.text,sc.speaker,b); else { const sp=sc.audioDur? sc.audioDur/rateOf(sc) : 0, segLen=sp? sp+0.06 : 0; const tx=narrChunkAt(sc.text, segLen? Math.min(1,prog*segLen/sp) : prog); layer(JSON.stringify(['n',tx,b,$('subPos').value,JA()]),()=>drawSub(tx,b)); } }
 }
 
+// 작품명 정리: "-드라마--그린북- (2018)", "[영화] 인턴.2015" → "그린북 (2018)", "인턴 (2015)"
+function cleanWork(w){
+  let t=String(w||'');
+  const y=(t.match(/(?:^|[^\d])((?:19|20)\d\d)(?!\d)/)||[])[1]||'';
+  if(y) t=t.replace(new RegExp('[\\(\\[]?\\s*'+y+'\\s*[\\)\\]]?'),' ');
+  t=t.replace(/영화|드라마|애니메이션|애니|映画|ドラマ|アニメ/g,' ').replace(/[\[\]{}()<>「」『』【】_\-–—~·.,:：|\/]+/g,' ').replace(/\s+/g,' ').trim();
+  return t? (y? `${t} (${y})` : t) : '';
+}
+let PERF={n:0,hitch:0,max:0,t0:0,msg:''};
 /* ================= 재생 · 녹화 ================= */
 /* 다시 분석하기 전에 미리보기용 영상·이전 목소리·이전 완성 영상이 잡고 있던 메모리를 비워요 */
 function releaseForAnalyze(){
@@ -1945,7 +1955,7 @@ async function run(record,only){
   setStatus('renderStatus', record? `녹화 중이에요. 끝날 때까지 이 탭을 화면에 띄워 두세요 (다른 탭·창으로 가리면 잠깐 멈춰요)…${miss?` (목소리 없는 나레이션 ${miss}개는 자막만 나와요)`:''}` : '미리보기 재생 중…');
   await new Promise(res=>{
     // 원본 영상에 새 프레임이 나올 때만 그리고 녹화해요 (같은 화면이 불규칙하게 반복되던 끊김 방지)
-    let vNew=true, lastReq=0, rvOn=true; const watch=v=>{ if(!v.requestVideoFrameCallback) return; const cb=()=>{ vNew=true; if(rvOn) v.requestVideoFrameCallback(cb); }; v.requestVideoFrameCallback(cb); };
+    PERF={n:0,hitch:0,max:0,t0:performance.now()}; let vNew=true, lastReq=0, rvOn=true; const watch=v=>{ if(!v.requestVideoFrameCallback) return; const cb=()=>{ vNew=true; if(rvOn) v.requestVideoFrameCallback(cb); }; v.requestVideoFrameCallback(cb); };
     [VA,VB].forEach(watch);
     // 탭이 가려지거나 창이 내려가면 크롬이 그리기를 멈춰요 → 그동안 녹화·소리·영상을 같이 멈췄다가 돌아오면 이어서 해요
     let held=null; const msgBase=$('renderStatus').textContent;
@@ -1975,7 +1985,7 @@ async function run(record,only){
       }
       const nowR=performance.now(), due= vNew || nowR-lastReq>50 || !('requestVideoFrameCallback' in HTMLVideoElement.prototype);
       if(!due){ if(t>=TL.total||stopFlag){ rvOn=false; document.removeEventListener('visibilitychange',onVis); res(); } else requestAnimationFrame(tick); return; }
-      vNew=false; lastReq=nowR;
+      vNew=false; if(lastReq && cur>=0){ PERF.n++; const gap=nowR-lastReq; if(gap>90) PERF.hitch++; if(gap>PERF.max) PERF.max=gap; } lastReq=nowR;
       if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], seg.type==='clip'?1:(JA()? 1.045-0.04*p : 1+0.035*p), seg.src+(t-seg.start)*(seg.rate||1), p); }
       else drawComposite(0, VA);
       if(vtrack) vtrack.requestFrame();
@@ -1984,6 +1994,7 @@ async function run(record,only){
     };
     requestAnimationFrame(tick);
   });
+  { const sec=(performance.now()-PERF.t0)/1000, fps=PERF.n/Math.max(1,sec); PERF.msg=`부드러움 점검: 초당 ${fps.toFixed(0)}장, 끊김 ${PERF.hitch}번 (가장 긴 멈춤 ${(PERF.max/1000).toFixed(2)}초)${fps<20||PERF.hitch>sec/5?' → 이 컴퓨터가 버거워해요':' → 정상'}`; console.log(PERF.msg); }
   els.forEach(v=>v.pause()); S.scenes.forEach(s=>s.audioEl&&s.audioEl.pause()); gains.forEach(gn=>gn.gain.setTargetAtTime(0,c.currentTime,0.02));
   if(bgmSrc) try{bgmSrc.stop();}catch(e){}
   setTimeout(()=>{ try{master.disconnect();}catch(e){} },1500);
@@ -1994,10 +2005,10 @@ async function run(record,only){
       const blob=new Blob(chunks,{type:mime.split(';')[0]}); const ext=mime.includes('mp4')?'mp4':'webm';
       const name=((S.title1+' '+S.title2).trim()||'shorts').replace(/[\\/:*?"<>|]/g,'').slice(0,40)+(JA()?'_JP':'_KR')+'.'+ext;
       $('dlBox').innerHTML=`<a class="dl" href="${URL.createObjectURL(blob)}" download="${name}">영상 저장하기 (${(blob.size/1048576).toFixed(1)}MB, ${ext})</a>`;
-      setStatus('renderStatus',`완성! ${TL.total.toFixed(1)}초 영상이에요.${ext==='webm'?' webm도 유튜브에 그대로 올릴 수 있어요.':''}`);
+      setStatus('renderStatus',`완성! ${TL.total.toFixed(1)}초 영상이에요.${ext==='webm'?' webm도 유튜브에 그대로 올릴 수 있어요.':''}\n${PERF.msg}`);
       window.__lastVideo={size:blob.size,ext,dur:TL.total};
     }
-  } else setStatus('renderStatus', stopFlag?'멈췄어요.':'미리보기 끝.');
+  } else setStatus('renderStatus', (stopFlag?'멈췄어요.':'미리보기 끝.')+'\n'+PERF.msg);
   busy=false; updateButtons();
 }
 $('playBtn').addEventListener('click',()=>run(false));
