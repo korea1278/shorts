@@ -1217,6 +1217,7 @@ function normalize(o,tx){ TX=tx||(typeof subsForClip==='function'? subsForClip()
 /* ================= 제목 따로 만들기 ================= */
 async function genTitles(provider){
   const body=S.scenes.map(sc=>sc.type==='clip'? (sc.lines||[]).map(l=>`${l.speaker}: ${l.text}`).join('\n') : `(나레이션) ${sc.text}`).join('\n').slice(0,6000);
+  const endScenes=S.scenes.slice(-3).map(sc=>sc.type==='clip'? (sc.lines||[]).map(l=>`${l.speaker}: ${l.text}`).join(' / ') : `(나레이션) ${sc.text}`).join('\n');
   const ja=JA();
   const sys= ja? `너는 일본 유튜브 영화 쇼츠 제목 전문가다. 아래 쇼츠 대본을 보고 일본 시청자가 클릭하고 싶어지는 일본어 제목 10개를 만든다. 15개를 만든다.
 - 자연스러운 일본어, 10~16자. 억지 합성어 금지. 핵심 인물·상황 + 반전·궁금증. 결과 숨기기·대비·구체적 숫자·감정어·대사형을 골고루. 결말 스포 금지.
@@ -1244,12 +1245,18 @@ JSON만: {"titles":[{"t":"전체","l1":"윗줄","l2":"아랫줄"}]}` : `너는 �
 # 규칙
 - 표준 띄어쓰기. 공백을 뺀 글자 수 10~20자.
 - 위 패턴을 골고루: 이유형 / 생기는 일형 / 한 행동형 / 근황·비밀형 / 대사형 / 주제형(~를 알게 해주는 명작 영화).
+
+# 결말이 궁금해지는 제목 (가장 중요)
+- 아래 [결말 장면]이 이 영상의 답이다. 제목은 그 답을 직접 말하지 않으면서, 시청자가 '그래서 어떻게 됐는데?' 하고 끝까지 보게 만드는 질문을 던져야 한다.
+- 제목이 던진 궁금증의 답이 반드시 영상 마지막에 나와야 한다. 영상에 없는 결말을 약속하면 실패다.
+- 좋은 예: 결말이 '전화 한 통으로 풀려남'이면 → "흑인 피아니스트가 / 전화 한 통에 풀려난 이유" (누가 전화했는지는 끝에서 공개) / 결말이 '45분 만에 심장이 다시 뜀'이면 → "엄마의 기도가 / 끝내 만들어 낸 일"
+- 나쁜 예: 결말을 다 말해 버림("결국 풀려난 두 사람"), 결말과 상관없는 궁금증.
 - 각 제목을 두 줄로 나눈다: l1 윗줄(설정, 3~12자), l2 아랫줄(궁금증 결과, 5~13자). 의미 단위로, 띄어쓰기 유지.
 JSON만: {"titles":[{"t":"전체 제목","l1":"윗줄","l2":"아랫줄"}]}`;
   const ok=x=> ja? (noSpaceLen(x)>=9 && noSpaceLen(x)<=17) : (/\s/.test(x.trim()) && noSpaceLen(x)>=9 && noSpaceLen(x)<=21);
   let best=[];
   for(let k=0;k<2 && best.length<6;k++){
-    const user=`작품명: ${$('work').value||'(모름)'}\n메모: ${$('memo').value||'(없음)'}\n\n쇼츠 대본:\n${body}${k?'\n\n(직전 제목들은 띄어쓰기나 글자 수 규칙을 어겼다. 규칙을 꼭 지켜서 다시.)':''}`;
+    const user=`작품명: ${$('work').value||'(모름)'}\n메모: ${$('memo').value||'(없음)'}\n\n쇼츠 대본:\n${body}\n\n[결말 장면] (영상의 마지막, 제목이 던질 궁금증의 답):\n${endScenes}${k?'\n\n(직전 제목들은 띄어쓰기나 글자 수 규칙을 어겼다. 규칙을 꼭 지켜서 다시.)':''}`;
     const out= provider==='claude'? await callClaude(sys,[],user) : await callGPT(sys,[],user);
     const j=parseJSON(out);
     const items=(j.titles||[]).map(x=> typeof x==='string'? {t:x} : x).filter(x=>x&&x.t).map(x=>({t:String(x.t).replace(/\s+/g,' ').trim(), l1:x.l1, l2:x.l2}));
@@ -1261,12 +1268,12 @@ JSON만: {"titles":[{"t":"전체 제목","l1":"윗줄","l2":"아랫줄"}]}`;
   S.tmeta={};
   try{
     const jsys=`너는 유튜브 쇼츠 썸네일·제목 심사위원이다. 쇼츠 피드를 빠르게 넘기는 ${ja?'일본':'한국'} 시청자가 이 제목을 보고 멈춰서 볼 확률을 매긴다.
-기준: 첫 3단어에서 궁금증이 생기는가 / 무슨 이야기인지 바로 그려지는가 / 의외의 조합·모순이 있는가 / 결말을 알고 싶어지는가 / 쉬운 말로 자연스럽게 읽히는가 / 낚시처럼 보여 신뢰를 잃지 않는가.
+기준(가장 중요한 것부터): 결말을 끝까지 봐야 알 수 있는가(답이 영상 마지막에 있는가) / 첫 3단어에서 궁금증이 생기는가 / 무슨 이야기인지 바로 그려지는가 / 의외의 조합·모순이 있는가 / 쉬운 말로 자연스럽게 읽히는가 / 낚시처럼 보여 신뢰를 잃지 않는가.
 참고로 잘 된 제목: "아빠가 집에 못 들어간 이유", "아이스 하키 선수가 골프로 전향하면 생기는 일", "재능을 썩히는 천재를 위해 명문대 교수가 한 행동".
 각 제목에 100점 만점 점수와, 왜 그 점수인지 ${ja?'한국어로':''} 20자 안팎 한 줄 이유를 쓴다.
 JSON만: {"ranks":[{"i":번호,"score":점수,"why":"이유"}]}`;
     const list=best.map((x,i)=>`${i+1}. ${x.t}`).join('\n');
-    const out= provider==='claude'? await callClaude(jsys,[],`대본 요약:\n${body.slice(0,2500)}\n\n제목 후보:\n${list}`) : await callGPT(jsys,[],`대본 요약:\n${body.slice(0,2500)}\n\n제목 후보:\n${list}`);
+    const out= provider==='claude'? await callClaude(jsys,[],`대본 요약:\n${body.slice(0,2500)}\n\n[결말 장면]:\n${endScenes}\n\n제목 후보:\n${list}`) : await callGPT(jsys,[],`대본 요약:\n${body.slice(0,2500)}\n\n[결말 장면]:\n${endScenes}\n\n제목 후보:\n${list}`);
     (parseJSON(out).ranks||[]).forEach(r=>{ const x=best[(+r.i||0)-1]; if(x){ x.score=Math.max(0,Math.min(100,+r.score||0)); x.why=String(r.why||'').slice(0,40); } });
     best.sort((a,b)=>(b.score||0)-(a.score||0));
     best.forEach(x=>{ if(x.score!=null) S.tmeta[x.t]={score:x.score,why:x.why}; });
