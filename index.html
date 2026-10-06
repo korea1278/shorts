@@ -1891,7 +1891,9 @@ function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
   const work=S.work||$('work').value;
   layer(JSON.stringify(['top',S.title1,S.title2,b,ACC(),$('channelName').value,$('accentBar').checked,JA(),work,$('subPos').value]),()=>{
     drawBrand(b); drawTitleLine(S.title1||'', 150, '#ffffff'); drawTitleLine(S.title2||'', 236, ACC());
-    if(work){ g.font=SFONT(25); g.textAlign='center'; g.fillStyle='#d8d8d8'; g.fillText(work,W/2,b.y+b.h+($('subPos').value==='below'?172:(b.h>=500?-48:46))); } });
+    const wk=String(work||'').replace(/^\s*(영화|드라마|애니메이션|映画|ドラマ|アニメ)\s*[:：·\-]?\s*/,'').trim();
+    if(wk){ g.save(); g.font=SFONT(27); g.textAlign='center'; g.textBaseline='top'; g.fillStyle='#f2f2f2'; g.shadowColor='rgba(0,0,0,.85)'; g.shadowBlur=6; g.shadowOffsetX=2; g.shadowOffsetY=2;
+      g.fillText(wk,W/2,b.y+b.h+($('accentBar').checked?8:0)+($('subPos').value==='below'?150:16)); g.restore(); } });
   const sc=S.scenes[i];
   if(sc && sc.type==='clip'){ const T=srcT==null? sc.src_start+0.3 : srcT; const L=sc.lines||[]; let l=null;
     for(let k=0;k<L.length;k++){ const x=L[k], nx=L[k+1]; const hold=Math.max(x.end+0.3, x.start+Math.max(1.3,noSpaceLen(x.text)/8)); const until=nx? Math.min(hold, nx.start-0.02) : hold; if(T>=x.start-0.05 && T<=until){ l=x; } }
