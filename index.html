@@ -1300,6 +1300,16 @@ function normalize(o,tx){ TX=tx||(typeof subsForClip==='function'? subsForClip()
   // 같은 화면이 두 번 나오지 않게: 원본 장면(clip)끼리 겹치면 겹친 부분을 빼고, 나레이션 화면은 clip이 안 쓰는 곳으로 옮겨요
   dedupeFootage(d);
   fillLinesFromTX();
+  trimEnding();
+}
+/* 명화관처럼 끝은 '결과를 보여 주는 대사 장면'에서 깔끔하게: 대사 없는 장면으로 늘어지며 끝나지 않게 해요 */
+function trimEnding(){
+  const L=S.scenes; let cut=0;
+  while(L.length>1){ const z=L[L.length-1]; const hasLine=z.type==='clip' && (z.lines||[]).length;
+    if(z.type==='clip' && !hasLine && L.slice(0,-1).some(x=>x.type==='clip'&&(x.lines||[]).length)){ L.pop(); cut++; continue; } break; }
+  const last=L[L.length-1];
+  if(last && last.type==='clip' && (last.lines||[]).length){ const le=Math.max(...last.lines.map(l=>l.end)); const nz=Math.min(last.src_end, le+1.0); if(nz<last.src_end-0.05){ last.src_end=+nz.toFixed(2); cut++; } }
+  return cut;
 }
 /* AI가 빠뜨린 대사: 원본 장면 안에서 말하는데 자막이 없으면, 원본 자막(받아쓰기)에서 채워 넣어요 */
 function fillLinesFromTX(){
@@ -2132,7 +2142,7 @@ $('playBtn').addEventListener('click',()=>run(false));
 const COLAB_FPS=30;
 function layerPng(plan){ return new Promise(res=>{ const c=document.createElement('canvas'); c.width=W; c.height=H; const og=g; g=c.getContext('2d'); try{ plan.draw(); } finally{ g=og; } c.toBlob(b=>res(b),'image/png'); }); }
 async function buildColabProject(onProg){
-  try{ fillLinesFromTX(); }catch(e){} assignNarrFootage(); await FONTS_READY;
+  try{ fillLinesFromTX(); trimEnding(); }catch(e){} assignNarrFootage(); await FONTS_READY;
   const TL=buildTL(), b=band(), dlg=(+$('dlgVol').value)/100, duck=(+$('duckVol').value)/100;
   const files=[]; const add=(name,blob)=>files.push({name,blob});
   const segs=TL.tl.map(seg=>{ const sc=S.scenes[seg.i], nar=seg.type!=='clip';
@@ -2230,7 +2240,7 @@ $('endChkBtn').addEventListener('click', async()=>{
   const d=S.videoDur||0, f=t=>fmt(t);
   const script=S.scenes.map((sc,i)=> sc.type==='narration'? `${i+1}. [나레이션, 화면 ${f(sc.src_start)}~] ${sc.text}` : `${i+1}. [원본 장면 ${f(sc.src_start)}~${f(sc.src_end)}] ${(sc.lines||[]).map(l=>l.text).join(' / ')||sc.text}`).join('\n');
   const trans=tx.map(x=>`${f(x.start)}-${f(x.end)} ${clean(x.text)}`).join('\n').slice(-14000);
-  const sys=`너는 영화 요약 쇼츠 채널 '명화관'의 편집 감독이다. 명화관 쇼츠는 반드시 이야기의 '결과(결말)'를 실제 장면으로 보여 주고 끝난다. 나레이션만으로 결과를 말하고 끝나거나, 사건이 해결되기 전에 끝나면 실패다.
+  const sys=`너는 영화 요약 쇼츠 채널 '명화관'의 편집 감독이다. 명화관 쇼츠는 반드시 이야기의 '결과(결말)'를 실제 장면으로 보여 주고 끝난다. 나레이션만으로 결과를 말하고 끝나거나, 사건이 해결되기 전에 끝나거나, "서로의 진심이 마주보는 순간"처럼 감정을 설명하는 나레이션 뒤에 대사 없는 화면으로 흐지부지 끝나면 실패다. 좋은 끝: 결과가 드러나는 장면의 강한 대사 한마디(+인물 반응)로 딱 끊거나, 결과 장면 위에 15자 안팎의 재치 있는 한 줄 나레이션.
 할 일: 아래 [쇼츠 대본]의 마지막 장면들이 이야기의 결말(사건이 어떻게 끝났는지 보여 주는 장면)을 원본 장면으로 보여 주는지 판단한다.
 - 결말이 잘 나오면 ok=true.
 - 결말이 빠졌거나 덜 나왔으면 ok=false로 하고, [재료 대사] 안에서 결말을 보여 주는 구간을 고른다(시간은 재료 대사의 초). 대사 시작 0.3초 전부터 마지막 대사 끝 1초 후까지, 6~25초. 대본에 이미 쓴 원본 장면과 겹치지 않게.
