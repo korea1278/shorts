@@ -1321,16 +1321,19 @@ function trimEnding(){
   if(last && last.type==='clip' && (last.lines||[]).length){ const le=Math.max(...last.lines.map(l=>l.end)); const nz=Math.min(last.src_end, le+1.0); if(nz<last.src_end-0.05){ last.src_end=+nz.toFixed(2); cut++; } }
   return cut;
 }
-/* AI가 빠뜨린 대사: 원본 장면 안에서 말하는데 자막이 없으면, 원본 자막(받아쓰기)에서 채워 넣어요 */
+/* 대사 자막은 원본 자막(받아쓰기)의 실제 시간·문장 그대로 써요.
+   AI가 여러 대사를 한 줄로 합치거나 빠뜨리면 자막이 말과 안 맞기 때문이에요. 누가 말했는지(색깔)만 AI 것을 따라요. */
 function fillLinesFromTX(){
-  const tx=(typeof TX!=='undefined'&&TX&&TX.length)? TX : null; if(!tx) return 0; let added=0;
-  S.scenes.forEach(sc=>{ if(sc.type!=='clip') return; const a=sc.src_start, z=sc.src_end; sc.lines=sc.lines||[];
-    tx.forEach(x=>{ const s0=Math.max(a,x.start), e0=Math.min(z,x.end); if(e0-s0 < Math.min(0.5,(x.end-x.start)*0.5)) return;
-      if(sc.lines.some(l=>l.start<x.end-0.1 && l.end>x.start+0.1)) return;
-      const near=sc.lines.reduce((b,l)=>!b||Math.abs(l.start-x.start)<Math.abs(b.start-x.start)?l:b,null);
-      sc.lines.push({start:Math.max(a,x.start), end:Math.min(z,Math.max(x.end,x.start+0.6)), text:clean(x.text), speaker:'기타'}); added++; });
-    sc.lines.sort((p,q)=>p.start-q.start); sc.text=sc.lines.map(l=>l.text).join(' / ')||sc.text; });
-  return added;
+  const tx=(typeof TX!=='undefined'&&TX&&TX.length)? TX : null; if(!tx) return 0; let n=0;
+  S.scenes.forEach(sc=>{ if(sc.type!=='clip') return; const a=sc.src_start, z=sc.src_end, old=sc.lines||[];
+    const cand=tx.filter(x=>{ const ov=Math.min(z,x.end)-Math.max(a,x.start); return ov>=Math.min(0.4,(x.end-x.start)*0.5); });
+    if(!cand.length) return;
+    const spk=x=>{ let best=null,bo=0; old.forEach(l=>{ const ov=Math.min(l.end,x.end)-Math.max(l.start,x.start); if(ov>bo){ bo=ov; best=l; } });
+      if(!best && old.length) best=old.reduce((b,l)=>Math.abs(l.start-x.start)<Math.abs(b.start-x.start)?l:b);
+      return best? best.speaker : '기타'; };
+    sc.lines=cand.map(x=>({start:Math.max(a,x.start), end:Math.min(z,Math.max(x.end,x.start+0.6)), text:clean(x.text), speaker:spk(x)})).filter(l=>l.text);
+    sc.lines.sort((p,q)=>p.start-q.start); sc.text=sc.lines.map(l=>l.text).join(' / ')||sc.text; n++; });
+  return n;
 }
 
 /* ================= 제목 따로 만들기 ================= */
@@ -1560,7 +1563,7 @@ ${$('targetLen').value==='auto'? '목표 길이: 자동. 명화관처럼 이야�
         const keep={t:S.titles,a:S.title1,b:S.title2,s:S.scenes}; normalize(parseJSON(out2),transcript);
         if(buildTL().total<tot){ S.titles=keep.t; S.title1=keep.a; S.title2=keep.b; S.scenes=keep.s; } }catch(e){}
     }
-    if(mode==='clip'){ setStatus('anaStatus','나레이션을 실제 화면에 맞추는 중…'); bar(0.9); try{ await fitNarrations(provider); }catch(e){} try{ setStatus('anaStatus','나레이션 말투를 명화관식으로 다듬는 중…'); await polishNarrations(provider); }catch(e){} }
+    if(mode==='clip'){ setStatus('anaStatus','나레이션을 실제 화면에 맞추는 중…'); bar(0.9); try{ await fitNarrations(provider); }catch(e){} try{ setStatus('anaStatus','나레이션 말투를 명화관식으로 다듬는 중…'); await polishNarrations(provider); }catch(e){} try{ setStatus('anaStatus','결말이 장면으로 나오는지 점검하는 중…'); await endCheckRun(true); }catch(e){} }
     setStatus('anaStatus','제목 만드는 중…'); bar(0.95);
     try{ await genTitles(provider); }catch(e){}
     try{ await autoFocus(m=>setStatus('anaStatus',m)); }catch(e){}
@@ -1996,15 +1999,21 @@ function drawDialogue(txt,speaker,b){
 /* 나레이션 자막을 명화관처럼 짧은 덩어리로 나눠서 말하는 속도에 맞춰 바꿔요 */
 /* 자막 나누기: 한국 사람이 읽기 편하게 '의미 덩어리'로 나눠요.
    "두", "더", "처음", "다른"처럼 뒷말을 꾸미는 말에서는 끊지 않고, "~은/는/을/를/에서/~고/~면" 처럼 말이 일단락되는 곳에서 끊어요. */
-const KO_MOD=new Set(['어떻게','왜','같이','함께','이렇게','그렇게','많이','빨리','더','두','세','네','한','내','제','그','이','저','우리','너무','정말','다시','또','잘','못','안','처음','아주','가장','제일','바로','모든','어떤','이런','그런','저런','새','첫','온','그냥','좀','막','꼭','이제','다들','늘','항상','결코','절대','전혀','마침내','결국','끝내','어느','무슨','몇','여러','각','첫번째','단']);
+const KO_MOD=new Set(['충분히','진짜','정말로','아직','벌써','계속','혼자','다들','모두','전부','어떻게','왜','같이','함께','이렇게','그렇게','많이','빨리','더','두','세','네','한','내','제','그','이','저','우리','너무','정말','다시','또','잘','못','안','처음','아주','가장','제일','바로','모든','어떤','이런','그런','저런','새','첫','온','그냥','좀','막','꼭','이제','다들','늘','항상','결코','절대','전혀','마침내','결국','끝내','어느','무슨','몇','여러','각','첫번째','단']);
 const KO_GOOD=/(은|는|이|가|을|를|에|에서|에게|한테|께|도|만|고|며|면|서|니까|는데|지만|요|다|지|죠|야|게|랑|와|과|로|으로|까지|부터|처럼|보다|하고|라고|다고|냐고|자고|면서|도록|려고|러|듯|며|든|던데|거든|잖아|네|어|아|나|까)$/;
 const KO_AUX=/^(않|못하|못했|대해|대한|위해|통해|관해|대하|버렸|버리|버린|싶|있|없|봐|보|줘|주|두고|놓)/;
+const KO_DEPN=/^(순간|것|거|게|건|걸|때|곳|줄|수|척|듯|만큼|동안|중|데|뿐|대로|채|김|탓|덕분|사이|적|뒤|후|전|이유|방법|모습)/;
+const KO_FINAL=/(야|지|다|요|까|죠|네|군|래|냐|니|어|아|해|게)$/;
+const KO_CONN=/(면서|는데|은데|던데|니까|지만|어서|아서|해서|고|며|면|서|도록|려고|자마자|다가)$/;
 function koBreakPen(w){
   if(/[,.?!…]$/.test(w)) return 0;
   const b=w.replace(/[^가-힣A-Za-z0-9]/g,'');
   if(KO_MOD.has(b)) return 9;
   if(b.length<=1) return 8;
-  if(KO_GOOD.test(b)) return 0;
+  if(KO_CONN.test(b)) return 0;
+  if(/(을|를)$/.test(b)) return 3;            // '세계를 | 돌아다니면서' 처럼 목적어와 동사를 떼지 않게
+  if(/(에|에서|에게|한테|로|으로|와|과|랑)$/.test(b)) return 2;
+  if(KO_GOOD.test(b)) return 1;
   const c=b.charCodeAt(b.length-1)-0xAC00; if(c>=0&&c<=11171){ const jong=c%28; if(jong===4||jong===8) return 5; } // ~ㄴ/~ㄹ 로 끝나는 꾸밈말 (다른, 고립된, 할)
   return 2;
 }
@@ -2013,7 +2022,7 @@ function koChunks(t,max){
   const L=w.map(x=>noSpaceLen(x)); const best=new Array(n+1).fill(Infinity), from=new Array(n+1).fill(0); best[0]=0;
   for(let e=1;e<=n;e++){ let len=0;
     for(let s=e-1;s>=0;s--){ len+=L[s]; if(len>max && s<e-1) break;
-      const last=e===n, pen=last?0:koBreakPen(w[e-1])+(KO_AUX.test(w[e]||'')?7:0), fill=Math.max(0,max-len)/max, tiny=(len<=2&&n>1)?6:0;
+      const last=e===n, nx=w[e]||'', pv=w[e-1]||'', pen=last?0:koBreakPen(pv)+(KO_AUX.test(nx)?7:0)+(KO_DEPN.test(nx)&&/[가-힣]$/.test(pv)&&((c=>c>=0&&c<=11171&&[4,8].includes(c%28))(pv.charCodeAt(pv.length-1)-0xAC00)||/(는|던)$/.test(pv))?9:0)-(KO_FINAL.test(pv)&&!KO_CONN.test(pv)&&noSpaceLen(pv)>=2?2:0), fill=Math.max(0,max-len)/max, tiny=(len<=2&&n>1)?6:0;
       const c=best[s]+3+pen+fill*fill*3+tiny+(len>max?20:0); if(c<best[e]){ best[e]=c; from[e]=s; } } }
   const out=[]; let e=n; while(e>0){ const s=from[e]; out.unshift(w.slice(s,e).join(' ')); e=s; } return out;
 }
@@ -2290,7 +2299,7 @@ $('endPlayBtn').addEventListener('click',()=>{ assignNarrFootage(); const idx=[]
   for(let i=S.scenes.length-1;i>=0;i--){ idx.unshift(i); t+=sceneLen(S.scenes[i]); if(t>=20) break; }
   run(false, idx); });
 function endTx(){ return (typeof TX!=='undefined'&&TX&&TX.length? TX : null) || (typeof subsForClip==='function'? subsForClip() : null) || (S.cache&&S.cache.tx) || []; }
-$('endChkBtn').addEventListener('click', async()=>{
+async function endCheckRun(auto=false){
   const say=(m,err)=>setStatus('endStatus',m,err); $('endFix').innerHTML='';
   let provider=$('provider').value; if(provider==='claude'&&!key('anthropicKey')) provider='openai';
   if(provider==='openai'&&!key('openaiKey')){ say('AI 키(OpenAI 또는 Claude)가 있어야 점검할 수 있어요.',true); return; }
@@ -2318,11 +2327,13 @@ JSON만: {"ok":true/false,"verdict":"한 줄 판정","why":"이유 1~2문장","e
       $('endFix').innerHTML=`<div class="row" style="margin-top:6px"><button type="button" class="small" id="endAdd">이 결말 장면을 마지막에 붙이기</button><button type="button" class="small" id="endPeek">이 장면 먼저 보기</button></div>`;
       $('endPeek').onclick=async()=>{ await seekTo(vThumb,a+0.3); drawComposite(S.scenes.length-1,vThumb); };
       $('endAdd').onclick=()=>{ addEnding(a,z); $('endFix').innerHTML=''; say(`결말 장면(${f(a)}~${f(z)})을 마지막에 붙였어요. '결말만 미리보기'로 확인해 보세요.`); };
+      if(auto){ addEnding(a,z); $('endFix').innerHTML=''; say(`⚠️ 대본이 결말 전에 끝나서, 결말 장면(${f(a)}~${f(z)})을 자동으로 붙였어요.\n${j.ending.summary||''}\n'결말만 미리보기'로 확인해 보세요.`); }
     }
     else say(`⚠️ ${j.verdict||'결말이 부족해요.'}\n${j.why||''}\n이 재료 안에는 결말 장면이 없어요. Colab ③에서 추천 구간을 다시 만들 때 마지막 구간의 끝 시간을 1~2분 늘려 주세요.`, true);
   }catch(e){ say(e.message,true); }
   b.disabled=false;
-});
+}
+$('endChkBtn').addEventListener('click',()=>endCheckRun(false));
 function addEnding(a,z){
   // 이미 쓴 원본 장면과 겹치면 겹친 앞부분을 잘라요
   S.scenes.forEach(x=>{ if(x.type==='clip' && a<x.src_end && z>x.src_start && x.src_start<=a) a=x.src_end+0.05; });
