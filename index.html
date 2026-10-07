@@ -2064,7 +2064,9 @@ async function buildColabProject(onProg){
   add('top.png', await layerPng(topPlan()));
   let bgm=null; if(window.__bgmFile && bgmBuf){ const ext=(window.__bgmFile.name.split('.').pop()||'mp3').toLowerCase(); add('bgm.'+ext, window.__bgmFile); bgm={file:'bgm.'+ext, vol:(+$('bgmVol').value)/100}; }
   const name=((S.title1+' '+S.title2).trim()||'shorts').replace(/[\\/:*?"<>|]/g,'').slice(0,40)+(JA()?'_JP':'_KR');
-  const proj={version:1, name, made:new Date().toISOString(), material:{name:(S.file&&S.file.name)||'', duration:S.videoDur||0},
+  // 제작기에서 잘라 낸 영상(Colab 재료가 아닌 것)은 드라이브에 없으니 영상 파일도 같이 보내요
+  let matFile=''; if(S.file && !isMaterial(S.file.name)){ matFile='material.'+((S.file.name.split('.').pop()||'mp4').toLowerCase()); add(matFile, S.file); }
+  const proj={version:1, name, made:new Date().toISOString(), material:{name:(S.file&&S.file.name)||'', file:matFile, duration:S.videoDur||0},
     W, H, fps:COLAB_FPS, total:+TL.total.toFixed(4), band:b, bandMode:$('bandMode').value, hsFrac:hsFrac(), bgStyle:$('bgStyle').value,
     segs, narr, bgm, top:'top.png', subs};
   files.unshift({name:'project.json', blob:new Blob([JSON.stringify(proj,null,1)],{type:'application/json'})});
@@ -2079,19 +2081,29 @@ async function gFolder(name,parent){
   return (await gDrive('/drive/v3/files',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',...(parent?{parents:[parent]}:{})})})).id;
 }
 async function gUpload(name,blob,parent){
-  const meta=new Blob([JSON.stringify({name,parents:[parent]})],{type:'application/json'}); const fd=new FormData(); fd.append('metadata',meta); fd.append('file',blob,name);
-  return gDrive('/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',body:fd});
+  if(blob.size<4.5e6){ const meta=new Blob([JSON.stringify({name,parents:[parent]})],{type:'application/json'}); const fd=new FormData(); fd.append('metadata',meta); fd.append('file',blob,name);
+    return gDrive('/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',body:fd}); }
+  // 큰 파일(영상)은 '이어 올리기' 방식으로
+  const tok=await gGetToken();
+  const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id',{method:'POST',headers:{Authorization:'Bearer '+tok,'content-type':'application/json; charset=UTF-8','X-Upload-Content-Type':blob.type||'application/octet-stream','X-Upload-Content-Length':String(blob.size)},body:JSON.stringify({name,parents:[parent]})});
+  if(!r.ok){ let m=''; try{ m=(await r.json()).error.message; }catch(e){} throw new Error('구글 드라이브 오류 ('+r.status+') '+m); }
+  const loc=r.headers.get('location'); if(!loc) throw new Error('구글 드라이브가 큰 파일 올리기를 받아 주지 않았어요.');
+  const r2=await fetch(loc,{method:'PUT',headers:{'content-type':blob.type||'application/octet-stream'},body:blob});
+  if(!r2.ok) throw new Error('영상 올리기에 실패했어요 ('+r2.status+').'); return r2.json();
 }
 async function zipDownload(name,files){
   if(!window.JSZip) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-  const z=new JSZip(), d=z.folder(name); files.forEach(f=>d.file(f.name,f.blob)); const blob=await z.generateAsync({type:'blob'});
+  const z=new JSZip(), d=z.folder(name); files.forEach(f=>d.file(f.name,f.blob,{compression:'STORE'})); const blob=await z.generateAsync({type:'blob',compression:'STORE'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name+'.zip'; document.body.appendChild(a); a.click(); a.remove();
 }
+setTimeout(()=>{ if(location.protocol!=='file:') gInit().catch(()=>{}); }, 2500);
 $('colabBtn').addEventListener('click', async()=>{
   const say=(m,e)=>setStatus('colabStatus',m,e), bar=v=>$('colabBar').style.width=(v*100)+'%';
   const miss=S.scenes.filter(s=>s.type==='narration'&&!s.audio).length;
   if(miss && !confirm(`목소리가 없는 나레이션이 ${miss}개 있어요. 그 부분은 자막만 나와요. 그래도 보낼까요?`)) return;
-  if(S.file && !isMaterial(S.file.name)) say('참고: 이 영상은 Colab 재료 파일이 아니에요. 같은 이름의 파일이 구글 드라이브에 있어야 Colab에서 찾을 수 있어요.');
+  // 구글 로그인 창은 버튼을 누른 바로 그 순간에 열어야 크롬이 막지 않아요 → 정리 작업 전에 먼저 요청
+  let tokP=null; const gReady=()=>window.google&&google.accounts&&google.accounts.oauth2&&window.gapi;
+  if(gReady() && location.protocol!=='file:'){ tokP=gGetToken(); tokP.catch(()=>{}); }
   busy=true; updateButtons(); bar(0);
   let pack=null;
   try{
@@ -2099,9 +2111,9 @@ $('colabBtn').addEventListener('click', async()=>{
     const stamp=new Date(Date.now()+9*3600e3).toISOString().slice(5,16).replace(/[-T:]/g,'');
     const folderName=`${stamp}_${pack.proj.name}`;
     try{
-      say('구글 드라이브에 연결하는 중… (로그인 창이 뜨면 허용해 주세요)'); await gInit();
+      say('구글 드라이브에 연결하는 중… (로그인 창이 뜨면 허용해 주세요)'); if(tokP) await tokP; else { await gInit(); await gGetToken(); }
       const root=await gFolder('쇼츠프로젝트'); const dir=await gFolder(folderName,root);
-      for(let i=0;i<pack.files.length;i++){ const f=pack.files[i]; say(`드라이브에 올리는 중… ${i+1}/${pack.files.length}`); await gUpload(f.name,f.blob,dir); bar(0.6+0.4*(i+1)/pack.files.length); }
+      for(let i=0;i<pack.files.length;i++){ const f=pack.files[i]; say(`드라이브에 올리는 중… ${i+1}/${pack.files.length}${f.blob.size>2e7?` (영상 ${(f.blob.size/1048576).toFixed(0)}MB — 1~3분 걸려요)`:''}`); await gUpload(f.name,f.blob,dir); bar(0.6+0.4*(i+1)/pack.files.length); }
       say(`✅ 보냈어요! 드라이브 → 쇼츠프로젝트 → "${folderName}"\n이제 Colab에서 render.ipynb를 열고 ① ② 칸을 차례로 실행하세요. 영상 길이 ${pack.proj.total.toFixed(1)}초.`);
     }catch(e){
       say(`드라이브에 바로 올리지 못했어요 (${e.message}).\n대신 압축 파일을 내려받을게요. 내 드라이브의 "쇼츠프로젝트" 폴더에 그대로 올린 뒤 Colab을 실행하세요.`, true);
