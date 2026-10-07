@@ -266,6 +266,12 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
       <!-- 3. 영상 -->
       <section class="card">
         <h2><span class="step">3</span>영상 만들기</h2>
+        <div class="colabBox" style="border:1px solid var(--acc,#ffcc00);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+          <div class="row" style="margin:0"><button class="primary" id="colabBtn" type="button" disabled>Colab으로 영상 만들기 (끊김 없음, 추천)</button></div>
+          <p class="note" style="margin:6px 0 0">편집 내용(장면·자막·나레이션)을 구글 드라이브 <b>쇼츠프로젝트</b> 폴더에 보내요. 그다음 Colab의 <b>render.ipynb</b>를 실행하면 <b>쇼츠완성</b> 폴더에 영상이 생겨요. 컴퓨터 성능과 상관없이 매끄럽게 나와요.</p>
+          <div class="bar"><i id="colabBar"></i></div>
+          <div class="status" id="colabStatus"></div>
+        </div>
         <div class="row">
           <button id="playBtn" type="button" disabled>미리보기 재생</button>
           <button class="primary" id="renderBtn" type="button" disabled>영상 파일 만들기</button>
@@ -607,7 +613,7 @@ function saveSettings(){
 document.addEventListener('change',e=>{ if(e.target.closest('section.card') && e.target.type!=='file') saveSettings(); });
 ['speed','duckVol','dlgVol','bgmVol'].forEach(id=>$(id).addEventListener('input',()=>{ syncVal(id); if(id==='speed') { refreshStats(); buildGuide(); } }));
 ['subPos','bandMode','bgStyle','accentBar'].forEach(id=>$(id).addEventListener('change',()=>redrawPreview())); 
-$('bgm').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f){bgmBuf=null;return;}
+$('bgm').addEventListener('change',async e=>{ const f=e.target.files[0]; window.__bgmFile=f||null; if(!f){bgmBuf=null;return;}
   try{ bgmBuf=await getCtx().decodeAudioData(await f.arrayBuffer()); }catch(err){ bgmBuf=null; setStatus('renderStatus','배경음악 파일을 읽지 못했어요.',true); } });
 
 /* ================= 영상 올리기 ================= */
@@ -1743,7 +1749,7 @@ function renderStat(i){
 function refreshStats(){ S.scenes.forEach((_,i)=>renderStat(i)); }
 function updateButtons(){
   const has=S.scenes.length>0;
-  $('ttsBtn').disabled=!has||busy; $('endChkBtn').disabled=!has||busy; $('endPlayBtn').disabled=!has||busy||!S.url; $('playBtn').disabled=!has||busy||!S.url; $('renderBtn').disabled=!has||busy||!S.url; $('stopBtn').disabled=!busy;
+  $('ttsBtn').disabled=!has||busy; $('endChkBtn').disabled=!has||busy; $('colabBtn').disabled=!has||busy; $('endPlayBtn').disabled=!has||busy||!S.url; $('playBtn').disabled=!has||busy||!S.url; $('renderBtn').disabled=!has||busy||!S.url; $('stopBtn').disabled=!busy;
 }
 let previewIdx=-1;
 async function showScene(i,at){ previewIdx=i; const sc=S.scenes[i]; if(!sc||!S.url){ drawComposite(i,null); return; } const T= at!=null? at : (sc.type==='clip'&&sc.lines&&sc.lines[0]? sc.lines[0].start+0.3 : sc.src_start+0.2); await seekTo(vThumb,T); if(previewIdx===i && !busy) drawComposite(i,vThumb,1,T); }
@@ -1889,25 +1895,36 @@ function layer(key, fn){ let c=LAYERS.get(key);
   if(!c){ c=document.createElement('canvas'); c.width=W; c.height=H; const og=g; g=c.getContext('2d'); try{ fn(); } finally{ g=og; }
     if(LAYERS.size>=16) LAYERS.delete(LAYERS.keys().next().value); LAYERS.set(key,c); }
   g.drawImage(c,0,0); }
+/* 제목·작품명 층과 자막 층 — 화면 미리보기·녹화·Colab 내보내기가 모두 같은 그림을 써요 */
+function topPlan(){
+  const b=band(), work=S.work||$('work').value;
+  return {key:JSON.stringify(['top',S.title1,S.title2,b,ACC(),$('channelName').value,$('accentBar').checked,JA(),work,$('subPos').value]), draw:()=>{
+    drawBrand(b); drawTitleLine(S.title1||'', 150, '#ffffff'); drawTitleLine(S.title2||'', 236, ACC());
+    const wk=cleanWork(work);
+    if(wk){ g.save(); g.font=SFONT(27); g.textAlign='center'; g.textBaseline='top'; g.fillStyle='#f2f2f2'; g.shadowColor='rgba(0,0,0,.85)'; g.shadowBlur=6; g.shadowOffsetX=2; g.shadowOffsetY=2;
+      g.fillText(wk,W/2,b.y+b.h+($('accentBar').checked?8:0)+($('subPos').value==='below'?150:16)); g.restore(); } }};
+}
+function subPlan(i, srcT=null, prog=0){
+  const b=band(), sc=S.scenes[i]; if(!sc) return null;
+  if(sc.type==='clip'){ const T=srcT==null? sc.src_start+0.3 : srcT; const L=sc.lines||[]; let l=null;
+    for(let k=0;k<L.length;k++){ const x=L[k], nx=L[k+1]; const hold=Math.max(x.end+0.3, x.start+Math.max(1.3,noSpaceLen(x.text)/8)); const until=nx? Math.min(hold, nx.start-0.02) : hold; if(T>=x.start-0.05 && T<=until){ l=x; } }
+    if(!l) return null;
+    const until=(()=>{ const k=L.indexOf(l), nx=L[k+1]; const hold=Math.max(l.end+0.3, l.start+Math.max(1.3,noSpaceLen(l.text)/8)); return nx? Math.min(hold,nx.start-0.02) : hold; })();
+    const pr=Math.max(0,Math.min(1,(T-l.start)/Math.max(0.3,Math.min(until,l.end+0.2)-l.start)));
+    const tx=lineChunkAt(l.text,pr); return {key:JSON.stringify(['d',tx,l.speaker,spkColor(l.speaker),b,$('subPos').value,JA()]), draw:()=>drawDialogue(tx,l.speaker,b)}; }
+  if(!sc.text) return null;
+  if(sc.type==='dialogue') return {key:JSON.stringify(['dd',sc.text,sc.speaker,b,$('subPos').value,JA()]), draw:()=>drawDialogue(sc.text,sc.speaker,b)};
+  const sp=sc.audioDur? sc.audioDur/rateOf(sc) : 0, segLen=sp? sp+0.06 : 0; const tx=narrChunkAt(sc.text, segLen? Math.min(1,prog*segLen/sp) : prog);
+  return {key:JSON.stringify(['n',tx,b,$('subPos').value,JA()]), draw:()=>drawSub(tx,b)};
+}
 function drawComposite(i, vid, zoom=1, srcT=null, prog=0){
   const b=band(); const sc0=S.scenes[i];
   drawBg(vid);
   g.save(); g.beginPath(); g.rect(b.x,b.y,b.w,b.h); g.clip();
   if(vid && vid.videoWidth) drawCoverVid(vid,b,zoom,fxAt(sc0,srcT)); else { g.fillStyle='#15161a'; g.fillRect(b.x,b.y,b.w,b.h); g.fillStyle='#555'; g.font=SFONT(30); g.textAlign='center'; g.fillText('원본 영상을 올려 주세요',W/2,b.y+b.h/2); }
   g.restore();
-  const work=S.work||$('work').value;
-  layer(JSON.stringify(['top',S.title1,S.title2,b,ACC(),$('channelName').value,$('accentBar').checked,JA(),work,$('subPos').value]),()=>{
-    drawBrand(b); drawTitleLine(S.title1||'', 150, '#ffffff'); drawTitleLine(S.title2||'', 236, ACC());
-    const wk=cleanWork(work);
-    if(wk){ g.save(); g.font=SFONT(27); g.textAlign='center'; g.textBaseline='top'; g.fillStyle='#f2f2f2'; g.shadowColor='rgba(0,0,0,.85)'; g.shadowBlur=6; g.shadowOffsetX=2; g.shadowOffsetY=2;
-      g.fillText(wk,W/2,b.y+b.h+($('accentBar').checked?8:0)+($('subPos').value==='below'?150:16)); g.restore(); } });
-  const sc=S.scenes[i];
-  if(sc && sc.type==='clip'){ const T=srcT==null? sc.src_start+0.3 : srcT; const L=sc.lines||[]; let l=null;
-    for(let k=0;k<L.length;k++){ const x=L[k], nx=L[k+1]; const hold=Math.max(x.end+0.3, x.start+Math.max(1.3,noSpaceLen(x.text)/8)); const until=nx? Math.min(hold, nx.start-0.02) : hold; if(T>=x.start-0.05 && T<=until){ l=x; } }
-    if(l){ const until=(()=>{ const k=L.indexOf(l), nx=L[k+1]; const hold=Math.max(l.end+0.3, l.start+Math.max(1.3,noSpaceLen(l.text)/8)); return nx? Math.min(hold,nx.start-0.02) : hold; })();
-      const pr=Math.max(0,Math.min(1,(T-l.start)/Math.max(0.3,Math.min(until,l.end+0.2)-l.start)));
-      const tx=lineChunkAt(l.text,pr); layer(JSON.stringify(['d',tx,l.speaker,spkColor(l.speaker),b,$('subPos').value,JA()]),()=>drawDialogue(tx,l.speaker,b)); } }
-  else if(sc && sc.text){ if(sc.type==='dialogue') drawDialogue(sc.text,sc.speaker,b); else { const sp=sc.audioDur? sc.audioDur/rateOf(sc) : 0, segLen=sp? sp+0.06 : 0; const tx=narrChunkAt(sc.text, segLen? Math.min(1,prog*segLen/sp) : prog); layer(JSON.stringify(['n',tx,b,$('subPos').value,JA()]),()=>drawSub(tx,b)); } }
+  const tp=topPlan(); layer(tp.key,tp.draw);
+  const sp=subPlan(i,srcT,prog); if(sp) layer(sp.key,sp.draw);
 }
 
 // 작품명 정리: "-드라마--그린북- (2018)", "[영화] 인턴.2015" → "그린북 (2018)", "인턴 (2015)"
@@ -1944,7 +1961,7 @@ async function run(record,only){
   if(record){
     mime=pickMime(); if(!mime){ setStatus('renderStatus','이 브라우저는 영상 녹화를 지원하지 않아요. 크롬 최신 버전을 써 주세요.',true); busy=false; updateButtons(); return; }
     const dest=c.createMediaStreamDestination(); master.connect(dest);
-    const vstream= ('requestVideoFrameCallback' in HTMLVideoElement.prototype)? cv.captureStream(0) : cv.captureStream(30); vtrack=vstream.getVideoTracks()[0]; if(!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) vtrack=null;
+    const vstream=cv.captureStream(30); vtrack=null; // '경고를 무시한 소년들' 때와 같은 방식 (화면을 매번 그리고 초당 30장으로 녹화)
     rec=new MediaRecorder(new MediaStream([...vstream.getVideoTracks(),...dest.stream.getAudioTracks()]),{mimeType:mime,videoBitsPerSecond:8_000_000,audioBitsPerSecond:192_000});
     rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
   }
@@ -1989,7 +2006,7 @@ async function run(record,only){
         const nx=TL.tl[k+1]; if(nx) setTimeout(()=>{ other.pause(); other.currentTime=nx.src; },40);
         cur=k;
       }
-      const nowR=performance.now(), due= vNew || nowR-lastReq>50 || !('requestVideoFrameCallback' in HTMLVideoElement.prototype);
+      const nowR=performance.now(), due=true;
       if(!due){ if(t>=TL.total||stopFlag){ rvOn=false; document.removeEventListener('visibilitychange',onVis); res(); } else requestAnimationFrame(tick); return; }
       vNew=false; if(lastReq && cur>=0){ PERF.n++; const gap=nowR-lastReq; if(gap>90) PERF.hitch++; if(gap>PERF.max) PERF.max=gap; } lastReq=nowR;
       if(cur>=0){ const seg=TL.tl[cur]; const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); drawComposite(seg.i, els[cur%2], seg.type==='clip'?1:(JA()? 1.045-0.04*p : 1+0.035*p), seg.src+(t-seg.start)*(seg.rate||1), p); }
@@ -2000,7 +2017,7 @@ async function run(record,only){
     };
     requestAnimationFrame(tick);
   });
-  { const sec=(performance.now()-PERF.t0)/1000, fps=PERF.n/Math.max(1,sec); PERF.msg=`부드러움 점검: 초당 ${fps.toFixed(0)}장, 끊김 ${PERF.hitch}번 (가장 긴 멈춤 ${(PERF.max/1000).toFixed(2)}초)${fps<20||PERF.hitch>sec/5?' → 이 컴퓨터가 버거워해요':' → 정상'}`; console.log(PERF.msg); }
+  { const sec=(performance.now()-PERF.t0)/1000, fps=PERF.n/Math.max(1,sec); PERF.msg=`부드러움 점검: 초당 ${fps.toFixed(0)}번 그림, 끊김 ${PERF.hitch}번 (가장 긴 멈춤 ${(PERF.max/1000).toFixed(2)}초)${fps<32||PERF.hitch>sec/5?' → 이 컴퓨터가 버거워해요 (초당 32번 이상이어야 부드러워요)':' → 정상'}`; console.log(PERF.msg); }
   els.forEach(v=>v.pause()); S.scenes.forEach(s=>s.audioEl&&s.audioEl.pause()); gains.forEach(gn=>gn.gain.setTargetAtTime(0,c.currentTime,0.02));
   if(bgmSrc) try{bgmSrc.stop();}catch(e){}
   setTimeout(()=>{ try{master.disconnect();}catch(e){} },1500);
@@ -2018,6 +2035,81 @@ async function run(record,only){
   busy=false; updateButtons();
 }
 $('playBtn').addEventListener('click',()=>run(false));
+/* ================= Colab으로 보내기 ================= */
+const COLAB_FPS=30;
+function layerPng(plan){ return new Promise(res=>{ const c=document.createElement('canvas'); c.width=W; c.height=H; const og=g; g=c.getContext('2d'); try{ plan.draw(); } finally{ g=og; } c.toBlob(b=>res(b),'image/png'); }); }
+async function buildColabProject(onProg){
+  assignNarrFootage(); await FONTS_READY;
+  const TL=buildTL(), b=band(), dlg=(+$('dlgVol').value)/100, duck=(+$('duckVol').value)/100;
+  const files=[]; const add=(name,blob)=>files.push({name,blob});
+  const segs=TL.tl.map(seg=>{ const sc=S.scenes[seg.i], nar=seg.type!=='clip';
+    return {i:seg.i, type:seg.type, start:+seg.start.toFixed(4), end:+seg.end.toFixed(4), src:+seg.src.toFixed(4), rate:seg.rate||1,
+      z0: nar? (JA()?1.045:1) : 1, z1: nar? (JA()?1.005:1.035) : 1,
+      fx: isFinite(sc.fx)?sc.fx:0.5, shots:(sc.shots||[]).map(x=>[x.t,x.fx]),
+      vol: (seg.type==='dialogue'||seg.type==='clip')? dlg : duck }; });
+  const narr=[]; let n=0;
+  for(const seg of TL.tl){ const sc=S.scenes[seg.i]; if(sc.type!=='narration'||!sc.audio) continue;
+    const ext=/mpeg|mp3/.test(sc.audio.type)?'mp3':'wav'; const name=`narr_${String(++n).padStart(2,'0')}.${ext}`; add(name,sc.audio);
+    narr.push({file:name, start:+seg.start.toFixed(4), rate:rateOf(sc), dur:sc.audioDur||0}); }
+  // 자막: 1/30초마다 화면에 나올 자막을 계산해서, 바뀌는 순간마다 그림(PNG) 한 장씩
+  const frames=Math.ceil(TL.total*COLAB_FPS), subs=[], pngOf=new Map(); let k=0, last=null;
+  for(let f=0; f<frames; f++){ const t=f/COLAB_FPS; while(k<TL.tl.length-1 && t>=TL.tl[k].end) k++; const seg=TL.tl[k];
+    const p=Math.min(1,Math.max(0,(t-seg.start)/(seg.end-seg.start))); const plan=subPlan(seg.i, seg.src+(t-seg.start)*(seg.rate||1), p);
+    const key=plan? plan.key : null;
+    if(key!==(last&&last.key)){ if(last&&last.key) last.end=t;
+      if(key){ if(!pngOf.has(key)){ const name=`sub_${String(pngOf.size+1).padStart(3,'0')}.png`; pngOf.set(key,name); add(name, await layerPng(plan)); }
+        last={key,start:t,end:TL.total,file:pngOf.get(key)}; subs.push(last); } else last={key:null}; }
+    if(f%300===0 && onProg) onProg(f/frames*0.6); }
+  subs.forEach(x=>delete x.key);
+  add('top.png', await layerPng(topPlan()));
+  let bgm=null; if(window.__bgmFile && bgmBuf){ const ext=(window.__bgmFile.name.split('.').pop()||'mp3').toLowerCase(); add('bgm.'+ext, window.__bgmFile); bgm={file:'bgm.'+ext, vol:(+$('bgmVol').value)/100}; }
+  const name=((S.title1+' '+S.title2).trim()||'shorts').replace(/[\\/:*?"<>|]/g,'').slice(0,40)+(JA()?'_JP':'_KR');
+  const proj={version:1, name, made:new Date().toISOString(), material:{name:(S.file&&S.file.name)||'', duration:S.videoDur||0},
+    W, H, fps:COLAB_FPS, total:+TL.total.toFixed(4), band:b, bandMode:$('bandMode').value, hsFrac:hsFrac(), bgStyle:$('bgStyle').value,
+    segs, narr, bgm, top:'top.png', subs};
+  files.unshift({name:'project.json', blob:new Blob([JSON.stringify(proj,null,1)],{type:'application/json'})});
+  return {proj, files};
+}
+async function gDrive(path,opt={}){ const tok=await gGetToken(); const r=await fetch('https://www.googleapis.com'+path,{...opt,headers:{Authorization:'Bearer '+tok,...(opt.headers||{})}});
+  if(!r.ok){ let m=''; try{ m=(await r.json()).error.message; }catch(e){} throw new Error('구글 드라이브 오류 ('+r.status+') '+m); } return r.json(); }
+async function gFolder(name,parent){
+  const q=`name='${name.replace(/'/g,"\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`+(parent?` and '${parent}' in parents`:'');
+  const l=await gDrive('/drive/v3/files?q='+encodeURIComponent(q)+'&fields=files(id,name)&spaces=drive');
+  if(l.files&&l.files[0]) return l.files[0].id;
+  return (await gDrive('/drive/v3/files',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',...(parent?{parents:[parent]}:{})})})).id;
+}
+async function gUpload(name,blob,parent){
+  const meta=new Blob([JSON.stringify({name,parents:[parent]})],{type:'application/json'}); const fd=new FormData(); fd.append('metadata',meta); fd.append('file',blob,name);
+  return gDrive('/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',body:fd});
+}
+async function zipDownload(name,files){
+  if(!window.JSZip) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+  const z=new JSZip(), d=z.folder(name); files.forEach(f=>d.file(f.name,f.blob)); const blob=await z.generateAsync({type:'blob'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name+'.zip'; document.body.appendChild(a); a.click(); a.remove();
+}
+$('colabBtn').addEventListener('click', async()=>{
+  const say=(m,e)=>setStatus('colabStatus',m,e), bar=v=>$('colabBar').style.width=(v*100)+'%';
+  const miss=S.scenes.filter(s=>s.type==='narration'&&!s.audio).length;
+  if(miss && !confirm(`목소리가 없는 나레이션이 ${miss}개 있어요. 그 부분은 자막만 나와요. 그래도 보낼까요?`)) return;
+  if(S.file && !isMaterial(S.file.name)) say('참고: 이 영상은 Colab 재료 파일이 아니에요. 같은 이름의 파일이 구글 드라이브에 있어야 Colab에서 찾을 수 있어요.');
+  busy=true; updateButtons(); bar(0);
+  let pack=null;
+  try{
+    say('편집 내용을 정리하는 중… (자막 그림 만드는 중)'); pack=await buildColabProject(bar);
+    const stamp=new Date(Date.now()+9*3600e3).toISOString().slice(5,16).replace(/[-T:]/g,'');
+    const folderName=`${stamp}_${pack.proj.name}`;
+    try{
+      say('구글 드라이브에 연결하는 중… (로그인 창이 뜨면 허용해 주세요)'); await gInit();
+      const root=await gFolder('쇼츠프로젝트'); const dir=await gFolder(folderName,root);
+      for(let i=0;i<pack.files.length;i++){ const f=pack.files[i]; say(`드라이브에 올리는 중… ${i+1}/${pack.files.length}`); await gUpload(f.name,f.blob,dir); bar(0.6+0.4*(i+1)/pack.files.length); }
+      say(`✅ 보냈어요! 드라이브 → 쇼츠프로젝트 → "${folderName}"\n이제 Colab에서 render.ipynb를 열고 ① ② 칸을 차례로 실행하세요. 영상 길이 ${pack.proj.total.toFixed(1)}초.`);
+    }catch(e){
+      say(`드라이브에 바로 올리지 못했어요 (${e.message}).\n대신 압축 파일을 내려받을게요. 내 드라이브의 "쇼츠프로젝트" 폴더에 그대로 올린 뒤 Colab을 실행하세요.`, true);
+      await zipDownload(folderName, pack.files); bar(1);
+    }
+  }catch(e){ say(e.message,true); }
+  busy=false; updateButtons();
+});
 /* ================= 결말 점검 ================= */
 const sceneLen = sc => sc.type==='narration'? narrLen(sc) : Math.max(0.8,(sc.src_end-sc.src_start));
 $('endPlayBtn').addEventListener('click',()=>{ assignNarrFootage(); const idx=[]; let t=0;
