@@ -273,6 +273,12 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
           <label style="margin:0;display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="monitor" checked> 만들 때 소리 듣기</label>
         </div>
         <p class="note">실제 길이만큼 재생하면서 녹화돼요. 녹화 중에는 이 탭을 화면에 띄워 두세요.</p>
+        <div class="row" style="margin-top:6px">
+          <button type="button" id="endChkBtn" class="small" disabled>결말 점검 (AI)</button>
+          <button type="button" id="endPlayBtn" class="small" disabled>▶ 결말만 미리보기 (마지막 20초)</button>
+        </div>
+        <div class="status" id="endStatus">영상 만들기 전에 '결말 점검'을 눌러 보세요. 결말 장면이 빠졌으면 찾아서 붙여 줘요.</div>
+        <div id="endFix"></div>
         <div class="bar"><i id="renderBar"></i></div>
         <div class="status" id="renderStatus"></div>
       </section>
@@ -1737,7 +1743,7 @@ function renderStat(i){
 function refreshStats(){ S.scenes.forEach((_,i)=>renderStat(i)); }
 function updateButtons(){
   const has=S.scenes.length>0;
-  $('ttsBtn').disabled=!has||busy; $('playBtn').disabled=!has||busy||!S.url; $('renderBtn').disabled=!has||busy||!S.url; $('stopBtn').disabled=!busy;
+  $('ttsBtn').disabled=!has||busy; $('endChkBtn').disabled=!has||busy; $('endPlayBtn').disabled=!has||busy||!S.url; $('playBtn').disabled=!has||busy||!S.url; $('renderBtn').disabled=!has||busy||!S.url; $('stopBtn').disabled=!busy;
 }
 let previewIdx=-1;
 async function showScene(i,at){ previewIdx=i; const sc=S.scenes[i]; if(!sc||!S.url){ drawComposite(i,null); return; } const T= at!=null? at : (sc.type==='clip'&&sc.lines&&sc.lines[0]? sc.lines[0].start+0.3 : sc.src_start+0.2); await seekTo(vThumb,T); if(previewIdx===i && !busy) drawComposite(i,vThumb,1,T); }
@@ -2012,6 +2018,53 @@ async function run(record,only){
   busy=false; updateButtons();
 }
 $('playBtn').addEventListener('click',()=>run(false));
+/* ================= 결말 점검 ================= */
+const sceneLen = sc => sc.type==='narration'? narrLen(sc) : Math.max(0.8,(sc.src_end-sc.src_start));
+$('endPlayBtn').addEventListener('click',()=>{ assignNarrFootage(); const idx=[]; let t=0;
+  for(let i=S.scenes.length-1;i>=0;i--){ idx.unshift(i); t+=sceneLen(S.scenes[i]); if(t>=20) break; }
+  run(false, idx); });
+function endTx(){ return (typeof TX!=='undefined'&&TX&&TX.length? TX : null) || (typeof subsForClip==='function'? subsForClip() : null) || (S.cache&&S.cache.tx) || []; }
+$('endChkBtn').addEventListener('click', async()=>{
+  const say=(m,err)=>setStatus('endStatus',m,err); $('endFix').innerHTML='';
+  let provider=$('provider').value; if(provider==='claude'&&!key('anthropicKey')) provider='openai';
+  if(provider==='openai'&&!key('openaiKey')){ say('AI 키(OpenAI 또는 Claude)가 있어야 점검할 수 있어요.',true); return; }
+  const tx=endTx(); if(!tx.length){ say('원본 대사(자막)가 없어서 점검할 수 없어요. 자막 파일을 같이 넣거나 대사 받아쓰기를 먼저 해 주세요.',true); return; }
+  assignNarrFootage();
+  const d=S.videoDur||0, f=t=>fmt(t);
+  const script=S.scenes.map((sc,i)=> sc.type==='narration'? `${i+1}. [나레이션, 화면 ${f(sc.src_start)}~] ${sc.text}` : `${i+1}. [원본 장면 ${f(sc.src_start)}~${f(sc.src_end)}] ${(sc.lines||[]).map(l=>l.text).join(' / ')||sc.text}`).join('\n');
+  const trans=tx.map(x=>`${f(x.start)}-${f(x.end)} ${clean(x.text)}`).join('\n').slice(-14000);
+  const sys=`너는 영화 요약 쇼츠 채널 '명화관'의 편집 감독이다. 명화관 쇼츠는 반드시 이야기의 '결과(결말)'를 실제 장면으로 보여 주고 끝난다. 나레이션만으로 결과를 말하고 끝나거나, 사건이 해결되기 전에 끝나면 실패다.
+할 일: 아래 [쇼츠 대본]의 마지막 장면들이 이야기의 결말(사건이 어떻게 끝났는지 보여 주는 장면)을 원본 장면으로 보여 주는지 판단한다.
+- 결말이 잘 나오면 ok=true.
+- 결말이 빠졌거나 덜 나왔으면 ok=false로 하고, [재료 대사] 안에서 결말을 보여 주는 구간을 고른다(시간은 재료 대사의 초). 대사 시작 0.3초 전부터 마지막 대사 끝 1초 후까지, 6~25초. 대본에 이미 쓴 원본 장면과 겹치지 않게.
+- 재료 안에 결말 장면 자체가 없으면 material_has_ending=false.
+모든 설명은 한국어, 짧고 쉬운 말로.
+JSON만: {"ok":true/false,"verdict":"한 줄 판정","why":"이유 1~2문장","ending":{"start":초,"end":초,"summary":"그 장면에서 일어나는 일"} 또는 null,"material_has_ending":true/false}`;
+  const user=`작품명: ${cleanWork($('work').value)||'(모름)'}\n메모: ${$('memo').value||'(없음)'}\n재료 영상 길이: ${f(d)} (${d.toFixed(0)}초)\n\n[쇼츠 대본] (위에서부터 순서대로 재생)\n${script}\n\n[재료 대사] (시간 = 재료 영상 기준)\n${trans}`;
+  const b=$('endChkBtn'); b.disabled=true; say('AI가 결말을 점검하는 중…');
+  try{
+    const out= provider==='claude'? await callClaude(sys,[],user) : await callGPT(sys,[],user);
+    const j=parseJSON(out);
+    if(j.ok){ say(`✅ ${j.verdict||'결말이 장면으로 잘 나와요.'}\n${j.why||''}\n'결말만 미리보기'로 눈으로도 한 번 확인해 보세요.`); }
+    else if(j.ending && isFinite(+j.ending.start) && isFinite(+j.ending.end) && j.material_has_ending!==false){
+      let a=Math.max(0,+j.ending.start), z=Math.min(d||1e9,+j.ending.end); if(z-a>30) z=a+30;
+      say(`⚠️ ${j.verdict||'결말 장면이 빠졌어요.'}\n${j.why||''}\n찾은 결말: ${f(a)}~${f(z)} — ${j.ending.summary||''}`, true);
+      $('endFix').innerHTML=`<div class="row" style="margin-top:6px"><button type="button" class="small" id="endAdd">이 결말 장면을 마지막에 붙이기</button><button type="button" class="small" id="endPeek">이 장면 먼저 보기</button></div>`;
+      $('endPeek').onclick=async()=>{ await seekTo(vThumb,a+0.3); drawComposite(S.scenes.length-1,vThumb); };
+      $('endAdd').onclick=()=>{ addEnding(a,z); $('endFix').innerHTML=''; say(`결말 장면(${f(a)}~${f(z)})을 마지막에 붙였어요. '결말만 미리보기'로 확인해 보세요.`); };
+    }
+    else say(`⚠️ ${j.verdict||'결말이 부족해요.'}\n${j.why||''}\n이 재료 안에는 결말 장면이 없어요. Colab ③에서 추천 구간을 다시 만들 때 마지막 구간의 끝 시간을 1~2분 늘려 주세요.`, true);
+  }catch(e){ say(e.message,true); }
+  b.disabled=false;
+});
+function addEnding(a,z){
+  // 이미 쓴 원본 장면과 겹치면 겹친 앞부분을 잘라요
+  S.scenes.forEach(x=>{ if(x.type==='clip' && a<x.src_end && z>x.src_start && x.src_start<=a) a=x.src_end+0.05; });
+  if(z-a<2) return;
+  const lines=endTx().filter(x=>x.start>=a-0.2 && x.start<z).map(x=>({start:x.start,end:Math.min(x.end,z),text:clean(x.text),speaker:'기타'}));
+  S.scenes.push(newScene({type:'clip',text:lines.map(l=>l.text).join(' / ')||'결말',src_start:+a.toFixed(2),src_end:+z.toFixed(2),lines,guide:'결말 (결말 점검으로 추가)'}));
+  assignNarrFootage(); try{ saveVer(); }catch(e){} renderScenes(); updateButtons(); buildGuide(); showScene(S.scenes.length-1);
+}
 $('renderBtn').addEventListener('click',()=>run(true));
 $('stopBtn').addEventListener('click',()=>{ stopFlag=true; });
 
