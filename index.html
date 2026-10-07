@@ -95,6 +95,11 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
     <p class="sub">원본 영상 올리기 → AI가 장면·대사 분석 → 제목·대본·편집점 → 자동 컷 편집 + 나레이션 + 자막 → 세로 영상</p>
   </header>
 
+  <section class="card" id="resumeBox" hidden style="border:1px solid var(--acc,#ffcc00)">
+    <div class="row" style="margin:0;align-items:center"><span id="resumeInfo" style="flex:1"></span>
+      <button type="button" class="primary small" id="resumeBtn">이어서 하기</button><button type="button" class="small" id="resumeDel">지우기</button></div>
+    <div class="status" id="resumeStatus"></div>
+  </section>
   <section class="card" id="verBar">
     <div class="row">
       <span style="font:400 18px var(--display)">만들 버전</span>
@@ -1506,8 +1511,46 @@ function otherShots(){
   const used=o.scenes.map(x=>x.src_start.toFixed(1)).join(', ');
   return `\n[다른 채널용 버전이 이미 있음] 그 버전이 쓴 장면 시간(초): ${used}\n같은 이야기라도 이번 버전은 가능하면 다른 장면(다른 각도, 다른 인물 클로즈업, 앞뒤로 몇 초 다른 컷)을 고르고, 첫 장면과 전개 순서·강조점도 다르게 구성해서 두 영상이 겹쳐 보이지 않게 할 것. 제목도 완전히 다른 표현으로.\n`;
 }
-function saveVer(){ const v=S.ver[S.lang]; v.titles=S.titles; v.tmeta=S.tmeta; v.tsplit=S.tsplit; v.title1=S.title1; v.title2=S.title2; v.scenes=S.scenes; v.channel=$('channelName').value; v.accent=$('accentColor').value; v.voice=$('stVoice').value;
+function saveVer(){ autosaveSoon(); const v=S.ver[S.lang]; v.titles=S.titles; v.tmeta=S.tmeta; v.tsplit=S.tsplit; v.title1=S.title1; v.title2=S.title2; v.scenes=S.scenes; v.channel=$('channelName').value; v.accent=$('accentColor').value; v.voice=$('stVoice').value;
   try{ localStorage.setItem('mrm_ver',JSON.stringify({ko:{channel:S.ver.ko.channel,accent:S.ver.ko.accent,voice:S.ver.ko.voice},ja:{channel:S.ver.ja.channel,accent:S.ver.ja.accent,voice:S.ver.ja.voice}})); }catch(e){} }
+/* ================= 작업 자동 저장 (새로고침·창 닫힘에도 대본·목소리·영상이 남아요) ================= */
+const WDB={ db:null, async open(){ if(this.db) return this.db; this.db=await new Promise((res,rej)=>{ const r=indexedDB.open('mrm_work',1); r.onupgradeneeded=()=>r.result.createObjectStore('w'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); return this.db; },
+  async put(k,v){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction('w','readwrite'); t.objectStore('w').put(v,k); t.oncomplete=res; t.onerror=()=>rej(t.error); }); },
+  async get(k){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction('w'); const q=t.objectStore('w').get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); },
+  async del(k){ const db=await this.open(); return new Promise(res=>{ const t=db.transaction('w','readwrite'); t.objectStore('w').delete(k); t.oncomplete=res; t.onerror=res; }); } };
+let AUTOSAVE_T=null, SAVED_FILE=null, RESTORING=false;
+function autosaveSoon(){ if(RESTORING) return; clearTimeout(AUTOSAVE_T); AUTOSAVE_T=setTimeout(()=>autosave().catch(e=>console.warn('autosave',e)),1200); }
+const SC_KEYS=['type','text','src_start','src_end','lines','speaker','fx','guide','shots','vrate','aiSrc','manual','audio','audioDur','rate','aState'];
+async function autosave(){
+  if(!S.scenes||!S.scenes.length) return;
+  if(S.file && S.file!==SAVED_FILE && S.file.size<=450*1048576){ await WDB.put('file',{blob:S.file,name:S.file.name}); SAVED_FILE=S.file; }
+  const scenes=S.scenes.map(sc=>{ const o={}; SC_KEYS.forEach(k=>{ if(sc[k]!==undefined) o[k]=sc[k]; }); if(o.aState==='만드는 중…') o.aState=''; return o; });
+  await WDB.put('last',{at:Date.now(), lang:S.lang, title1:S.title1, title2:S.title2, titles:S.titles, tmeta:S.tmeta||{}, tsplit:S.tsplit||{},
+    memo:$('memo').value, work:$('work').value, fileName:S.file?S.file.name:'', tx:(typeof TX!=='undefined'&&TX)||null, scenes});
+}
+async function checkResume(){
+  try{ const w=await WDB.get('last'); if(!w||!w.scenes||!w.scenes.length) return;
+    const f=await WDB.get('file'); const hasVid=f&&f.blob&&f.name===w.fileName;
+    const nar=w.scenes.filter(x=>x.type==='narration'), voiced=nar.filter(x=>x.audio).length;
+    $('resumeInfo').innerHTML=`📂 <b>저장된 작업이 있어요</b> — ${(w.title1||'')+' '+(w.title2||'')} · 장면 ${w.scenes.length}개 · 목소리 ${voiced}/${nar.length} · ${new Date(w.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}${hasVid?' · 영상 포함':'<br><small>영상은 저장되지 않았어요. "이어서 하기" 전에 같은 영상('+w.fileName+')을 먼저 열어 주세요.</small>'}`;
+    $('resumeBox').hidden=false; }catch(e){}
+}
+async function resumeWork(){
+  const say=(m,e)=>setStatus('resumeStatus',m,e);
+  try{ const w=await WDB.get('last'); if(!w) return; RESTORING=true;
+    const f=await WDB.get('file');
+    if(f&&f.blob&&f.name===w.fileName && !(S.file&&S.file.name===w.fileName)){ say('영상 불러오는 중…'); const file=new File([f.blob],f.name,{type:f.blob.type||'video/mp4'}); if(isMaterial(file.name)) $('subOffset').value='0:00:00'; const ok=await loadVideoFile(file,true); if(!ok) throw new Error('저장된 영상을 열지 못했어요.'); SAVED_FILE=S.file; }
+    if(!S.url) say('영상이 없어요. 같은 영상을 먼저 열고 다시 눌러 주세요. (대본은 불러왔어요)', true);
+    S.lang=w.lang||S.lang; S.title1=w.title1||''; S.title2=w.title2||''; S.titles=w.titles||[]; S.tmeta=w.tmeta||{}; S.tsplit=w.tsplit||{};
+    $('memo').value=w.memo||''; $('work').value=w.work||''; S.work=$('work').value; if(w.tx) TX=w.tx;
+    S.scenes=w.scenes.map(o=>{ const sc=Object.assign(newScene(o),o); if(sc.audio){ sc.audioEl=new Audio(URL.createObjectURL(sc.audio)); sc.audioEl.preload='auto'; } sc.srcNode=null; return sc; });
+    LAYERS.clear(); RESTORING=false; saveVer(); renderAll();
+    if(S.url) say('✅ 이전 작업을 불러왔어요. 이어서 하시면 돼요.');
+  }catch(e){ RESTORING=false; say(e.message,true); }
+}
+$('resumeBtn').addEventListener('click',resumeWork);
+$('resumeDel').addEventListener('click',async()=>{ if(!confirm('저장된 작업을 지울까요?')) return; await WDB.del('last'); await WDB.del('file'); $('resumeBox').hidden=true; });
+setTimeout(checkResume,800);
 function verNote(){ const k=S.ver.ko.scenes.length, j=S.ver.ja.scenes.length; $('verNote').textContent=`한국어: ${k?'대본 있음':'아직 없음'} · 일본어: ${j?'대본 있음':'아직 없음'}`; }
 function loadVer(l){
   if(busy) return; saveVer(); S.lang=l; const v=S.ver[l];
@@ -1547,6 +1590,7 @@ function renderTitles(){
 }
 let thumbQueue=Promise.resolve();
 function renderScenes(){
+  autosaveSoon();
   const box=$('scenes'); box.innerHTML='';
   const names=[]; S.scenes.forEach(sc=>(sc.lines||[]).forEach(l=>{ if(!names.includes(l.speaker)) names.push(l.speaker); }));
   let dl=document.getElementById('spkList'); if(!dl){ dl=document.createElement('datalist'); dl.id='spkList'; document.body.appendChild(dl); }
