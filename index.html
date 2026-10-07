@@ -1277,7 +1277,9 @@ function narrTone(t){ if(JA()) return t;
   .replace(/([았었였했됐섰갔왔봤줬켰셨났렸졌웠겼])지$/,'$1죠').replace(/([았었였했됐섰갔왔봤줬켰셨났렸졌웠겼])어$/,'$1습니다').replace(/([았었였했됐섰갔왔봤줬켰셨났렸졌웠겼])다$/,'$1습니다')
   .replace(/이야$/,'입니다').replace(/거야$/,'겁니다').replace(/([가-힣])네$/,(m,w)=>formal(w))
   .replace(/려$/,'립니다').replace(/([가-힣])여$/,'$1입니다').replace(/해$/,'합니다').replace(/워$/,'웁니다').replace(/와$/,'옵니다').replace(/줘$/,'줍니다').replace(/봐$/,'봅니다').replace(/돼$/,'됩니다').replace(/져$/,'집니다').replace(/쳐$/,'칩니다')
-  .replace(/([가-힣])([아어])$/,(m,w,e)=>{ const c=w.charCodeAt(0)-0xAC00; return (c>=0&&c<=11171&&c%28!==0)? w+'습니다' : m; }); }
+  .replace(/([가-힣])([아어])$/,(m,w,e)=>{ const c=w.charCodeAt(0)-0xAC00; return (c>=0&&c<=11171&&c%28!==0)? w+'습니다' : m; })
+  .replace(/(있|없|같)다$/,'$1습니다').replace(/는다$/,'습니다')
+  .replace(/([가-힣])다$/,(m,w)=>{ const c=w.charCodeAt(0)-0xAC00; if(c<0||c>11171||c%28!==4) return m; return String.fromCharCode(w.charCodeAt(0)-4+17)+'니다'; }); } // 번진다→번집니다, 간다→갑니다
 function normalize(o,tx){ TX=tx||(typeof subsForClip==='function'? subsForClip() : null)||(S.cache&&S.cache.tx)||null;
   S.titles=(o.titles||[]).map(t=>String(t).replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,10);
   let tl=o.title_lines; if(!Array.isArray(tl)||!tl[0]||(S.titles[0]&&!splitOK(S.titles[0],tl[0],tl[1]))) tl=splitTitle(S.titles[0]||'');
@@ -1420,6 +1422,13 @@ $('retitleBtn').addEventListener('click',async()=>{
 
 /* ================= 분석 실행 ================= */
 /* ================= 나레이션을 실제로 나오는 화면에 맞춰 다듬기 ================= */
+/* 나레이션이 명화관답지 않은 이유를 찾아요 (없으면 빈 문자열) */
+function narrLint(t){ t=String(t||'').trim(); const why=[];
+  if(/(마음|외로움|따뜻함|희망|침묵|용기|진심|쓸쓸|울림|여운|온기|번지|번진|닿는|닿았|스며|물들|녹아|공허|그리움|설렘)/.test(t)) why.push('감정·분위기를 말하는 추상적인 표현(마음, 외로움, 따뜻함, 번진다, 닿는다 등) 대신 눈에 보이는 행동·사건을 말할 것');
+  if(/다$/.test(t) && !/니다$/.test(t)) why.push('"~다"로 끝나는 글말 대신 "~합니다/~했죠/~는데요"로 끝낼 것');
+  if(/(순간|하나|뿐|이유)$/.test(t)) why.push('"~하는 순간/~하나" 같은 감성적인 명사 끝맺음 대신 사건을 말할 것');
+  if(/(지|어|야|네|버려|여)$/.test(t) && !/(네요|는데요)$/.test(t)) why.push('반말 끝맺음 금지');
+  return why.join(' / '); }
 /* 나레이션을 명화관 말투로: 구체적인 사건 + 이야기체 끝맺음. 시 같은 문장·반말·해요체를 고쳐요 */
 async function polishNarrations(provider){
   const idx=S.scenes.map((x,i)=>x.type==='narration'?i:-1).filter(i=>i>=0); if(!idx.length) return 0;
@@ -1435,9 +1444,17 @@ async function polishNarrations(provider){
 - 이미 규칙에 맞으면 그대로 둔다.
 JSON만: {"narrations":[{"n":1,"text":"..."}]}`;
   const out= provider==='claude'? await callClaude(sys,[],`작품: ${cleanWork($('work').value)||'(모름)'}\n메모: ${($('memo').value||'').slice(0,800)}\n\n쇼츠 흐름:\n${flow}`) : await callGPT(sys,[],`작품: ${cleanWork($('work').value)||'(모름)'}\n메모: ${($('memo').value||'').slice(0,800)}\n\n쇼츠 흐름:\n${flow}`);
-  const arr=(parseJSON(out).narrations)||[]; let changed=0;
-  arr.forEach(o=>{ const i=idx[(+o.n||0)-1]; const t=narrTone(clean(o.text||'')); if(i==null||!t||t.length<4) return; const sc=S.scenes[i];
+  let changed=0;
+  const apply=arr=>(arr||[]).forEach(o=>{ const i=idx[(+o.n||0)-1]; const t=narrTone(clean(o.text||'')); if(i==null||!t||t.length<4) return; const sc=S.scenes[i];
     if(t!==sc.text){ sc.text=t; if(sc.audio){ try{ sc.audioEl&&sc.audioEl.pause(); }catch(e){} sc.audio=null; sc.audioDur=0; sc.audioEl=null; sc.srcNode=null; } changed++; } });
+  apply(parseJSON(out).narrations);
+  // 검사해서 아직 명화관답지 않은 줄은 이유를 알려 주고 한 번 더 고치게 해요
+  for(let round=0; round<2; round++){
+    const bad=idx.map((i,k)=>({n:k+1,t:S.scenes[i].text,why:narrLint(S.scenes[i].text)})).filter(x=>x.why);
+    if(!bad.length) break;
+    const fb=`아래 나레이션은 아직 명화관 말투가 아니다. 이유를 보고 다시 써라. 구체적인 행동·사건으로, 쉬운 말로, 명화관 끝맺음(~합니다/~했죠/~는데요/[행동+인물])으로.\n`+bad.map(x=>`${x.n}번: "${x.t}" → 문제: ${x.why}`).join('\n')+`\n\n쇼츠 흐름:\n${flow}`;
+    try{ const o2= provider==='claude'? await callClaude(sys,[],fb) : await callGPT(sys,[],fb); apply(parseJSON(o2).narrations); }catch(e){ break; }
+  }
   return changed;
 }
 $('polishBtn').addEventListener('click', async()=>{
