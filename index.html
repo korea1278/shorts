@@ -254,6 +254,8 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
         <h2><span class="step">2</span>제목 · 대본 · 편집점 확인</h2>
         <div class="row" style="margin-top:6px"><label style="margin:0">추천 제목 10개 (클릭될 확률이 높은 순, 맨 위가 ★추천). 고르면 상단 제목이 바뀌어요.</label><button type="button" class="small" id="retitleBtn">제목 다시 만들기</button><span class="note" id="retitleNote" style="margin:0"></span></div>
         <div class="titles" id="titles"><p class="note">분석이 끝나면 여기에 나와요.</p></div>
+        <div class="row" style="margin-top:10px"><label style="margin:0">고정 댓글 (작품 정보 + 줄거리, 명화관식)</label><button type="button" class="small" id="pinBtn">고정 댓글 만들기</button><button type="button" class="small" id="pinCopy">복사</button><span class="note" id="pinNote" style="margin:0"></span></div>
+        <textarea id="pinText" rows="9" style="width:100%;margin-top:6px" placeholder="'고정 댓글 만들기'를 누르면 여기에 나와요. 직접 고쳐도 돼요."></textarea>
         <div class="cols">
           <div><label for="title1">상단 제목 1줄 (흰색)</label><input id="title1" type="text"></div>
           <div><label for="title2">상단 제목 2줄 (노란색)</label><input id="title2" type="text"></div>
@@ -1392,6 +1394,41 @@ JSON만: {"keep":[1,2,5]}`;
   S.scenes=out2.filter((sc,i,arr)=>!(sc.type==='narration' && arr[i-1] && arr[i-1].type==='narration' && noSpaceLen(sc.text)<noSpaceLen(arr[i-1].text)));
   removeOverlaps(); trimEnding(); assignNarrFootage();
 }
+/* 고정 댓글: 명화관처럼 작품 정보 + 줄거리 */
+async function genPinned(provider){
+  const flow=S.scenes.map(sc=> sc.type==='narration'? `(나레이션) ${sc.text}` : (sc.lines||[]).map(l=>`${l.speaker}: ${l.text}`).join(' / ')).join('\n').slice(0,5000);
+  const sys=`너는 유튜브 영화 쇼츠 채널 '명화관'의 고정 댓글 담당이다. 아래 형식 그대로, 한국어로 쓴다.
+
+[형식]
+작품명 (원제, 개봉연도)
+감독: 이름
+출연배우: 주연 3~4명 (쉼표로)
+시청가능플랫폼: (확인 필요)
+
+줄거리 한 문단 (350~500자)
+
+[줄거리 쓰는 법 — 명화관 실제 예]
+"남북전쟁이 모든 것을 집어삼키던 시절, 인먼은 하루하루 죽음을 견디며 고향 콜드 마운틴에 남겨둔 에이다를 떠올린다. 그러던 어느 날, 에이다가 보낸 편지 한 통이 그의 마음을 흔든다. … 서로를 향해 걷는 두 사람과 그 길 위에 스쳐가는 사람들의 사연이 더해지며, 전쟁 속 사랑과 기다림을 깊고 애절하게 그려낸 영화."
+- 시대·배경 → 주인공의 처지 → 사건의 계기 → 여정과 만나는 사람들 → 마지막 문장은 "~을 ~하게 그려낸 영화." 로 끝낸다.
+- 글말(~한다, ~이다)로 쓴다. 쇼츠의 결말을 그대로 말하지 말고 영화 전체의 흐름을 소개한다.
+- 감독·배우·원제·연도는 확실히 아는 것만 쓴다. 모르면 "(확인 필요)"라고 쓴다. 시청가능플랫폼은 늘 "(확인 필요)"로 둔다(자주 바뀌기 때문).
+- 다른 설명이나 인사말 없이 위 형식의 글만 출력한다.
+JSON만: {"text":"고정 댓글 전체(줄바꿈 포함)"}`;
+  const user=`작품명: ${cleanWork($('work').value)||'(모름)'}\n메모: ${($('memo').value||'').slice(0,1500)}\n\n이 쇼츠의 흐름:\n${flow}`;
+  const out= provider==='claude'? await callClaude(sys,[],user) : await callGPT(sys,[],user);
+  return String(parseJSON(out).text||'').trim();
+}
+$('pinBtn').addEventListener('click', async()=>{
+  let provider=$('provider').value; if(provider==='claude'&&!key('anthropicKey')) provider='openai';
+  if(provider==='openai'&&!key('openaiKey')){ $('pinNote').textContent='AI 키를 먼저 넣어 주세요.'; return; }
+  const b=$('pinBtn'); b.disabled=true; $('pinNote').textContent='만드는 중…';
+  try{ const t=await genPinned(provider); $('pinText').value=t; S.pinned=t; autosaveSoon();
+    $('pinNote').textContent='완성! 감독·배우·플랫폼은 꼭 한 번 확인해 주세요. (AI가 틀릴 수 있고, 플랫폼은 자주 바뀌어요)'; }
+  catch(e){ $('pinNote').textContent=e.message; }
+  b.disabled=false;
+});
+$('pinCopy').addEventListener('click', async()=>{ try{ await navigator.clipboard.writeText($('pinText').value); $('pinNote').textContent='복사했어요. 유튜브 댓글에 붙여 넣고 고정하세요.'; }catch(e){ $('pinText').select(); document.execCommand('copy'); $('pinNote').textContent='복사했어요.'; } });
+$('pinText').addEventListener('input',()=>{ S.pinned=$('pinText').value; autosaveSoon(); });
 /* 대사마다 누가 말했는지 AI가 다시 정해요 (자막 색깔이 사람마다 다르게 나오도록) */
 async function labelSpeakers(provider){
   const items=[]; S.scenes.forEach((sc,i)=>{ if(sc.type==='clip') (sc.lines||[]).forEach((l,k)=>items.push({i,k,l})); });
@@ -1652,6 +1689,7 @@ ${$('targetLen').value==='auto'? '목표 길이: 자동. 명화관처럼 이야�
     if(mode==='clip'){ setStatus('anaStatus','나레이션을 실제 화면에 맞추는 중…'); bar(0.9); try{ await fitNarrations(provider); }catch(e){} try{ setStatus('anaStatus','나레이션 말투를 명화관식으로 다듬는 중…'); await polishNarrations(provider); }catch(e){} try{ setStatus('anaStatus','대사마다 누가 말했는지 정리하는 중…'); fillLinesFromTX({merge:false}); await labelSpeakers(provider); }catch(e){} try{ mergeLines(); }catch(e){} try{ setStatus('anaStatus','결말이 장면으로 나오는지 점검하는 중…'); await endCheckRun(true); }catch(e){} }
     setStatus('anaStatus','제목 만드는 중…'); bar(0.95);
     try{ await genTitles(provider); }catch(e){}
+    try{ setStatus('anaStatus','고정 댓글 만드는 중…'); $('pinText').value=await genPinned(provider); }catch(e){}
     try{ await autoFocus(m=>setStatus('anaStatus',m)); }catch(e){}
     saveVer();
     S.work=$('work').value;
@@ -1707,7 +1745,7 @@ async function autosave(){
   }
   const scenes=S.scenes.map(sc=>{ const o={}; SC_KEYS.forEach(k=>{ if(sc[k]!==undefined) o[k]=sc[k]; }); if(o.aState==='만드는 중…') o.aState=''; return o; });
   await WDB.put('last',{at:Date.now(), lang:S.lang, title1:S.title1, title2:S.title2, titles:S.titles, tmeta:S.tmeta||{}, tsplit:S.tsplit||{},
-    memo:$('memo').value, work:$('work').value, fileName:S.file?S.file.name:'', tx:(typeof TX!=='undefined'&&TX)||null, scenes});
+    memo:$('memo').value, work:$('work').value, pinned:$('pinText').value, fileName:S.file?S.file.name:'', tx:(typeof TX!=='undefined'&&TX)||null, scenes});
 }
 async function checkResume(){
   try{ const w=await WDB.get('last'); if(!w||!w.scenes||!w.scenes.length) return;
@@ -1723,7 +1761,7 @@ async function resumeWork(){
     if(f&&f.blob&&f.name===w.fileName && !(S.file&&S.file.name===w.fileName)){ say('영상 불러오는 중…'); const file=new File([f.blob],f.name,{type:f.blob.type||'video/mp4'}); if(isMaterial(file.name)) $('subOffset').value='0:00:00'; const ok=await loadVideoFile(file,true); if(!ok) throw new Error('저장된 영상을 열지 못했어요.'); SAVED_FILE=S.file; }
     if(!S.url) say('영상이 없어요. 같은 영상을 먼저 열고 다시 눌러 주세요. (대본은 불러왔어요)', true);
     S.lang=w.lang||S.lang; S.title1=w.title1||''; S.title2=w.title2||''; S.titles=w.titles||[]; S.tmeta=w.tmeta||{}; S.tsplit=w.tsplit||{};
-    $('memo').value=w.memo||''; $('work').value=w.work||''; S.work=$('work').value; if(w.tx) TX=w.tx;
+    $('memo').value=w.memo||''; $('work').value=w.work||''; $('pinText').value=w.pinned||''; S.work=$('work').value; if(w.tx) TX=w.tx;
     S.scenes=w.scenes.map(o=>{ const sc=Object.assign(newScene(o),o); if(sc.audio){ sc.audioEl=new Audio(URL.createObjectURL(sc.audio)); sc.audioEl.preload='auto'; } sc.srcNode=null; return sc; });
     let toned=0; S.scenes.forEach(sc=>{ if(sc.type!=='narration') return; const t=narrTone(sc.text); if(t!==sc.text){ sc.text=t; sc.audio=null; sc.audioDur=0; sc.audioEl=null; sc.srcNode=null; toned++; } });
     try{ fillLinesFromTX(); }catch(e){}
