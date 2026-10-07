@@ -263,6 +263,7 @@ canvas#cv{width:100%;aspect-ratio:9/16;display:block;border-radius:8px;backgroun
         <div id="scenes"></div>
         <div class="row" style="margin-top:12px">
           <button class="primary" id="ttsBtn" type="button" disabled>나레이션 목소리 만들기</button>
+          <button id="ttsRedo" type="button" class="small" disabled>목소리 전부 새로 만들기 (목소리 바꿨을 때)</button>
         </div>
         <div class="bar"><i id="ttsBar"></i></div>
         <div class="status" id="ttsStatus"></div>
@@ -1817,7 +1818,7 @@ function renderStat(i){
 function refreshStats(){ S.scenes.forEach((_,i)=>renderStat(i)); }
 function updateButtons(){
   const has=S.scenes.length>0;
-  $('ttsBtn').disabled=!has||busy; $('endChkBtn').disabled=!has||busy; $('colabBtn').disabled=!has||busy; $('endPlayBtn').disabled=!has||busy||!S.url; $('playBtn').disabled=!has||busy||!S.url; $('renderBtn').disabled=!has||busy||!S.url; $('stopBtn').disabled=!busy;
+  $('ttsBtn').disabled=!has||busy; $('ttsRedo').disabled=!has||busy; $('endChkBtn').disabled=!has||busy; $('colabBtn').disabled=!has||busy; $('endPlayBtn').disabled=!has||busy||!S.url; $('playBtn').disabled=!has||busy||!S.url; $('renderBtn').disabled=!has||busy||!S.url; $('stopBtn').disabled=!busy;
 }
 let previewIdx=-1;
 async function showScene(i,at){ previewIdx=i; const sc=S.scenes[i]; if(!sc||!S.url){ drawComposite(i,null); return; } const T= at!=null? at : (sc.type==='clip'&&sc.lines&&sc.lines[0]? sc.lines[0].start+0.3 : sc.src_start+0.2); await seekTo(vThumb,T); if(previewIdx===i && !busy) drawComposite(i,vThumb,1,T); }
@@ -1851,6 +1852,12 @@ $('ttsBtn').addEventListener('click', async ()=>{
   setStatus('ttsStatus', fails? `${fails}개 실패했어요. 다시 누르면 실패한 것만 다시 만들어요.\n${last}` : '목소리 준비 완료. 미리보기로 확인하고 영상 파일을 만드세요.', !!fails);
 });
 
+$('ttsRedo').addEventListener('click',()=>{
+  const n=S.scenes.filter(s=>s.type==='narration'&&s.audio).length;
+  if(n && !confirm(`이미 만든 나레이션 목소리 ${n}개를 지우고, 지금 고른 목소리로 전부 새로 만들까요?`)) return;
+  S.scenes.forEach(sc=>{ if(sc.type!=='narration') return; try{ sc.audioEl&&sc.audioEl.pause(); }catch(e){} sc.audio=null; sc.audioDur=0; sc.audioEl=null; sc.srcNode=null; sc.aState=''; });
+  renderScenes(); updateButtons(); $('ttsBtn').click();
+});
 /* ================= 타임라인 ================= */
 function buildTL(only){
   const sp=+$('speed').value; let t=0.05; const tl=[]; const vd=S.videoDur||1e9;
