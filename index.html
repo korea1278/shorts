@@ -515,7 +515,7 @@ function setupEngineUI(sample){
   $('vbTry').addEventListener('click',async()=>{
     const b=$('vbTry'); b.disabled=true; const say=m=>{ $('vbStatus').textContent=m; }; VB_PROFILE=null;
     try{ say('연결하는 중…'); await vbProfileId(); say(`연결됐어요 (프로필: ${VB_PROFILE.name}). 목소리 만드는 중… (처음엔 모델을 불러오느라 1분쯤 걸려요)`);
-      const t=(window.S&&S.lang==='ja')?'その瞬間 信じられないことが起きたのです':'그런데 모두가 포기하려던 그때 믿을 수 없는 일이 일어나는데요';
+      const t=(window.S&&S.lang==='ja')?'その瞬間 信じられないことが起きたのです':'그런데 모두가 포기하려던 그때 믿을 수 없는 일이 일어납니다';
       let blob=await vbSpeak(t,(window.S&&S.lang)||'ko'); const buf=await getCtx().decodeAudioData(await blob.arrayBuffer()); const tr=trimSilence(buf); blob=wavBlob(tr,buf.sampleRate);
       const a=new Audio(URL.createObjectURL(blob)); a.playbackRate=+$('speed').value; a.preservesPitch=true; a.play().catch(()=>{});
       say(`연결 성공! "${VB_PROFILE.name}" 목소리를 ${$('speed').value}배속으로 들려드려요.`); }
@@ -1158,10 +1158,10 @@ const CLIP_RULES = (lang,order='story') => `너는 유튜브 영화 쇼츠 채�
 2) 소개 나레이션 1~2개: 주인공이 누구이고 어떤 상황인지 한 문장씩. 예: "얼어붙은 호수 위에서 장난을 치던 세 소년"
 3) 본편 기승전결: clip 2~3개마다 나레이션 1개를 넣어 다음 장면으로 이어 준다.
  - 기: 인물과 상황 / 승: 갈등이 커짐 / 전: 사고·위기·반전 / 결: 감정이 터지거나 통쾌한 결과(보상) 장면.
- - 끝맺음은 둘 중 하나: ① 웃기거나 강한 원본 대사 한마디 + 인물 반응 ("이제 죽었다") ② 결과 장면 위에 15자 안팎의 짧고 재치 있는 마무리 나레이션 ("공 회수와 함께 복수도 성공이네요")
+ - 끝맺음은 둘 중 하나: ① 웃기거나 강한 원본 대사 한마디 + 인물 반응 ("이제 죽었다") ② 결과 장면 위에 15자 안팎의 짧고 재치 있는 마무리 나레이션 ("공 회수와 함께 복수도 성공입니다")
  - clip 하나는 3~10초. 대사가 이어지는 부분만 고르고, 대사 없이 조용한 구간(2초 이상)은 넣지 않는다. src_start는 첫 대사 0.2초 전, src_end는 마지막 대사 끝 0.4초 뒤. 다만 인물이 하던 동작(물건을 꺼내기, 넘어지기 등)이 이어지면 그 동작이 끝날 때까지(최대 1.5초 더) 늘린다.
 ${order==='time'? ' - clip들은 원본 시간 순서대로, 서로 겹치지 않게 고른다. 같은 장면을 두 번 쓰지 않는다.' : ` - [장면 순서: 이야기 흐름 순] 원본 시간 순서를 꼭 지킬 필요는 없다. 명화관처럼 시청자가 가장 몰입하는 순서로 배치한다.
-   · 가장 흥미로운 순간을 먼저 보여 주고, 나레이션으로 앞 이야기로 돌아갈 수 있다 ("사실 이 모든 건 장난에서 시작됐는데요")
+   · 가장 흥미로운 순간을 먼저 보여 주고, 나레이션으로 앞 이야기로 돌아갈 수 있다 ("사실 이 모든 건 장난에서 시작됐는데")
    · 이야기 중간에 인물의 과거나 이유를 보여 주는 앞쪽 장면을 회상처럼 끼워 넣을 수 있다 (예: 악어와 싸우기 직전, 스승의 손을 악어가 물어뜯었던 과거 장면)
    · 서로 다른 장소에서 동시에 일어나는 일을 번갈아 보여 줄 수 있다 (집에서 TV를 보는 가족 ↔ 경기장의 아빠)
    · 순서를 바꿀 때는 바로 앞에 나레이션 한 줄로 이어 줘서, 시청자가 시간·장소가 바뀐 걸 자연스럽게 알게 한다. 순서가 바뀌어도 이야기 앞뒤가 맞아야 한다.
@@ -1173,7 +1173,7 @@ ${order==='time'? ' - clip들은 원본 시간 순서대로, 서로 겹치지 �
 
 # 나레이션 문장
 - 한 나레이션 = 자연스러운 한 문장, ${lang==='ja'?'12~30자':'공백 포함 12~30자'}, 말하는 시간 2~5초. 화면 자막은 프로그램이 2~3어절씩 끊어서 보여 주니 문장을 억지로 줄이지 않는다.
-${lang==='ja'?'- 일본 나레이터의 감정이 담긴 이야기 말투(〜でした / 〜のです / 〜ところが). 문장부호 없이.':'- 명화관 말투: 이야기체(~합니다, ~했죠)와 친근한 해요체(~는데요, ~네요)를 섞고, 감정이 실리는 단어(간절히, 무너지는, 믿을 수 없는, 끝내, 마침내)를 쓴다. 문장부호 없이(마지막 재치 한마디만 느낌표 허용).'}
+${lang==='ja'?'- 일본 나레이터의 감정이 담긴 이야기 말투(〜でした / 〜のです / 〜ところが). 문장부호 없이.':'- 명화관 말투: 나레이션 끝은 반드시 이야기체(~합니다, ~했습니다, ~했죠, ~이었죠, ~고 맙니다, ~것이었습니다) 또는 긴장감을 남기는 "~는데"/"~지만"으로 끝낸다. "~요"로 끝나는 해요체(~는데요, ~네요, ~거든요, ~어요, ~했어요)는 절대 쓰지 않는다. ~습니다·~죠·~는데를 번갈아 써서 단조롭지 않게 하고, 감정이 실리는 단어(간절히, 무너지는, 믿을 수 없는, 끝내, 마침내)를 쓴다. 문장부호 없이(마지막 재치 한마디만 느낌표 허용).'}
 - 나레이션 합계는 전체의 30% 이하.
 - 나레이션 개수는 영상에 따라 4~10개. 대사만으로 이야기가 이해되면 나레이션을 줄인다.
 - 나레이션이 나오는 동안 화면에는 (앞뒤 clip이 원본 시간 순서로 이어질 때) '바로 앞 clip이 끝난 지점부터 다음 clip이 시작하기 전까지'의 원본이 그대로 이어서 나온다. 순서를 바꾼 곳에서는 src_start에 적은 장면이 나온다. 그러니 나레이션 내용은 반드시 그 사이(건너뛴 부분)에 화면에서 일어나는 일이나, 다음 clip으로 넘어가는 상황을 말해야 한다. 그 사이 화면과 상관없는 말(예: 아저씨가 전화하는 화면에 '친구들의 외침')은 금지.
@@ -1259,6 +1259,13 @@ function assignNarrFootage(){
   });
 }
 let TX=null;
+// 명화관 말투: 나레이션 끝의 '~요'를 이야기체로 (AI가 지침을 어겨도 확실하게)
+function narrTone(t){ if(JA()) return t;
+  const formal=w=>{ const c=w.charCodeAt(0)-0xAC00; if(c<0||c>11171) return w+'습니다'; return (c%28===0? String.fromCharCode(w.charCodeAt(0)+17)+'니다' : w+'습니다'); }; // 가→갑니다, 좋→좋습니다
+  return String(t||'')
+  .replace(/(는|인|한|은|던)데요$/,'$1데').replace(/지만요$/,'지만').replace(/거든요$/,'죠').replace(/죠요$/,'죠')
+  .replace(/이에요$/,'입니다').replace(/예요$/,'입니다').replace(/이네요$/,'입니다').replace(/해요$/,'합니다')
+  .replace(/([았었였했됐섰갔왔봤줬켰셨났렸졌웠겼])어요$/,'$1습니다').replace(/([가-힣])네요$/,(m,w)=>formal(w)); }
 function normalize(o,tx){ TX=tx||(typeof subsForClip==='function'? subsForClip() : null)||(S.cache&&S.cache.tx)||null;
   S.titles=(o.titles||[]).map(t=>String(t).replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,10);
   let tl=o.title_lines; if(!Array.isArray(tl)||!tl[0]) tl=splitTitle(S.titles[0]||'');
@@ -1283,7 +1290,7 @@ function normalize(o,tx){ TX=tx||(typeof subsForClip==='function'? subsForClip()
         return newScene({type:'clip',text:gp.map(l=>l.text).join(' / '),src_start:a,src_end:Math.max(z,a+1),lines:gp,fx,guide:s.guide}); }); }
     if(s.type==='dialogue'){ let en=+s.src_end||st+2.5; en=Math.min(Math.max(en,st+1),st+6,d); const sp=['female','male','other'].includes(s.speaker)?s.speaker:'other';
       return newScene({type:'dialogue',text:clean(s.subtitle||s.text),src_start:st,src_end:en,speaker:sp,guide:s.guide}); }
-    return newScene({type:'narration',text:clean(s.text),src_start:st,fx,guide:s.guide});
+    return newScene({type:'narration',text:narrTone(clean(s.text)),src_start:st,fx,guide:s.guide});
   }).flat().filter(s=>s.text);
   if(!S.scenes.length) throw new Error('장면이 비어 있어요. 다시 눌러 주세요.');
   // 같은 화면이 두 번 나오지 않게: 원본 장면(clip)끼리 겹치면 겹친 부분을 빼고, 나레이션 화면은 clip이 안 쓰는 곳으로 옮겨요
@@ -1397,11 +1404,11 @@ async function fitNarrations(provider){
 - 화면과 어긋나는 사건(예: 물속 화면인데 '어른이 전화를 건다')만 고친다. 화면에 안 보이는 사건은 쓰지 않는다.
 - 하지만 화면을 중계하지 않는다("~하는 모습입니다" 금지). 그 장면 속 인물의 마음·간절함·두려움·기쁨을 감정을 실어 말한다. 원래 문장에 감정이 있으면 살린다.
 - 앞뒤 대사와 이야기 흐름이 자연스럽게 이어지게. 이미 화면과 맞으면 그대로 둔다.
-- ${ja?'자연스러운 일본어 나레이션(〜でした/〜のです), 12~30자, 문장부호 없이.':'감정이 실린 이야기체(~합니다/~했죠/~는데요), 공백 포함 12~30자, 질문형 금지, 문장부호 없이.'}
+- ${ja?'자연스러운 일본어 나레이션(〜でした/〜のです), 12~30자, 문장부호 없이.':'감정이 실린 이야기체(~합니다/~했습니다/~했죠/~는데), "~요"로 끝나는 해요체 금지, 공백 포함 12~30자, 질문형 금지, 문장부호 없이.'}
 JSON만: {"narrations":[{"n":1,"text":"..."}]}`;
   const out= provider==='claude'? await callClaude(sys,[img],`쇼츠 전체 흐름:\n${ctx}`) : await callGPT(sys,[img],`쇼츠 전체 흐름:\n${ctx}`);
   const arr=(parseJSON(out).narrations)||[];
-  arr.forEach(o=>{ const i=idx[(+o.n||0)-1]; const t=clean(o.text||''); if(i!=null && t && t.length>=4) S.scenes[i].text=t; });
+  arr.forEach(o=>{ const i=idx[(+o.n||0)-1]; const t=clean(o.text||''); if(i!=null && t && t.length>=4) S.scenes[i].text=narrTone(t); });
   assignNarrFootage();
 }
 /* ================= 메모 자동 작성 ================= */
