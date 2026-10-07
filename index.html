@@ -1070,7 +1070,7 @@ const SYSTEM = `너는 유튜브 영화·드라마 짜깁기 쇼츠 작가 겸 �
 ## 2. 고농도 도파민 대본
 - 평범한 요약 금지. 불륜, 약점 협박, 비밀, 배신처럼 가장 자극적인 갈등 구간을 중심으로.
 - 의미 단위(한 호흡)마다 한 구절. 구절 하나가 화면 한 컷(2~4초)에 대응.
-- 종결어미는 전문 나레이터처럼 자연스럽게: ~했죠, ~했습니다, ~것이었죠, ~했으나, ~것입니다, ~는데. "~했지", "~였지" 남발 금지.
+- 종결어미는 명화관 나레이터처럼: ~합니다, ~했습니다, ~했죠, ~것이었죠, ~것입니다, ~는데. 반말(~했지, ~였지, ~했어, ~이야, ~다)과 해요체(~요) 금지.
 - 문장부호(마침표, 쉼표, 느낌표, 물음표, 따옴표) 전혀 쓰지 않음.
 - 마지막 구절은 여운이 남는 한마디. 구독·좋아요·다음 편 유도 멘트는 절대 넣지 않는다.
 
@@ -1173,7 +1173,7 @@ ${order==='time'? ' - clip들은 원본 시간 순서대로, 서로 겹치지 �
 
 # 나레이션 문장
 - 한 나레이션 = 자연스러운 한 문장, ${lang==='ja'?'12~30자':'공백 포함 12~30자'}, 말하는 시간 2~5초. 화면 자막은 프로그램이 2~3어절씩 끊어서 보여 주니 문장을 억지로 줄이지 않는다.
-${lang==='ja'?'- 일본 나레이터의 감정이 담긴 이야기 말투(〜でした / 〜のです / 〜ところが). 문장부호 없이.':'- 명화관 말투: 나레이션 끝은 반드시 이야기체(~합니다, ~했습니다, ~했죠, ~이었죠, ~고 맙니다, ~것이었습니다) 또는 긴장감을 남기는 "~는데"/"~지만"으로 끝낸다. "~요"로 끝나는 해요체(~는데요, ~네요, ~거든요, ~어요, ~했어요)는 절대 쓰지 않는다. ~습니다·~죠·~는데를 번갈아 써서 단조롭지 않게 하고, 감정이 실리는 단어(간절히, 무너지는, 믿을 수 없는, 끝내, 마침내)를 쓴다. 문장부호 없이(마지막 재치 한마디만 느낌표 허용).'}
+${lang==='ja'?'- 일본 나레이터의 감정이 담긴 이야기 말투(〜でした / 〜のです / 〜ところが). 문장부호 없이.':'- 명화관 말투: 나레이션 끝은 반드시 이야기체(~합니다, ~했습니다, ~했죠, ~이었죠, ~고 맙니다, ~것이었습니다) 또는 긴장감을 남기는 "~는데"/"~지만"으로 끝낸다. "~요"로 끝나는 해요체(~는데요, ~네요, ~거든요, ~어요, ~했어요)와 반말(~했지, ~던졌지, ~했어, ~순간이야, ~번지네, ~했다)은 절대 쓰지 않는다. 명화관 예: "엄마는 무너지는 마음을 붙잡고 기도를 시작합니다" "친구들은 언제나 그를 이상한 눈으로 바라봤습니다" "그런데 그날 밤 예상치 못한 일이 벌어지는데" "결국 그는 모든 걸 털어놓고 맙니다". ~습니다·~죠·~는데를 번갈아 써서 단조롭지 않게 하고, 감정이 실리는 단어(간절히, 무너지는, 믿을 수 없는, 끝내, 마침내)를 쓴다. 문장부호 없이(마지막 재치 한마디만 느낌표 허용).'}
 - 나레이션 합계는 전체의 30% 이하.
 - 나레이션 개수는 영상에 따라 4~10개. 대사만으로 이야기가 이해되면 나레이션을 줄인다.
 - 나레이션이 나오는 동안 화면에는 (앞뒤 clip이 원본 시간 순서로 이어질 때) '바로 앞 clip이 끝난 지점부터 다음 clip이 시작하기 전까지'의 원본이 그대로 이어서 나온다. 순서를 바꾼 곳에서는 src_start에 적은 장면이 나온다. 그러니 나레이션 내용은 반드시 그 사이(건너뛴 부분)에 화면에서 일어나는 일이나, 다음 clip으로 넘어가는 상황을 말해야 한다. 그 사이 화면과 상관없는 말(예: 아저씨가 전화하는 화면에 '친구들의 외침')은 금지.
@@ -1265,7 +1265,10 @@ function narrTone(t){ if(JA()) return t;
   return String(t||'')
   .replace(/(는|인|한|은|던)데요$/,'$1데').replace(/지만요$/,'지만').replace(/거든요$/,'죠').replace(/죠요$/,'죠')
   .replace(/이에요$/,'입니다').replace(/예요$/,'입니다').replace(/이네요$/,'입니다').replace(/해요$/,'합니다')
-  .replace(/([았었였했됐섰갔왔봤줬켰셨났렸졌웠겼])어요$/,'$1습니다').replace(/([가-힣])네요$/,(m,w)=>formal(w)); }
+  .replace(/([았었였했됐섰갔왔봤줬켰셨났렸졌웠겼])어요$/,'$1습니다').replace(/([가-힣])네요$/,(m,w)=>formal(w))
+  // 반말 끝맺음(~지, ~어, ~야, ~네, ~다)도 명화관 이야기체로
+  .replace(/([았었였했됐섰갔왔봤줬켰셨났렸졌웠겼])지$/,'$1죠').replace(/([았었였했됐섰갔왔봤줬켰셨났렸졌웠겼])어$/,'$1습니다').replace(/([았었였했됐섰갔왔봤줬켰셨났렸졌웠겼])다$/,'$1습니다')
+  .replace(/이야$/,'입니다').replace(/거야$/,'겁니다').replace(/([가-힣])네$/,(m,w)=>formal(w)); }
 function normalize(o,tx){ TX=tx||(typeof subsForClip==='function'? subsForClip() : null)||(S.cache&&S.cache.tx)||null;
   S.titles=(o.titles||[]).map(t=>String(t).replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,10);
   let tl=o.title_lines; if(!Array.isArray(tl)||!tl[0]) tl=splitTitle(S.titles[0]||'');
@@ -1295,6 +1298,18 @@ function normalize(o,tx){ TX=tx||(typeof subsForClip==='function'? subsForClip()
   if(!S.scenes.length) throw new Error('장면이 비어 있어요. 다시 눌러 주세요.');
   // 같은 화면이 두 번 나오지 않게: 원본 장면(clip)끼리 겹치면 겹친 부분을 빼고, 나레이션 화면은 clip이 안 쓰는 곳으로 옮겨요
   dedupeFootage(d);
+  fillLinesFromTX();
+}
+/* AI가 빠뜨린 대사: 원본 장면 안에서 말하는데 자막이 없으면, 원본 자막(받아쓰기)에서 채워 넣어요 */
+function fillLinesFromTX(){
+  const tx=(typeof TX!=='undefined'&&TX&&TX.length)? TX : null; if(!tx) return 0; let added=0;
+  S.scenes.forEach(sc=>{ if(sc.type!=='clip') return; const a=sc.src_start, z=sc.src_end; sc.lines=sc.lines||[];
+    tx.forEach(x=>{ const s0=Math.max(a,x.start), e0=Math.min(z,x.end); if(e0-s0 < Math.min(0.5,(x.end-x.start)*0.5)) return;
+      if(sc.lines.some(l=>l.start<x.end-0.1 && l.end>x.start+0.1)) return;
+      const near=sc.lines.reduce((b,l)=>!b||Math.abs(l.start-x.start)<Math.abs(b.start-x.start)?l:b,null);
+      sc.lines.push({start:Math.max(a,x.start), end:Math.min(z,Math.max(x.end,x.start+0.6)), text:clean(x.text), speaker:'기타'}); added++; });
+    sc.lines.sort((p,q)=>p.start-q.start); sc.text=sc.lines.map(l=>l.text).join(' / ')||sc.text; });
+  return added;
 }
 
 /* ================= 제목 따로 만들기 ================= */
@@ -1404,7 +1419,7 @@ async function fitNarrations(provider){
 - 화면과 어긋나는 사건(예: 물속 화면인데 '어른이 전화를 건다')만 고친다. 화면에 안 보이는 사건은 쓰지 않는다.
 - 하지만 화면을 중계하지 않는다("~하는 모습입니다" 금지). 그 장면 속 인물의 마음·간절함·두려움·기쁨을 감정을 실어 말한다. 원래 문장에 감정이 있으면 살린다.
 - 앞뒤 대사와 이야기 흐름이 자연스럽게 이어지게. 이미 화면과 맞으면 그대로 둔다.
-- ${ja?'자연스러운 일본어 나레이션(〜でした/〜のです), 12~30자, 문장부호 없이.':'감정이 실린 이야기체(~합니다/~했습니다/~했죠/~는데), "~요"로 끝나는 해요체 금지, 공백 포함 12~30자, 질문형 금지, 문장부호 없이.'}
+- ${ja?'자연스러운 일본어 나레이션(〜でした/〜のです), 12~30자, 문장부호 없이.':'감정이 실린 이야기체(~합니다/~했습니다/~했죠/~는데), "~요"로 끝나는 해요체와 반말(~했지/~했어/~이야/~다) 금지, 공백 포함 12~30자, 질문형 금지, 문장부호 없이.'}
 JSON만: {"narrations":[{"n":1,"text":"..."}]}`;
   const out= provider==='claude'? await callClaude(sys,[img],`쇼츠 전체 흐름:\n${ctx}`) : await callGPT(sys,[img],`쇼츠 전체 흐름:\n${ctx}`);
   const arr=(parseJSON(out).narrations)||[];
@@ -1551,8 +1566,10 @@ async function resumeWork(){
     S.lang=w.lang||S.lang; S.title1=w.title1||''; S.title2=w.title2||''; S.titles=w.titles||[]; S.tmeta=w.tmeta||{}; S.tsplit=w.tsplit||{};
     $('memo').value=w.memo||''; $('work').value=w.work||''; S.work=$('work').value; if(w.tx) TX=w.tx;
     S.scenes=w.scenes.map(o=>{ const sc=Object.assign(newScene(o),o); if(sc.audio){ sc.audioEl=new Audio(URL.createObjectURL(sc.audio)); sc.audioEl.preload='auto'; } sc.srcNode=null; return sc; });
+    let toned=0; S.scenes.forEach(sc=>{ if(sc.type!=='narration') return; const t=narrTone(sc.text); if(t!==sc.text){ sc.text=t; sc.audio=null; sc.audioDur=0; sc.audioEl=null; sc.srcNode=null; toned++; } });
+    try{ fillLinesFromTX(); }catch(e){}
     LAYERS.clear(); RESTORING=false; saveVer(); renderAll();
-    if(S.url) say('✅ 이전 작업을 불러왔어요. 이어서 하시면 돼요.');
+    if(S.url) say('✅ 이전 작업을 불러왔어요. 이어서 하시면 돼요.'+(toned?`\n나레이션 ${toned}개의 말투를 명화관 말투로 고쳤어요. '나레이션 목소리 만들기'를 눌러 그 부분만 다시 만들어 주세요.`:''));
   }catch(e){ RESTORING=false; say(e.message,true); }
 }
 $('resumeBtn').addEventListener('click',resumeWork);
@@ -1901,11 +1918,32 @@ function drawDialogue(txt,speaker,b){
   lines.forEach((ln,k)=>g.fillText(ln,W/2,by+14+size+k*lh-4));
 }
 /* 나레이션 자막을 명화관처럼 짧은 덩어리로 나눠서 말하는 속도에 맞춰 바꿔요 */
+/* 자막 나누기: 한국 사람이 읽기 편하게 '의미 덩어리'로 나눠요.
+   "두", "더", "처음", "다른"처럼 뒷말을 꾸미는 말에서는 끊지 않고, "~은/는/을/를/에서/~고/~면" 처럼 말이 일단락되는 곳에서 끊어요. */
+const KO_MOD=new Set(['어떻게','왜','같이','함께','이렇게','그렇게','많이','빨리','더','두','세','네','한','내','제','그','이','저','우리','너무','정말','다시','또','잘','못','안','처음','아주','가장','제일','바로','모든','어떤','이런','그런','저런','새','첫','온','그냥','좀','막','꼭','이제','다들','늘','항상','결코','절대','전혀','마침내','결국','끝내','어느','무슨','몇','여러','각','첫번째','단']);
+const KO_GOOD=/(은|는|이|가|을|를|에|에서|에게|한테|께|도|만|고|며|면|서|니까|는데|지만|요|다|지|죠|야|게|랑|와|과|로|으로|까지|부터|처럼|보다|하고|라고|다고|냐고|자고|면서|도록|려고|러|듯|며|든|던데|거든|잖아|네|어|아|나|까)$/;
+const KO_AUX=/^(않|못하|못했|대해|대한|위해|통해|관해|대하|버렸|버리|버린|싶|있|없|봐|보|줘|주|두고|놓)/;
+function koBreakPen(w){
+  if(/[,.?!…]$/.test(w)) return 0;
+  const b=w.replace(/[^가-힣A-Za-z0-9]/g,'');
+  if(KO_MOD.has(b)) return 9;
+  if(b.length<=1) return 8;
+  if(KO_GOOD.test(b)) return 0;
+  const c=b.charCodeAt(b.length-1)-0xAC00; if(c>=0&&c<=11171){ const jong=c%28; if(jong===4||jong===8) return 5; } // ~ㄴ/~ㄹ 로 끝나는 꾸밈말 (다른, 고립된, 할)
+  return 2;
+}
+function koChunks(t,max){
+  const w=String(t||'').trim().split(/\s+/).filter(Boolean), n=w.length; if(!n) return [];
+  const L=w.map(x=>noSpaceLen(x)); const best=new Array(n+1).fill(Infinity), from=new Array(n+1).fill(0); best[0]=0;
+  for(let e=1;e<=n;e++){ let len=0;
+    for(let s=e-1;s>=0;s--){ len+=L[s]; if(len>max && s<e-1) break;
+      const last=e===n, pen=last?0:koBreakPen(w[e-1])+(KO_AUX.test(w[e]||'')?7:0), fill=Math.max(0,max-len)/max, tiny=(len<=2&&n>1)?6:0;
+      const c=best[s]+3+pen+fill*fill*3+tiny+(len>max?20:0); if(c<best[e]){ best[e]=c; from[e]=s; } } }
+  const out=[]; let e=n; while(e>0){ const s=from[e]; out.unshift(w.slice(s,e).join(' ')); e=s; } return out;
+}
 function narrChunks(t){
   t=String(t||'').trim(); if(!t) return [];
-  if(t.includes(' ')){ const w=t.split(/\s+/), out=[]; let cur='';
-    let nw=0; for(const x of w){ const big=noSpaceLen(x)>1, c=cur?cur+' '+x:x; if(cur && (noSpaceLen(c)>9 || (big && nw>=2))){ out.push(cur); cur=x; nw=big?1:0; } else { cur=c; if(big) nw++; } } if(cur) out.push(cur);
-    if(out.length>1 && noSpaceLen(out[out.length-1])<=3){ const z=out.pop(); out[out.length-1]+=' '+z; } return out; }
+  if(t.includes(' ')) return koChunks(t,10);
   const a=[...t], out=[]; let i=0; while(i<a.length){ let e=Math.min(a.length,i+9);
     if(e<a.length){ for(let k=e;k>i+3;k--){ if('はがをにでとものへて、。'.includes(a[k-1])){ e=k; break; } } }
     if(a.length-e<=2) e=a.length; out.push(a.slice(i,e).join('')); i=e; }
@@ -1913,11 +1951,8 @@ function narrChunks(t){
 }
 /* 대사 자막은 명화관처럼 항상 한 줄. 길면 의미 단위로 나눠서 말하는 속도에 맞춰 차례로 보여 줘요 */
 function lineChunks(t){ t=String(t||'').trim(); if(noSpaceLen(t)<=13) return [t];
-  const parts=t.split(/(?<=[,.?!…])\s+/).filter(Boolean); const out=[];
-  for(const p of parts){ if(noSpaceLen(p)<=13){ out.push(p); continue; }
-    const w=p.split(/\s+/); let cur=''; for(const x of w){ const c=cur?cur+' '+x:x; if(cur && noSpaceLen(c)>12){ out.push(cur); cur=x; } else cur=c; } if(cur) out.push(cur); }
-  if(out.length>1 && noSpaceLen(out[out.length-1])<=3){ const z=out.pop(); out[out.length-1]+=' '+z; }
-  return out; }
+  if(!t.includes(' ')) return narrChunks(t);
+  return koChunks(t,13); }
 function lineChunkAt(t,p){ const c=lineChunks(t); if(c.length<2) return t; const w=c.map(x=>noSpaceLen(x)+1), tot=w.reduce((a,b)=>a+b,0); let acc=0; for(let k=0;k<c.length;k++){ acc+=w[k]; if(p*1.02<=acc/tot) return c[k]; } return c[c.length-1]; }
 function narrChunkAt(t,p){ const c=narrChunks(t); if(c.length<2) return t; const w=c.map(x=>noSpaceLen(x)+1), tot=w.reduce((x,y)=>x+y,0); let acc=0; for(let k=0;k<c.length;k++){ acc+=w[k]; if(p*1.04<=acc/tot) return c[k]; } return c[c.length-1]; }
 // 배경용 캔버스가 너무 작으면 크롬이 그래픽카드 대신 CPU로 그려서, 매 장면마다 영상을 CPU로 옮기느라 뚝뚝 끊겨요 → 그래픽카드가 맡는 크기(180x320)로
@@ -2090,7 +2125,7 @@ $('playBtn').addEventListener('click',()=>run(false));
 const COLAB_FPS=30;
 function layerPng(plan){ return new Promise(res=>{ const c=document.createElement('canvas'); c.width=W; c.height=H; const og=g; g=c.getContext('2d'); try{ plan.draw(); } finally{ g=og; } c.toBlob(b=>res(b),'image/png'); }); }
 async function buildColabProject(onProg){
-  assignNarrFootage(); await FONTS_READY;
+  try{ fillLinesFromTX(); }catch(e){} assignNarrFootage(); await FONTS_READY;
   const TL=buildTL(), b=band(), dlg=(+$('dlgVol').value)/100, duck=(+$('duckVol').value)/100;
   const files=[]; const add=(name,blob)=>files.push({name,blob});
   const segs=TL.tl.map(seg=>{ const sc=S.scenes[seg.i], nar=seg.type!=='clip';
