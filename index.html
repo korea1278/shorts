@@ -1513,7 +1513,7 @@ async function polishNarrations(provider){
 명화관 나레이션 규칙:
 - 이야기꾼처럼 줄거리를 이어 준다. '누가 무엇을 했는지' 구체적인 사건을 말하고, 그 안에 감정 단어(간절히, 끝내, 믿을 수 없는, 결국, 마침내)를 싣는다.
 - 끝맺음은 ~합니다 / ~했습니다 / ~했죠 / ~것이었죠 / ~는데요 / ~는데 / ~지만 / [행동+인물] 중 하나. 반말(~했지, ~버려, ~움직여, ~이야, ~했어, ~다)·다른 해요체(~했어요, ~거든요)·감정만 있는 명사구 금지.
-- 시처럼 분위기만 말하는 추상적인 문장 금지. 예) "짙은 긴장 안에 흔들리는 희망 하나"(X) → "꼼짝없이 갇힌 두 사람 그때 셜리가 전화 한 통을 요구합니다"(O) / "묵묵히 품위를 지킨 자의 승리"(X) → "결국 주먹이 아닌 전화 한 통이 두 사람을 풀어 줬습니다"(O) / "두 남자 마음에 스며드는 불안과 초조"(X) → "흑인 통금이 있는 마을 두 사람은 불안하기만 합니다"(O)
+- 시처럼 분위기만 말하는 추상적인 문장 금지. 예) "짙은 긴장 안에 흔들리는 희망 하나"(X) → "꼼짝없이 갇힌 두 사람 그때 셜리가 전화 한 통을 요구합니다"(O) / "묵묵히 품위를 지킨 자의 승리"(X) → "결국 주먹이 아닌 전화 한 통이 두 사람을 풀어 줬습니다"(O) / "두 남자 마음에 스며드는 불안과 초조"(X) → "하필 그곳은 흑인 통금이 있는 마을이었는데요"(O)
 - 명화관 영상에서 실제로 나온 나레이션(이 느낌을 그대로 따른다): "여자는 창밖을 내다보다가 충격적인 장면을 보게 됩니다" "그가 폐건물에 살고 있다는 것이었죠" "다음날 몇 가지 생필품을 챙겼습니다" "마침내 궁금했던 것을 물었고" "교수는 청소부 사무실로 찾아갑니다" "자신이 저지른 행위에 대한 변호를 이어 나가는데요" "키스 캠이 남편을 비춥니다" "또다시 비추는 카메라" "악어가 순순히 입을 벌리는데요" "물로 도망가버리는 악어" "공 회수와 함께 복수도 성공이네요" "전쟁터에서 탈영해 고향으로 향하던 남자" "한 여인이 사는 오두막에 들어오는데요" "콩과 옥수수가 전부였지만 지친 남자를 위해 따뜻한 음식을 내어줍니다" "그렇게 헛간 한구석에서 잠을 청하는데" "조수의 손을 보더니 뭔가를 시켜보는 교수" "조수의 남다른 재능을 본 블레이락은 연구 보조 업무에 투입시키는데요" "실험을 성공적으로 마치는 듯했는데" "결국 모진 말까지 쏟아내는 블레이락" "불시에 감방 수색을 나왔는데" "별 관심 없어 보이는 소장" "그때 뭔가를 발견하는데요" "어느 날 아침 앤디가 보이지 않았죠"
 - 특징: 쉬운 말, 주어+행동이 분명함, 비유·시적 표현 없음. 나레이션은 원본 대사와 대사 사이를 잇는 다리 역할이라 짧고, "~는데"로 다음 장면에 넘기거나, "뭔가를 시켜보는 교수" "별 관심 없어 보이는 소장"처럼 [행동 + 인물 역할]로 끝내거나, "~줍니다/~했죠"로 사실을 말한다. "~다가 / ~고 / ~는데"로 끝내서 바로 다음 원본 대사로 이어지게 하는 경우가 많다. 행동을 꾸미는 명사구("물로 도망가버리는 악어")는 괜찮지만 감정·분위기만 있는 명사구("흔들리는 희망 하나")는 안 된다.
 - 앞뒤 원본 대사와 자연스럽게 이어지게. 원래 나레이션이 전하려던 사실은 유지. 공백 포함 12~30자, 문장부호 없이, 질문형 금지.
@@ -2095,12 +2095,13 @@ function koBreakPen(w){
   if(/[,.?!…]$/.test(w)) return 0;
   const b=w.replace(/[^가-힣A-Za-z0-9]/g,'');
   if(KO_MOD.has(b)) return 9;
+  if(/^(돼|해|봐|줘|와|가|자|죠|야|다|지|요|래|네)$/.test(b)) return -1;   // "안 돼", "해" 처럼 한 글자로 끝나는 말끝
   if(b.length<=1) return 8;
   if(KO_CONN.test(b)) return 0;
   if(/(을|를)$/.test(b)) return 3;            // '세계를 | 돌아다니면서' 처럼 목적어와 동사를 떼지 않게
   if(/(에|에서|에게|한테|로|으로|와|과|랑)$/.test(b)) return 2;
   if(KO_GOOD.test(b)) return 1;
-  const c=b.charCodeAt(b.length-1)-0xAC00; if(c>=0&&c<=11171){ const jong=c%28; if(jong===4||jong===8) return 5; } // ~ㄴ/~ㄹ 로 끝나는 꾸밈말 (다른, 고립된, 할)
+  const c=b.charCodeAt(b.length-1)-0xAC00; if(c>=0&&c<=11171){ const jong=c%28; if(jong===4||jong===8) return 8; } // ~ㄴ/~ㄹ 로 끝나는 꾸밈말 (다른, 고립된, 할, 있는)
   return 2;
 }
 function koChunks(t,max){
@@ -2108,13 +2109,13 @@ function koChunks(t,max){
   const L=w.map(x=>noSpaceLen(x)); const best=new Array(n+1).fill(Infinity), from=new Array(n+1).fill(0); best[0]=0;
   for(let e=1;e<=n;e++){ let len=0;
     for(let s=e-1;s>=0;s--){ len+=L[s]; if(len>max && s<e-1) break;
-      const last=e===n, nx=w[e]||'', pv=w[e-1]||'', pen=last?0:koBreakPen(pv)+(KO_AUX.test(nx)?7:0)+(KO_DEPN.test(nx)&&/[가-힣]$/.test(pv)&&((c=>c>=0&&c<=11171&&[4,8].includes(c%28))(pv.charCodeAt(pv.length-1)-0xAC00)||/(는|던)$/.test(pv))?9:0)-(KO_FINAL.test(pv)&&!KO_CONN.test(pv)&&noSpaceLen(pv)>=2?2:0), fill=Math.max(0,max-len)/max, tiny=(len<=2&&n>1)?6:0;
+      const last=e===n, nx=w[e]||'', pv=w[e-1]||'', pen=last?0:koBreakPen(pv)+(KO_AUX.test(nx)?7:0)+(/^(안|못)$/.test(nx)&&/(면|서|도|야)$/.test(pv)?8:0)+(KO_DEPN.test(nx)&&/[가-힣]$/.test(pv)&&((c=>c>=0&&c<=11171&&[4,8].includes(c%28))(pv.charCodeAt(pv.length-1)-0xAC00)||/(는|던)$/.test(pv))?9:0)-(KO_FINAL.test(pv)&&!KO_CONN.test(pv)&&noSpaceLen(pv)>=2?2:0), fill=Math.max(0,max-len)/max, tiny=(len<=2&&n>1)?6:0;
       const c=best[s]+3+pen+fill*fill*3+tiny+(len>max?20:0); if(c<best[e]){ best[e]=c; from[e]=s; } } }
   const out=[]; let e=n; while(e>0){ const s=from[e]; out.unshift(w.slice(s,e).join(' ')); e=s; } return out;
 }
 function narrChunks(t){
   t=String(t||'').trim(); if(!t) return [];
-  if(t.includes(' ')) return koChunks(t,10);
+  if(t.includes(' ')) return koChunks(t,12);
   const a=[...t], out=[]; let i=0; while(i<a.length){ let e=Math.min(a.length,i+9);
     if(e<a.length){ for(let k=e;k>i+3;k--){ if('はがをにでとものへて、。'.includes(a[k-1])){ e=k; break; } } }
     if(a.length-e<=2) e=a.length; out.push(a.slice(i,e).join('')); i=e; }
