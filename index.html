@@ -1369,6 +1369,29 @@ function mergeLines(){
       else out.push({...l}); });
     sc.lines=out; sc.text=out.map(l=>l.text).join(' / ')||sc.text; });
 }
+/* 너무 길면: 명화관처럼 핵심 대사만 남기고 나머지는 빼요 (빠진 내용은 나레이션이 이어 줘요) */
+async function tightenToTarget(provider, cap, cur){
+  const items=[]; S.scenes.forEach((sc,i)=>{ if(sc.type==='clip') (sc.lines||[]).forEach((l,k)=>items.push({i,k,l})); });
+  if(items.length<4) return;
+  let n=0; const flow=S.scenes.map((sc,i)=> sc.type==='narration'? `(나레이션) ${sc.text}` : (sc.lines||[]).map(l=>`${++n}. [${(l.end-l.start).toFixed(1)}초] ${l.speaker}: ${l.text}`).join('\n')).join('\n');
+  const sys=`너는 유튜브 영화 쇼츠 채널 '명화관'의 편집자다. 지금 쇼츠가 약 ${Math.round(cur)}초로 너무 길다. ${cap}초 이하가 되도록 '남길 원본 대사' 번호만 고른다.
+- 명화관은 대화를 통째로 보여 주지 않는다. 이야기를 이끄는 핵심 대사, 감정이 터지는 대사, 웃기거나 강한 한마디, 결말 대사만 남긴다.
+- 비슷한 말 반복, 설명하는 대화, 주고받기가 길게 이어지는 부분은 뺀다(빠진 내용은 나레이션이 이어 준다).
+- 이야기 순서(소개→갈등→절정→결과)는 유지하고, 마지막 결말 대사는 꼭 남긴다.
+- 대사 하나 남길 때마다 [초]만큼 길이가 든다. 나레이션 길이(한 줄 약 3초)도 생각해서 고른다.
+JSON만: {"keep":[1,2,5]}`;
+  const out= provider==='claude'? await callClaude(sys,[],flow) : await callGPT(sys,[],flow);
+  const keep=new Set((parseJSON(out).keep||[]).map(x=>+x)); if(keep.size<2) return;
+  const out2=[];
+  S.scenes.forEach((sc,i)=>{ if(sc.type!=='clip'){ out2.push(sc); return; }
+    const kept=(sc.lines||[]).filter(l=>keep.has(items.findIndex(x=>x.l===l)+1)); if(!kept.length) return;
+    const groups=[[kept[0]]]; for(let k=1;k<kept.length;k++){ const g=groups[groups.length-1]; if(kept[k].start-g[g.length-1].end>1.2) groups.push([kept[k]]); else g.push(kept[k]); }
+    groups.forEach(g=>{ const a=Math.max(sc.src_start,g[0].start-0.25), z=Math.min(sc.src_end,g[g.length-1].end+0.45);
+      const ns=newScene({type:'clip',text:g.map(l=>l.text).join(' / '),src_start:+a.toFixed(2),src_end:+Math.max(z,a+1).toFixed(2),lines:g.map(l=>({...l})),fx:sc.fx,guide:sc.guide}); if(sc.shots) ns.shots=sc.shots; out2.push(ns); }); });
+  // 나레이션이 연달아 붙으면 하나만 남겨요
+  S.scenes=out2.filter((sc,i,arr)=>!(sc.type==='narration' && arr[i-1] && arr[i-1].type==='narration' && noSpaceLen(sc.text)<noSpaceLen(arr[i-1].text)));
+  removeOverlaps(); trimEnding(); assignNarrFootage();
+}
 /* 대사마다 누가 말했는지 AI가 다시 정해요 (자막 색깔이 사람마다 다르게 나오도록) */
 async function labelSpeakers(provider){
   const items=[]; S.scenes.forEach((sc,i)=>{ if(sc.type==='clip') (sc.lines||[]).forEach((l,k)=>items.push({i,k,l})); });
@@ -1622,6 +1645,10 @@ ${$('targetLen').value==='auto'? '목표 길이: 자동. 명화관처럼 이야�
         const keep={t:S.titles,a:S.title1,b:S.title2,s:S.scenes}; normalize(parseJSON(out2),transcript);
         if(buildTL().total<tot){ S.titles=keep.t; S.title1=keep.a; S.title2=keep.b; S.scenes=keep.s; } }catch(e){}
     }
+    if(mode==='clip'){ const cap= $('targetLen').value==='auto'? 110 : Math.round(tgt*1.15);
+      for(let r=0;r<2;r++){ try{ fillLinesFromTX({merge:false}); }catch(e){} assignNarrFootage(); const cur=buildTL().total; if(cur<=cap) break;
+        setStatus('anaStatus',`약 ${Math.round(cur)}초로 너무 길어서, 핵심 대사만 남기는 중… (목표 ${cap}초 이하)`); bar(0.87);
+        try{ await tightenToTarget(provider, cap, cur); }catch(e){ break; } } }
     if(mode==='clip'){ setStatus('anaStatus','나레이션을 실제 화면에 맞추는 중…'); bar(0.9); try{ await fitNarrations(provider); }catch(e){} try{ setStatus('anaStatus','나레이션 말투를 명화관식으로 다듬는 중…'); await polishNarrations(provider); }catch(e){} try{ setStatus('anaStatus','대사마다 누가 말했는지 정리하는 중…'); fillLinesFromTX({merge:false}); await labelSpeakers(provider); }catch(e){} try{ mergeLines(); }catch(e){} try{ setStatus('anaStatus','결말이 장면으로 나오는지 점검하는 중…'); await endCheckRun(true); }catch(e){} }
     setStatus('anaStatus','제목 만드는 중…'); bar(0.95);
     try{ await genTitles(provider); }catch(e){}
