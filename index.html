@@ -1229,7 +1229,7 @@ function assignNarrFootage(){
     else if(cur==null){ sc.src_start=Math.max(0,+(nextStart-len).toFixed(2)); sc.vrate=1; }
     else { const gap=nextStart-cur;
       if(gap>=len){ sc.src_start=+cur.toFixed(2); sc.vrate=1; }
-      else if(gap>=len*0.6){ sc.src_start=+cur.toFixed(2); sc.vrate=Math.max(0.6,gap/len); }
+      else if(gap>=len*0.92){ sc.src_start=+cur.toFixed(2); sc.vrate=Math.max(0.92,gap/len); } // 느리게 틀면 초당 장면 수가 줄어 뚝뚝 끊겨 보여요 → 거의 안 늦춰요
       else if(gap>-0.5 && nx && nx.type==='clip' && (!nx.lines||!nx.lines.length||nx.lines[0].start>=cur+len-0.2)){
         // 사이가 너무 짧으면 앞 장면에서 이어서 보여 주고, 다음 장면의 대사 전 부분을 그만큼 잘라요
         sc.src_start=+cur.toFixed(2); sc.vrate=1; nx.src_start=Math.min(nx.src_end-1,+(cur+len).toFixed(2)); }
