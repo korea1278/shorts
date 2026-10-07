@@ -1589,11 +1589,16 @@ const WDB={ db:null, async open(){ if(this.db) return this.db; this.db=await new
   async get(k){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction('w'); const q=t.objectStore('w').get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); },
   async del(k){ const db=await this.open(); return new Promise(res=>{ const t=db.transaction('w','readwrite'); t.objectStore('w').delete(k); t.oncomplete=res; t.onerror=res; }); } };
 let AUTOSAVE_T=null, SAVED_FILE=null, RESTORING=false;
-function autosaveSoon(){ if(RESTORING) return; clearTimeout(AUTOSAVE_T); AUTOSAVE_T=setTimeout(()=>autosave().catch(e=>console.warn('autosave',e)),1200); }
+function autosaveSoon(){ if(RESTORING) return; clearTimeout(AUTOSAVE_T); AUTOSAVE_T=setTimeout(()=>{ if(busy){ autosaveSoon(); return; } autosave().catch(e=>console.warn('autosave',e)); },1500); }
 const SC_KEYS=['type','text','src_start','src_end','lines','speaker','fx','guide','shots','vrate','aiSrc','manual','audio','audioDur','rate','aState'];
 async function autosave(){
   if(!S.scenes||!S.scenes.length) return;
-  if(S.file && S.file!==SAVED_FILE && S.file.size<=450*1048576){ await WDB.put('file',{blob:S.file,name:S.file.name}); SAVED_FILE=S.file; }
+  // 영상은 '내 컴퓨터에서 연 파일'일 때만, 작업이 한가할 때 저장해요.
+  // 제작기가 잘라 낸 영상(메모리에만 있는 파일)을 저장하면 메모리를 한 번 더 써서 PC방 PC에서 '메모리 부족'으로 튕길 수 있어요.
+  if(S.file && S.file!==SAVED_FILE){
+    if(S.file.__cut || S.file.size>450*1048576){ SAVED_FILE=S.file; try{ await WDB.del('file'); }catch(e){} }
+    else if(!busy){ await WDB.put('file',{blob:S.file,name:S.file.name}); SAVED_FILE=S.file; }
+  }
   const scenes=S.scenes.map(sc=>{ const o={}; SC_KEYS.forEach(k=>{ if(sc[k]!==undefined) o[k]=sc[k]; }); if(o.aState==='만드는 중…') o.aState=''; return o; });
   await WDB.put('last',{at:Date.now(), lang:S.lang, title1:S.title1, title2:S.title2, titles:S.titles, tmeta:S.tmeta||{}, tsplit:S.tsplit||{},
     memo:$('memo').value, work:$('work').value, fileName:S.file?S.file.name:'', tx:(typeof TX!=='undefined'&&TX)||null, scenes});
@@ -1602,7 +1607,7 @@ async function checkResume(){
   try{ const w=await WDB.get('last'); if(!w||!w.scenes||!w.scenes.length) return;
     const f=await WDB.get('file'); const hasVid=f&&f.blob&&f.name===w.fileName;
     const nar=w.scenes.filter(x=>x.type==='narration'), voiced=nar.filter(x=>x.audio).length;
-    $('resumeInfo').innerHTML=`📂 <b>저장된 작업이 있어요</b> — ${(w.title1||'')+' '+(w.title2||'')} · 장면 ${w.scenes.length}개 · 목소리 ${voiced}/${nar.length} · ${new Date(w.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}${hasVid?' · 영상 포함':'<br><small>영상은 저장되지 않았어요. "이어서 하기" 전에 같은 영상('+w.fileName+')을 먼저 열어 주세요.</small>'}`;
+    $('resumeInfo').innerHTML=`📂 <b>저장된 작업이 있어요</b> — ${(w.title1||'')+' '+(w.title2||'')} · 장면 ${w.scenes.length}개 · 목소리 ${voiced}/${nar.length} · ${new Date(w.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}${hasVid?' · 영상 포함':'<br><small>영상은 저장되지 않았어요 (제작기에서 잘라 쓴 영상은 메모리 때문에 저장하지 않아요). "이어서 하기" 전에 같은 영상('+w.fileName+')을 먼저 열거나 같은 구간을 다시 잘라 주세요.</small>'}`;
     $('resumeBox').hidden=false; }catch(e){}
 }
 async function resumeWork(){
