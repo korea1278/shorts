@@ -1200,6 +1200,9 @@ ${lang==='ja'?'- 일본어, 공백 없이 10~18자, 호기심 자극.':'- 정상
  {"type":"narration","text":"...","src_start":12.5,"focus":"center","guide":"..."}]}`;
 
 function parseJSON(t){ t=t.replace(/```json|```/g,''); const a=t.indexOf('{'), b=t.lastIndexOf('}'); if(a<0||b<0) throw new Error('AI 응답 형식을 읽지 못했어요. 다시 눌러 주세요.'); return JSON.parse(t.slice(a,b+1)); }
+// AI가 나눈 두 줄이 원래 제목과 글자 하나라도 다르면(예: '경찰서장이' → '경찰서장') 쓰지 않고 직접 나눠요
+const titleKey=t=>String(t||'').replace(/[\s.,!?'"“”‘’…·~\/]/g,'');
+function splitOK(t,a,b){ return !!(a&&b) && titleKey(String(a)+String(b))===titleKey(t); }
 function splitTitle(t){ t=String(t||'').trim(); const words=t.split(' '); if(words.length<2){ const a=[...t]; if(a.length<9) return [t,'']; const h=Math.ceil(a.length/2); return [a.slice(0,h).join(''),a.slice(h).join('')]; } let best=1, bd=1e9; for(let i=1;i<words.length;i++){ const d=Math.abs(words.slice(0,i).join(' ').length - words.slice(i).join(' ').length); if(d<bd){bd=d;best=i;} } return [words.slice(0,best).join(' '), words.slice(best).join(' ')]; }
 const newScene = o => ({type:o.type, text:o.text, src_start:o.src_start, src_end:o.src_end, lines:o.lines||null, speaker:o.speaker||'other', fx:isFinite(o.fx)?o.fx:0.5, guide:o.guide||'', audio:null, audioDur:0, audioEl:null, srcNode:null, aState:''});
 function dedupeFootage(d){
@@ -1272,7 +1275,7 @@ function narrTone(t){ if(JA()) return t;
   .replace(/이야$/,'입니다').replace(/거야$/,'겁니다').replace(/([가-힣])네$/,(m,w)=>formal(w)); }
 function normalize(o,tx){ TX=tx||(typeof subsForClip==='function'? subsForClip() : null)||(S.cache&&S.cache.tx)||null;
   S.titles=(o.titles||[]).map(t=>String(t).replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,10);
-  let tl=o.title_lines; if(!Array.isArray(tl)||!tl[0]) tl=splitTitle(S.titles[0]||'');
+  let tl=o.title_lines; if(!Array.isArray(tl)||!tl[0]||(S.titles[0]&&!splitOK(S.titles[0],tl[0],tl[1]))) tl=splitTitle(S.titles[0]||'');
   S.title1=clean(tl[0]); S.title2=clean(tl[1]);
   const d=S.videoDur||1e9;
   const FX={left:0.15,center:0.5,right:0.85};
@@ -1397,7 +1400,7 @@ JSON만: {"ranks":[{"i":번호,"score":점수,"why":"이유"}]}`;
   }catch(e){}
   best=best.slice(0,10);
   S.titles=best.map(x=>x.t); S.tsplit={};
-  best.forEach(x=>{ S.tsplit[x.t]= (x.l1&&x.l2)? [clean(x.l1),clean(x.l2)] : splitTitle(x.t); });
+  best.forEach(x=>{ S.tsplit[x.t]= splitOK(x.t,x.l1,x.l2)? [clean(x.l1),clean(x.l2)] : splitTitle(x.t); });
   [S.title1,S.title2]=S.tsplit[S.titles[0]];
 }
 $('retitleBtn').addEventListener('click',async()=>{
@@ -1619,7 +1622,7 @@ function renderTitles(){
     l.querySelector('span').textContent=t;
     if(m&&m.why){ const w=document.createElement('small'); w.style.cssText='display:block;margin:2px 0 0 26px;color:#9aa3ad'; w.textContent=(i===0?'추천 이유: ':'')+m.why; l.appendChild(w); }
     if(i===0&&m){ l.style.outline='2px solid #ffd400'; l.style.borderRadius='8px'; }
-    l.querySelector('input').addEventListener('change',()=>{ const [a,b]=(S.tsplit&&S.tsplit[t])||splitTitle(t); S.title1=clean(a); S.title2=clean(b); $('title1').value=S.title1; $('title2').value=S.title2; redrawPreview(); buildGuide(); });
+    l.querySelector('input').addEventListener('change',()=>{ const sp=S.tsplit&&S.tsplit[t]; const [a,b]=(sp&&splitOK(t,sp[0],sp[1]))? sp : splitTitle(t); S.title1=clean(a); S.title2=clean(b); $('title1').value=S.title1; $('title2').value=S.title2; redrawPreview(); buildGuide(); });
     box.appendChild(l);
   });
 }
