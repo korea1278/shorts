@@ -587,7 +587,7 @@ def main():
             mix[k:k + len(fx)] += fx[:len(mix) - k]
     voiced = voice[np.abs(voice) > 0.02]
     vrms = float(np.sqrt((voiced ** 2).mean())) if len(voiced) else 0.1
-    target = vrms * 10 ** (-cfg["bgm_gap_db"] / 20) * 0.35
+    target = vrms * 10 ** (-cfg["bgm_gap_db"] / 20)
     bdir = os.path.join(ROOT, "bgm")
     cands = sorted(f for f in os.listdir(bdir) if f.lower().endswith((".mp3", ".wav", ".m4a"))) \
         if os.path.isdir(bdir) else []
@@ -608,6 +608,16 @@ def main():
         w.setframerate(SR)
         w.writeframes((np.clip(mix, -1, 1) * 32767).astype(np.int16).tobytes())
 
+    # 음량 맞추기 (loudnorm 2단계: 먼저 재고, 잰 값으로 정확히 맞춤)
+    lt = cfg["loudness"]
+    meas = subprocess.run(["ffmpeg", "-v", "info", "-i", wav_path, "-af",
+                           f"loudnorm=I={lt}:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
+                          capture_output=True, text=True).stderr
+    m = json.loads(meas[meas.rfind("{"):meas.rfind("}") + 1])
+    loudnorm = (f"loudnorm=I={lt}:TP=-1.5:LRA=11:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
+                f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:"
+                f"offset={m['target_offset']}:linear=true")
+
     # 6) 화면
     title = make_title(job["title"], int(job.get("title_yellow", 0)))
     cursors = [make_cursor(1.0), make_cursor(0.85)]
@@ -615,7 +625,7 @@ def main():
     cmd = ["ffmpeg", "-y", "-v", "error",
            "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
            "-i", wav_path, "-map", "0:v", "-map", "1:a",
-           "-af", f"loudnorm=I={cfg['loudness']}:TP=-1.5:LRA=11",
+           "-af", loudnorm,
            "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p",
            "-c:a", "aac", "-b:a", "192k", "-ar", str(SR), "-shortest", "-movflags", "+faststart", out_mp4]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
