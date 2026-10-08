@@ -63,7 +63,7 @@ DEFAULT_CONFIG = {
         "plain white background, single clear subject, no text, no letters, no numbers, no logos, no watermark. "
         "No real, identifiable people or celebrities; no existing cartoon characters or memes."
     ),
-    "sfx_db": -16,                      # 효과음 크기 (목소리 최대 크기 기준, 낮을수록 작게)
+    "sfx_db": -10,                      # 효과음 크기 (목소리 평균 크기보다 이만큼 작게)
     "bgm": False,                       # 배경음악 (사용자 요청으로 기본 끔)
     "bgm_gap_db": 9,                    # 배경음악을 켤 때 목소리보다 이만큼 작게
     "loudness": -14,
@@ -608,11 +608,13 @@ def main():
     # 5) 소리
     mix = np.zeros(int(SR * total), dtype=np.float32)
     mix[:len(voice)] += voice[:len(mix)]
-    vpeak = float(np.percentile(np.abs(voice), 99.9)) if len(voice) else 0.5
+    voiced = voice[np.abs(voice) > 0.02]
+    vrms = float(np.sqrt((voiced ** 2).mean())) if len(voiced) else 0.1
     for i, s in enumerate(scenes):
         if s.get("sfx"):
             fx = load_sfx(s["sfx"])
-            fx = fx / (np.abs(fx).max() + 1e-9) * vpeak * 10 ** (cfg["sfx_db"] / 20)
+            act = fx[np.abs(fx) > np.abs(fx).max() * 0.05]          # 소리 나는 부분의 크기 기준
+            fx = fx / (np.sqrt((act ** 2).mean()) + 1e-9) * vrms * 10 ** (cfg["sfx_db"] / 20)
             at = scene_times[i][0]
             if s.get("sfx_on"):                              # 이 단어가 나올 때 맞춰서
                 k = full.find(s["sfx_on"], spans[i][0], spans[i][1])
