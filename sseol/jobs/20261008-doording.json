@@ -1,0 +1,183 @@
+{
+  "id": "20261008-doording",
+  "title": [
+    "문콕 당했는데",
+    "월급이 깎인 썰"
+  ],
+  "title_yellow": 1,
+  "post_title": "문콕 당했는데 월급이 깎인 썰",
+  "source": "https://m.bobaedream.co.kr/board/bbs_view/best/1038124/2/1",
+  "scenes": [
+    {
+      "text": "문콕 당했는데 월급이 깎인 썰.",
+      "images": [
+        "board"
+      ]
+    },
+    {
+      "text": "영업팀에서 일하는 한 직장인이 있었음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2014/07/blog-post_25.html"
+        }
+      ]
+    },
+    {
+      "text": "하루 종일 외근이라, 회사 차를 타고 다님.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2016/04/blog-post_630.html#1"
+        },
+        {
+          "ai": "a simple gray company SUV car parked, side view"
+        }
+      ]
+    },
+    {
+      "text": "그런데 어느 날 차를 봤더니, 문에 콕 찍힌 자국이 있었음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2016/04/blog-post_630.html#6"
+        },
+        {
+          "ai": "close-up of a gray car door with a small round dent, simple illustration",
+          "fill": true
+        }
+      ],
+      "red": [
+        "콕"
+      ],
+      "sfx": "shock",
+      "sfx_on": "자국이"
+    },
+    {
+      "text": "누가 옆에서 문을 열다가 찍고 간 거임.",
+      "images": [
+        {
+          "ai": "a person carelessly opening a car door and hitting the side of the parked gray car next to it in a parking lot"
+        }
+      ]
+    },
+    {
+      "text": "회사에 말했더니, 이런 대답이 돌아옴.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2017/09/blog-post_45.html#1"
+        }
+      ]
+    },
+    {
+      "text": "그 차 렌터카라서, 반납할 때 면책금이 나와요.",
+      "sub": "\"그 차 렌터카라서 반납할 때 면책금이 나와요\"",
+      "color": "white",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2017/10/blog-post_994.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2014/07/blog-post_16.html"
+        }
+      ]
+    },
+    {
+      "text": "그러니까 월급에서 10만 원 뺄게요.",
+      "sub": "\"그러니까 월급에서 10만 원 뺄게요\"",
+      "color": "white",
+      "red": [
+        "10만 원"
+      ],
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2015/09/blog-post_59.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2018/10/blog-post_267.html#1"
+        }
+      ],
+      "sfx": "dundun",
+      "sfx_on": "10만"
+    },
+    {
+      "text": "본인이 찍은 것도 아니고, 일하다 당한 건데 말임.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2016/04/blog-post_630.html#3"
+        }
+      ]
+    },
+    {
+      "text": "덴트 집에 가면 더 싸게 고칠 수도 있는데, 그것도 안 된다고 함.",
+      "images": [
+        {
+          "ai": "a mechanic in a small auto body shop repairing a small dent on a car door"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2016/10/blog-post_5.html"
+        }
+      ]
+    },
+    {
+      "text": "10원 한 장도 손해 안 보려는 회사가, 너무 서운했다고 함.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2018/05/blog-post_973.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2021/04/blog-post_191.html"
+        }
+      ]
+    },
+    {
+      "text": "그런데 여기서 반전이 있음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2016/04/blog-post_630.html#7"
+        }
+      ],
+      "sfx": "scratch"
+    },
+    {
+      "text": "회사가 월급에서 마음대로 돈을 빼는 건, 원칙적으로 안 된다고 함.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2013/09/blog-post_7656.html"
+        },
+        {
+          "ai": "a wooden judge gavel on a sound block, simple illustration"
+        }
+      ]
+    },
+    {
+      "text": "근로기준법에, 임금은 전액을 줘야 한다고 나와 있기 때문임.",
+      "red": [
+        "전액"
+      ],
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2013/04/blog-post_7614.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2013/12/blog-post_2984.html"
+        }
+      ],
+      "sfx": "ding",
+      "sfx_on": "전액을"
+    },
+    {
+      "text": "결국 10만 원 아끼려다, 회사가 법에 문콕 당하게 생겼음.",
+      "red": [
+        "문콕"
+      ],
+      "images": [
+        {
+          "ai": "a nervous company boss in a suit sweating at his desk"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2016/04/blog-post_630.html#4"
+        }
+      ],
+      "sfx": "boing",
+      "sfx_on": "문콕"
+    }
+  ]
+}
