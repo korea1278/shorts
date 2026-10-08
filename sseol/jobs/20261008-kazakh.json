@@ -1,0 +1,26 @@
+{
+  "id": "20261008-kazakh",
+  "title": ["카자흐스탄 가면", "한국인이 겪는 일"],
+  "title_yellow": 1,
+  "post_title": "카자흐스탄에 가면 생기는 일",
+  "board": [],
+  "source": "https://m.bobaedream.co.kr/board/bbs_view/best/1038126/2/1",
+  "scenes": [
+    {"text": "카자흐스탄 가면 한국인이 겪는 일.", "images": ["board"]},
+    {"text": "카자흐스탄에 가면 의외로 놀라는 게 있음.", "images": [{"ira": "https://www.irasutoya.com/2017/08/blog-post_285.html"}, {"ai": "simple flat clipart of a wide Central Asian city street with mountains in the background, sunny day"}]},
+    {"text": "길에서 우리랑 닮은 얼굴을 자주 보게 됨.", "images": [{"ai": "simple flat clipart of a surprised East Asian tourist looking at friendly East Asian looking locals on a Central Asian street"}], "sfx": "huh"},
+    {"text": "바로 고려인이라고 불리는 우리 동포들임.", "images": [{"ai": "simple flat clipart of a smiling elderly Korean grandmother and grandfather in warm Central Asian clothing, friendly"}], "red": ["고려인"], "sfx": "ding"},
+    {"text": "1937년, 연해주에 살던 한인 약 17만 명이 화물열차에 실려 강제로 옮겨졌음.", "images": [{"ira": "https://www.irasutoya.com/2021/01/blog-post_37.html"}, {"ai": "simple flat clipart of a sad crowded old freight train wagon with people inside, 1930s, gloomy colors"}], "red": ["17만 명"]},
+    {"text": "내린 곳은 아무것도 없는 카자흐스탄 벌판이었음.", "images": [{"ira": "https://www.irasutoya.com/2019/05/blog-post_64.html"}], "sfx": "cricket"},
+    {"text": "그런데도 땅을 일구고 끝까지 버텨냈음.", "images": [{"ira": "https://www.irasutoya.com/2015/12/blog-post_513.html"}, {"ira": "https://www.irasutoya.com/2020/01/blog-post_55.html"}]},
+    {"text": "지금은 그 후손이 10만 명 넘게 살면서, 존경받는 사람도 많다고 함.", "images": [{"ai": "simple flat clipart of a big friendly crowd of people of many generations smiling together, families"}, {"ira": "https://www.irasutoya.com/2015/01/blog-post_883.html"}], "red": ["10만 명"]},
+    {"text": "그래서인지 한국을 보는 눈도 따뜻한 편임.", "images": [{"ai": "simple flat clipart of two people shaking hands warmly with hearts around them"}]},
+    {"text": "젊은 사람들은 케이팝 그룹을 직접 만들 정도임.", "images": [{"ira": "https://www.irasutoya.com/2013/12/blog-post_8837.html"}], "sfx": "pop"},
+    {"text": "현지 케이팝 대회에는 2천 명 넘게 모였다고 함.", "images": [{"ira": "https://www.irasutoya.com/2013/09/blog-post_7432.html"}, {"ira": "https://www.irasutoya.com/2017/12/blog-post_796.html"}], "red": ["2천 명"]},
+    {"text": "김치랑 불고기도 인기가 많고,", "images": [{"ira": "https://www.irasutoya.com/2014/10/blog-post_23.html"}, {"ira": "https://www.irasutoya.com/2013/08/blog-post_3504.html"}]},
+    {"text": "한국어를 배우려는 사람도 엄청 많음.", "images": [{"ira": "https://www.irasutoya.com/2019/12/blog-post_24.html"}, {"ira": "https://www.irasutoya.com/2019/12/blog-post_3.html"}]},
+    {"text": "신청자가 너무 많아서, 교실이 모자랄 정도였다고 함.", "images": [{"ira": "https://www.irasutoya.com/2014/03/blog-post_6094.html"}, {"ai": "simple flat clipart of an overcrowded small classroom with students squeezed together, funny"}], "sfx": "boing", "sfx_on": "모자랄"},
+    {"text": "그러니 한국인이라고 하면 이런 말이 돌아올 수도 있음.", "images": [{"ira": "https://www.irasutoya.com/2017/08/blog-post_285.html"}]},
+    {"text": "안녕하세요, 저 한국어 배웠어요.", "sub": "\"안녕하세요 저 한국어 배웠어요\"", "color": "white", "images": [{"ira": "https://www.irasutoya.com/2013/08/blog-post_787.html"}], "sfx": "tada"}
+  ]
+}
