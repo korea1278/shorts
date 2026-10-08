@@ -1,0 +1,25 @@
+{
+  "id": "20261008-housecar",
+  "title": ["10년 전 신입들의", "행복한 고민"],
+  "title_yellow": 0,
+  "post_title": "10년 전 신입들의 행복한 고민",
+  "source": "https://m.dcinside.com/board/dcbest/468744",
+  "scenes": [
+    {"text": "10년 전 신입들의 행복한 고민", "images": ["board"]},
+    {"text": "지금 마흔 언저리인 영포티들이 갓 신입 딱지 떼던 시절", "images": [{"ira": "https://www.irasutoya.com/2012/02/blog-post_47.html"}, {"ira": "https://www.irasutoya.com/2012/02/blog-post_1278.html"}]},
+    {"text": "인터넷에 자주 올라오던 고민이 있었음", "images": [{"ira": "https://www.irasutoya.com/2018/03/blog-post_56.html"}]},
+    {"text": "바로 집이냐 차냐", "images": [{"ira": "https://www.irasutoya.com/2013/12/blog-post_13.html"}, {"ai": "a simple cute small red hatchback car, side view"}], "sfx": "dundun"},
+    {"text": "월급 모아서 둘 중에 뭘 먼저 사야 하냐는 거임", "images": [{"ira": "https://www.irasutoya.com/2013/04/blog-post_1970.html"}, {"ira": "https://www.irasutoya.com/2014/02/blog-post_4488.html"}]},
+    {"text": "댓글은 사는 스타일 따라 고르라는 사람부터 무조건 집이라는 사람까지 진지했음", "images": [{"ira": "https://www.irasutoya.com/2015/10/blog-post_19.html"}, {"ira": "https://www.irasutoya.com/2018/03/blog-post_83.html"}]},
+    {"text": "근데 이게 어떻게 가능했냐면", "images": [{"ira": "https://www.irasutoya.com/2016/04/blog-post_78.html"}], "sfx": "pop"},
+    {"text": "2014년에 주택담보대출 한도가 집값의 70%까지 풀렸거든", "sub": ["2014년 주택담보대출 한도가", "집값의 70%까지 풀림"], "red": ["70%까지"], "images": [{"ira": "https://www.irasutoya.com/2014/10/blog-post_870.html"}]},
+    {"text": "차 살 돈을 모으면 거기에 조금 보태고 대출받아서", "images": [{"ira": "https://www.irasutoya.com/2017/11/blog-post_37.html"}]},
+    {"text": "바로 집을 살 수 있었다는 거임", "images": [{"ira": "https://www.irasutoya.com/2013/12/blog-post_6366.html"}], "sfx": "ding"},
+    {"text": "집값이 폭등하기 전이라 가능했던 이야기", "images": [{"ira": "https://www.irasutoya.com/2012/07/blog-post_22.html"}]},
+    {"text": "그럼 지금은?", "pause": 0.4, "images": [{"ai": "a shocked young office worker with wide eyes and open mouth, upper body"}], "sfx": "whoosh"},
+    {"text": "서울 아파트 평균 매매가가 16억을 넘었음", "red": ["16억을"], "images": [{"ira": "https://www.irasutoya.com/2013/01/blog-post_4376.html"}], "sfx": "dundun"},
+    {"text": "근데 15억 넘는 집은 대출이 최대 4억까지만 나옴", "red": ["4억까지만"], "images": [{"ira": "https://www.irasutoya.com/2015/03/blog-post_879.html"}]},
+    {"text": "이제는 집이냐 차냐가 아니라", "images": [{"ai": "a small house and a small car side by side, both far away and out of reach behind a tall fence"}]},
+    {"text": "둘 다 꿈같은 이야기가 됐다고 함", "images": [{"ira": "https://www.irasutoya.com/2016/05/blog-post_642.html"}, {"ira": "https://www.irasutoya.com/2015/07/blog-post_82.html"}], "sfx": "fail"}
+  ]
+}
