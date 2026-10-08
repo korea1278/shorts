@@ -1,0 +1,723 @@
+#!/usr/bin/env python3
+"""썰 쇼츠 자동 제작 엔진
+
+사용법:
+    python3 sseol/make_short.py sseol/jobs/<작업이름>.json
+    python3 sseol/make_short.py sseol/jobs/<작업이름>.json --test   # API 없이 시험 렌더
+
+레퍼런스(커뮤니티 썰 쇼츠) 형식 — 자세한 수치는 sseol/REFERENCE.md
+  검은 배경 · 맨 위 아주 두꺼운 2줄 제목(노랑/흰) · 가운데 그림(이라스토야 또는 AI)
+  · 그림 아래쪽 검은 상자 자막(노랑) · 시작은 게시판 목록에서 글을 클릭하는 화면
+  · 자연스러운 나레이션(긴 쉼만 줄임) · 웃음 포인트 효과음 · 배경음악 없음(설정으로 켤 수 있음) · 구독 부탁 없이 끝
+
+장면 그림(images)은 여러 개 넣으면 장면 시간을 나눠 차례로 보여준다. 항목 형식:
+  {"ira": "이라스토야 글 주소 또는 그림 주소"}   흰 바탕에 그림 (영상 1편 20장까지)
+  {"ai": "English prompt"}                     AI 그림
+  "board"                                      게시판 목록 클릭 화면 (보통 첫 장면)
+
+API 키는 환경변수(ELEVENLABS_API_KEY, OPENAI_API_KEY)가 있으면 쓰고,
+없으면 클로드 코드 클라우드 환경의 "API credentials"가 자동으로 붙여준다고 보고 키 없이 요청한다.
+"""
+import base64
+import json
+import math
+import os
+import re
+import subprocess
+import sys
+import urllib.request
+import wave
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import irasutoya  # noqa: E402
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
+W, H, FPS = 1080, 1920, 30
+SR = 44100
+
+# ── 레이아웃 (레퍼런스 측정값, 1080x1920 기준) ──────────────────
+BG = (0, 0, 0)
+TITLE_CENTERS = (268, 400)                  # 제목 두 줄 세로 중심
+TITLE_MAX_W = 1040
+IMG_TOP, IMG_H = 480, 960                   # 그림 영역 (가로 꽉 참)
+SUB_CENTER_Y = 1362                         # 자막 상자 중심 (그림 아래쪽 안)
+SUB_MAX_CHARS = 12                          # 자막 한 줄 최대 글자 수 (공백 제외)
+WHITE, YELLOW, RED = (255, 255, 255), (255, 236, 0), (255, 50, 40)
+ZOOM_END = 1.04
+IRA_LIMIT = 20                              # 이라스토야 영상 1편 최대 장수
+
+DEFAULT_CONFIG = {
+    "voice_id": "",
+    "tts_model": "eleven_v3",           # 가장 자연스러운 최신 모델 (사용자 선택)
+    "voice_settings": {"stability": 0.5, "similarity_boost": 0.8},
+    "tempo": 1.25,                      # 배속 (목소리 높이는 그대로, 말만 빠르게)
+    "max_pause": 0.3,                   # 배속 뒤 이보다 긴 쉼은 줄인다
+    "pause_to": 0.22,
+    "image_model": "gpt-image-1",
+    "image_quality": "medium",
+    "image_style": (
+        "Simple, cute Japanese-style flat clip-art illustration with soft pastel colors and thin outlines, "
+        "plain white background, single clear subject, no text, no letters, no numbers, no logos, no watermark. "
+        "No real, identifiable people or celebrities; no existing cartoon characters or memes."
+    ),
+    "sfx_db": -10,                      # 효과음 크기 (목소리 평균 크기보다 이만큼 작게)
+    "bgm": False,                       # 배경음악 (사용자 요청으로 기본 끔)
+    "bgm_gap_db": 9,                    # 배경음악을 켤 때 목소리보다 이만큼 작게
+    "loudness": -14,
+}
+
+FONT_SOURCES = {
+    "black": [("Pretendard-Black.otf",
+               "https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/public/static/Pretendard-Black.otf")],
+    "bold": [("Pretendard-ExtraBold.otf",
+              "https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/public/static/Pretendard-ExtraBold.otf")],
+    "regular": [("Pretendard-Medium.otf",
+                 "https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/public/static/Pretendard-Medium.otf")],
+}
+
+DEFAULT_BOARD = [
+    "요즘 편의점 알바 근황", "의외로 모르는 사람 많은 생활 꿀팁", "회사에서 있었던 레전드 사건",
+    "우리 동네 중국집 사장님 클라스", "생각보다 비싼 물건들", "엄마가 보낸 카톡 모음",
+    "군대에서 진짜 있었던 일", "요즘 초등학생들 수준", "택배 기사님이 남긴 메모",
+]
+
+
+def log(*a):
+    print("▶", *a, flush=True)
+
+
+def load_config():
+    cfg = dict(DEFAULT_CONFIG)
+    p = os.path.join(ROOT, "config.json")
+    if os.path.exists(p):
+        with open(p, encoding="utf-8") as f:
+            cfg.update(json.load(f))
+    return cfg
+
+
+def http_json(url, payload, headers):
+    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+    req.add_header("Content-Type", "application/json")
+    for k, v in headers.items():
+        req.add_header(k, v)
+    with urllib.request.urlopen(req, timeout=300) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def font_path(kind):
+    fdir = os.path.join(ROOT, "fonts")
+    os.makedirs(fdir, exist_ok=True)
+    for name, url in FONT_SOURCES[kind]:
+        p = os.path.join(fdir, name)
+        if os.path.exists(p) and os.path.getsize(p) > 10000:
+            return p
+        urllib.request.urlretrieve(url, p)
+        ImageFont.truetype(p, 40)
+        log(f"폰트 받음: {name}")
+        return p
+
+
+# ── 나레이션 ────────────────────────────────────────────
+def tts_elevenlabs(text, cfg, out_mp3):
+    if not cfg.get("voice_id"):
+        raise RuntimeError("sseol/config.json 에 voice_id(일레븐랩스 목소리 ID)를 넣어주세요")
+    headers = {}
+    if os.environ.get("ELEVENLABS_API_KEY"):
+        headers["xi-api-key"] = os.environ["ELEVENLABS_API_KEY"]
+    url = (f"https://api.elevenlabs.io/v1/text-to-speech/{cfg['voice_id']}/with-timestamps"
+           f"?output_format=mp3_44100_128")
+    res = http_json(url, {"text": text, "model_id": cfg["tts_model"],
+                          "voice_settings": cfg["voice_settings"]}, headers)
+    with open(out_mp3, "wb") as f:
+        f.write(base64.b64decode(res["audio_base64"]))
+    al = res.get("alignment") or res.get("normalized_alignment")
+    return al["character_start_times_seconds"], al["character_end_times_seconds"]
+
+
+def mp3_to_array(path):
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-f", "s16le", "-ac", "1", "-ar", str(SR), "-"],
+                         check=True, capture_output=True).stdout
+    return np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+
+
+def shorten_pauses(voice, starts, ends, max_pause, pause_to):
+    """긴 쉼을 줄여 쉬지 않고 이어 말하게 한다. 글자 타이밍도 같이 옮긴다."""
+    hop = int(SR * 0.01)
+    n = len(voice) // hop
+    rms = np.sqrt((voice[:n * hop].reshape(n, hop) ** 2).mean(1) + 1e-12)
+    silent = 20 * np.log10(rms / (rms.max() + 1e-9)) < -38
+    cuts = []
+    i = 0
+    while i < n:
+        if silent[i]:
+            j = i
+            while j < n and silent[j]:
+                j += 1
+            a, b = i * hop / SR, j * hop / SR
+            keep = 0.03 if i == 0 else 0.2 if j == n else (pause_to if b - a > max_pause else b - a)
+            if b - a > keep:
+                m = (a + b) / 2
+                cuts.append((m - (b - a - keep) / 2, m + (b - a - keep) / 2))
+            i = j
+        else:
+            i += 1
+    if not cuts:
+        return voice, starts, ends
+    pieces, last = [], 0
+    for a, b in cuts:
+        pieces.append(voice[last:int(a * SR)])
+        last = int(b * SR)
+    pieces.append(voice[last:])
+
+    def remap(t):
+        removed = 0.0
+        for a, b in cuts:
+            if t >= b:
+                removed += b - a
+            elif t > a:
+                removed += t - a
+                break
+            else:
+                break
+        return t - removed
+
+    return np.concatenate(pieces), [remap(t) for t in starts], [remap(t) for t in ends]
+
+
+def speed_up(voice, starts, ends, tempo):
+    """목소리 높이는 그대로 두고 배속 (ffmpeg atempo). 글자 타이밍도 같이 줄인다."""
+    if abs(tempo - 1.0) < 1e-3:
+        return voice, starts, ends
+    pcm = (np.clip(voice, -1, 1) * 32767).astype(np.int16).tobytes()
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-f", "s16le", "-ac", "1", "-ar", str(SR), "-i", "-",
+                          "-af", f"atempo={tempo}", "-f", "s16le", "-ac", "1", "-ar", str(SR), "-"],
+                         input=pcm, check=True, capture_output=True).stdout
+    out = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    return out, [t / tempo for t in starts], [t / tempo for t in ends]
+
+
+def insert_pause(voice, starts, ends, at, dur):
+    """at 초 위치에 dur 초 쉼을 넣는다 (웃음 포인트 앞 '뜸')."""
+    k = int(at * SR)
+    voice = np.concatenate([voice[:k], np.zeros(int(dur * SR), np.float32), voice[k:]])
+    starts = [t + dur if t >= at - 1e-6 else t for t in starts]
+    ends = [t + dur if t > at else t for t in ends]
+    return voice, starts, ends
+
+
+# ── 그림 ────────────────────────────────────────────────
+def gen_image(prompt, cfg, out_png):
+    headers = {}
+    if os.environ.get("OPENAI_API_KEY"):
+        headers["Authorization"] = "Bearer " + os.environ["OPENAI_API_KEY"]
+    res = http_json("https://api.openai.com/v1/images/generations",
+                    {"model": cfg["image_model"], "prompt": f"{prompt}\n\nStyle: {cfg['image_style']}",
+                     "size": "1536x1024", "quality": cfg["image_quality"], "n": 1}, headers)
+    with open(out_png, "wb") as f:
+        f.write(base64.b64decode(res["data"][0]["b64_json"]))
+
+
+def fetch_irasutoya(ref, out_png):
+    """글 주소면 그 글의 첫 그림(또는 #2 처럼 번호), 그림 주소면 그대로 받는다."""
+    url, n = ref, 1
+    m = re.match(r"(.*)#(\d+)$", ref)
+    if m:
+        url, n = m.group(1), int(m.group(2))
+    if re.search(r"irasutoya\.com/\d{4}/\d{2}/", url):
+        imgs = irasutoya.images(url)
+        if not imgs:
+            raise RuntimeError(f"이라스토야 그림을 못 찾음: {url}")
+        url = imgs[min(n, len(imgs)) - 1]
+    data = irasutoya.get(url)
+    with open(out_png, "wb") as f:
+        f.write(data)
+    return url
+
+
+def fit_into(img, w, h, bg=(255, 255, 255), pad=36):
+    """흰 바탕 w x h 안에 그림을 비율 그대로 넣는다 (투명 부분은 흰색)."""
+    canvas = Image.new("RGB", (w, h), bg)
+    im = img.convert("RGBA")
+    s = min((w - 2 * pad) / im.width, (h - 2 * pad) / im.height)
+    im = im.resize((max(1, int(im.width * s)), max(1, int(im.height * s))), Image.LANCZOS)
+    canvas.paste(im, ((w - im.width) // 2, (h - im.height) // 2), im)
+    return canvas
+
+
+def cover(img, w, h):
+    s = max(w / img.width, h / img.height)
+    im = img.convert("RGB").resize((math.ceil(img.width * s), math.ceil(img.height * s)), Image.LANCZOS)
+    x, y = (im.width - w) // 2, (im.height - h) // 2
+    return im.crop((x, y, x + w, y + h))
+
+
+def placeholder_image(i, label, w, h):
+    rng = np.random.default_rng(i + 7)
+    c = tuple(int(v) for v in rng.integers(150, 235, 3))
+    im = Image.new("RGB", (w, h), c)
+    d = ImageDraw.Draw(im)
+    d.text((w / 2, h / 2), f"그림 {i}", font=ImageFont.truetype(font_path("bold"), 70), fill=(60, 60, 60),
+           anchor="mm")
+    return im
+
+
+# ── 게시판 목록 클릭 화면 ──────────────────────────────────
+def make_board(post_title, others):
+    """어두운 게시판 목록 (사이트 이름·로고 없음). 가운데 줄이 이번 글."""
+    rows = 9
+    rh = IMG_H // rows
+    im = Image.new("RGB", (W, IMG_H), (14, 14, 18))
+    d = ImageDraw.Draw(im)
+    f = ImageFont.truetype(font_path("regular"), 38)
+    fb = ImageFont.truetype(font_path("bold"), 38)
+    titles = list(others[:rows - 1])
+    titles.insert(rows // 2, post_title)
+    for i, t in enumerate(titles):
+        y = i * rh
+        me = i == rows // 2
+        if me:
+            d.rectangle((0, y, W, y + rh), fill=(44, 34, 74))
+        d.line((0, y + rh - 1, W, y + rh - 1), fill=(32, 32, 40), width=2)
+        d.rounded_rectangle((28, y + rh / 2 - 13, 56, y + rh / 2 + 13), 4,
+                            outline=(120, 170, 120) if me else (70, 90, 70), width=3)
+        d.text((76, y + rh / 2), t, font=fb if me else f, fill=(250, 250, 250) if me else (110, 110, 118),
+               anchor="lm")
+    return im
+
+
+def make_cursor(scale=1.0):
+    s = int(64 * scale)
+    cur = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(cur)
+    pts = [(0.05, 0.02), (0.05, 0.78), (0.24, 0.6), (0.38, 0.92), (0.5, 0.86), (0.36, 0.55), (0.62, 0.55)]
+    d.polygon([(x * s, y * s) for x, y in pts], fill=(255, 255, 255), outline=(0, 0, 0), width=max(2, s // 20))
+    return cur
+
+
+# ── 소리 (직접 합성) ─────────────────────────────────────
+def _env(n, a=0.005, decay=8.0):
+    t = np.arange(n) / SR
+    return np.minimum(1, t / a) * np.exp(-t * decay)
+
+
+def sfx(name):
+    t = np.arange(int(SR * 0.6)) / SR
+    if name == "pop":
+        n = int(SR * 0.12)
+        tt = t[:n]
+        out = np.sin(2 * np.pi * (500 * tt + 4000 * tt ** 2)) * _env(n, 0.002, 30)
+    elif name == "ding":
+        out = (np.sin(2 * np.pi * 1318.5 * t) + 0.35 * np.sin(2 * np.pi * 2637 * t)
+               + 0.15 * np.sin(2 * np.pi * 3955.5 * t)) * _env(len(t), 0.003, 6)
+    elif name == "kaching":                     # 띠링 (돈 소리)
+        out = np.zeros(len(t))
+        for st, fr in ((0.0, 2093.0), (0.09, 2637.0)):
+            k = int(st * SR)
+            tt = np.arange(len(t) - k) / SR
+            out[k:] += (np.sin(2 * np.pi * fr * tt) + 0.4 * np.sin(2 * np.pi * fr * 1.5 * tt)) * _env(len(tt), 0.002, 9)
+    elif name == "tada":                        # 짜잔
+        out = np.zeros(int(SR * 0.9))
+        for st, fr in ((0.0, 523.25), (0.12, 783.99)):
+            k = int(st * SR)
+            n = len(out) - k
+            tt = np.arange(n) / SR
+            out[k:] += sum(np.sin(2 * np.pi * fr * h * tt) / h for h in (1, 2, 3)) * _env(n, 0.005, 3.5)
+    elif name == "boing":
+        f = 180 + 120 * np.exp(-t * 6) * np.sin(2 * np.pi * 9 * t)
+        out = np.sin(2 * np.pi * np.cumsum(f) / SR) * _env(len(t), 0.005, 5)
+    elif name == "whoosh":
+        rng = np.random.default_rng(3)
+        nz = rng.standard_normal(len(t))
+        k = np.convolve(nz, np.ones(12) / 12, "same")
+        out = (nz - k) * np.sin(np.pi * t / t[-1]) ** 2 * 0.6
+    elif name == "dundun":                      # 두둥
+        out = np.zeros(len(t))
+        for st in (0.0, 0.22):
+            k = int(st * SR)
+            n = len(t) - k
+            tt = np.arange(n) / SR
+            out[k:] += np.sin(2 * np.pi * (70 * tt - 30 * tt ** 2)) * _env(n, 0.003, 6)
+    elif name == "fail":                        # 띠로리 (내려가는 세 음)
+        out = np.zeros(int(SR * 0.9))
+        for i, fr in enumerate((523, 494, 466)):
+            k = int(i * 0.22 * SR)
+            n = int(0.3 * SR)
+            tt = np.arange(n) / SR
+            out[k:k + n] += np.sign(np.sin(2 * np.pi * fr * tt)) * 0.35 * _env(n, 0.004, 5)
+    else:
+        return np.zeros(1, np.float32)
+    return (out / (np.abs(out).max() + 1e-9) * 0.22).astype(np.float32)
+
+
+def load_sfx(name):
+    """sseol/sfx/<이름>.mp3(.wav) 가 있으면 그 소리, 없으면 직접 만든 소리"""
+    for ext in (".mp3", ".wav"):
+        p = os.path.join(ROOT, "sfx", name + ext)
+        if os.path.exists(p):
+            return mp3_to_array(p)
+    return sfx(name)
+
+
+def pluck(freq, dur, rng):
+    """카플러스-스트롱 기타 뜯는 소리"""
+    n = int(SR * dur)
+    p = max(2, int(SR / freq))
+    buf = rng.uniform(-1, 1, p)
+    out = np.zeros(n)
+    for i in range(n):
+        out[i] = buf[i % p]
+        buf[i % p] = 0.5 * (buf[i % p] + buf[(i + 1) % p]) * 0.996
+    return out
+
+
+def make_bgm(total, rms_target):
+    """저작권 걱정 없는 경쾌한 배경음악 (120BPM 기타 뜯기 + 가벼운 박자)"""
+    rng = np.random.default_rng(5)
+    beat = 0.5
+    prog = [(261.63, 329.63, 392.00), (196.00, 246.94, 293.66),
+            (220.00, 261.63, 329.63), (174.61, 220.00, 261.63)]   # C G Am F
+    notes = {}
+    n = int(SR * (total + 1))
+    out = np.zeros(n)
+    step = beat / 2
+    k = 0
+    while k * step < total + 0.5:
+        bar = int(k * step // (beat * 4))
+        ch = prog[bar % 4]
+        pat = [0, 1, 2, 1, 0, 2, 1, 2]
+        f = ch[pat[k % 8]] * (2 if k % 8 in (2, 5) else 1)
+        key = round(f, 1)
+        if key not in notes:
+            notes[key] = pluck(f, 0.6, rng)
+        a = int(k * step * SR)
+        seg = notes[key][:n - a]
+        out[a:a + len(seg)] += seg * (1.0 if k % 2 == 0 else 0.7)
+        if k % 2 == 0:                                         # 가벼운 하이햇
+            hh = rng.standard_normal(int(0.03 * SR)) * _env(int(0.03 * SR), 0.001, 120) * 0.25
+            out[a:a + len(hh)] += hh[:n - a]
+        if k % 4 == 0:                                         # 부드러운 킥
+            kn = int(0.18 * SR)
+            tt = np.arange(kn) / SR
+            kick = np.sin(2 * np.pi * (90 * tt - 120 * tt ** 2)) * _env(kn, 0.002, 18) * 0.8
+            out[a:a + kn] += kick[:n - a]
+        k += 1
+    out = out[:int(SR * total)]
+    return (out / (np.sqrt((out ** 2).mean()) + 1e-9) * rms_target).astype(np.float32)
+
+
+def load_bgm(path, total):
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-stream_loop", "-1", "-i", path, "-t", f"{total:.2f}",
+                          "-f", "s16le", "-ac", "1", "-ar", str(SR), "-"],
+                         check=True, capture_output=True).stdout
+    return np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+
+
+# ── 글자 ────────────────────────────────────────────────
+def fit_font(path, lines, max_w, start, min_size=40):
+    tmp = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    size = start
+    while size > min_size:
+        f = ImageFont.truetype(path, size)
+        if all(tmp.textlength(l, font=f) <= max_w for l in lines):
+            return f
+        size -= 2
+    return ImageFont.truetype(path, min_size)
+
+
+def make_title(lines, yellow_line):
+    layer = Image.new("RGBA", (W, IMG_TOP), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    lines = [l for l in lines if l][:2]
+    f = fit_font(font_path("black"), lines, TITLE_MAX_W, 136, 70)
+    centers = TITLE_CENTERS if len(lines) == 2 else ((TITLE_CENTERS[0] + TITLE_CENTERS[1]) // 2,)
+    for i, l in enumerate(lines):
+        d.text((W / 2, centers[i]), l, font=f, fill=YELLOW if i == yellow_line else WHITE, anchor="mm")
+    return layer
+
+
+def chunk_text(text, max_chars=SUB_MAX_CHARS):
+    words = text.split()
+    chunks, cur = [], ""
+    for w in words:
+        cand = (cur + " " + w).strip()
+        if len(cand.replace(" ", "")) > max_chars and cur:
+            chunks.append(cur)
+            cur = w
+        else:
+            cur = cand
+    if cur:
+        if chunks and len(cur.replace(" ", "")) <= 3:      # "함" 같은 짧은 꼬리는 앞 줄에 붙인다
+            chunks[-1] += " " + cur
+        else:
+            chunks.append(cur)
+    return chunks
+
+
+def make_sub(text, color, reds):
+    """검은 상자 + 노란(또는 흰) 글자. reds 에 든 단어는 빨간색."""
+    f = fit_font(font_path("bold"), [text], W - 100, 62, 42)
+    tmp = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    words = text.split(" ")
+    sp = tmp.textlength(" ", font=f)
+    widths = [tmp.textlength(w, font=f) for w in words]
+    tw = sum(widths) + sp * (len(words) - 1)
+    asc, desc = f.getmetrics()
+    bw, bh = int(tw + 36), int(asc + desc + 14)
+    layer = Image.new("RGBA", (W, bh), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    x0 = (W - bw) // 2
+    d.rectangle((x0, 0, x0 + bw, bh), fill=(0, 0, 0, 235))
+    x = x0 + 18
+    base = YELLOW if color == "yellow" else WHITE if color == "white" else RED
+    rs = {w for r in (reds or []) for w in r.split()}
+    for w, ww in zip(words, widths):
+        d.text((x, bh / 2), w, font=f, fill=RED if w in rs else base, anchor="lm")
+        x += ww + sp
+    return layer
+
+
+# ── 메인 ────────────────────────────────────────────────
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(1)
+    job_path = sys.argv[1]
+    test_mode = "--test" in sys.argv
+    cfg = load_config()
+    with open(job_path, encoding="utf-8") as f:
+        job = json.load(f)
+    job_id = job.get("id") or os.path.splitext(os.path.basename(job_path))[0]
+    out_dir = os.path.join(ROOT, "output", job_id)
+    work = os.path.join(out_dir, "work")
+    os.makedirs(work, exist_ok=True)
+    scenes = job["scenes"]
+
+    # 1) 나레이션 원고
+    full, spans = "", []
+    for s in scenes:
+        t = re.sub(r"\s+", " ", s["text"]).strip()
+        if full:
+            full += " "
+        spans.append((len(full), len(full) + len(t)))
+        full += t
+    log(f"나레이션 {len(full)}자 (공백 제외 {len(full.replace(' ', ''))}자), 장면 {len(scenes)}개")
+
+    # 2) 나레이션 생성
+    mp3 = os.path.join(work, "voice.mp3")
+    if test_mode:
+        per = 0.15
+        starts = [i * per for i in range(len(full))]
+        ends = [(i + 1) * per for i in range(len(full))]
+        voice = np.zeros(int(SR * (len(full) * per)), dtype=np.float32)
+        log("시험 모드: 무음 나레이션")
+    else:
+        meta = json.dumps([full, cfg["voice_id"], cfg["tts_model"], cfg["voice_settings"]], ensure_ascii=False)
+        cached = False
+        if os.path.exists(mp3) and os.path.exists(mp3 + ".json"):
+            with open(mp3 + ".json") as f:
+                saved = json.load(f)
+            if saved.get("meta") == meta:
+                starts, ends = saved["starts"], saved["ends"]
+                cached = True
+                log("이전에 만든 나레이션 재사용")
+        if not cached:
+            log("일레븐랩스 나레이션 만드는 중…")
+            starts, ends = tts_elevenlabs(full, cfg, mp3)
+            with open(mp3 + ".json", "w") as f:
+                json.dump({"meta": meta, "starts": starts, "ends": ends}, f)
+        voice = mp3_to_array(mp3)
+        voice, starts, ends = speed_up(voice, starts, ends, float(cfg.get("tempo", 1.0)))
+        voice, starts, ends = shorten_pauses(voice, starts, ends, cfg["max_pause"], cfg["pause_to"])
+    for i in range(len(scenes) - 1, 0, -1):               # 웃음 포인트 앞 '뜸'
+        if scenes[i].get("pause"):
+            at = starts[spans[i][0]] - 0.02
+            voice, starts, ends = insert_pause(voice, starts, ends, at, float(scenes[i]["pause"]))
+    voice_len = len(voice) / SR
+    log(f"나레이션 {voice_len:.1f}초 (초당 {len(full.replace(' ', '')) / voice_len:.1f}글자)")
+    total = voice_len + 0.35
+
+    def t_at(ci, use_end=False):
+        ci = max(0, min(ci, len(starts) - 1))
+        return ends[ci] if use_end else starts[ci]
+
+    scene_times = []
+    for i, (a, b) in enumerate(spans):
+        st = 0.0 if i == 0 else t_at(a)
+        en = total if i == len(spans) - 1 else t_at(spans[i + 1][0])
+        scene_times.append((st, en))
+
+    # 3) 자막 (장면별 sub 가 있으면 그 글로, 없으면 나레이션을 잘라서)
+    subs = []
+    for i, s in enumerate(scenes):
+        a, b = spans[i]
+        color, reds = s.get("color", "yellow"), s.get("red", [])
+        if s.get("sub") is not None:
+            lines = s["sub"] if isinstance(s["sub"], list) else [s["sub"]]
+            st, en = scene_times[i]
+            for j, l in enumerate(lines):
+                if l:
+                    subs.append([st + (en - st) * j / len(lines), st + (en - st) * (j + 1) / len(lines),
+                                 make_sub(l, color, reds)])
+            continue
+        seg = full[a:b]
+        pos = 0
+        for ch in chunk_text(seg):
+            k = seg.find(ch, pos)
+            k = pos if k < 0 else k
+            pos = k + len(ch)
+            subs.append([t_at(a + k), t_at(a + pos - 1, True), make_sub(re.sub(r"[.,…]+", "", ch).strip(), color, reds)])
+    subs.sort(key=lambda x: x[0])
+    for j in range(len(subs) - 1):
+        subs[j][1] = subs[j + 1][0]
+    if subs:
+        subs[-1][1] = total
+
+    # 4) 그림
+    post_title = job.get("post_title") or " ".join(job["title"])
+    board = make_board(post_title, job.get("board") or DEFAULT_BOARD)
+    slots = []           # (시작, 끝, 그림 또는 "board")
+    credits, n_ira, n = [], 0, 0
+    for i, s in enumerate(scenes):
+        items = s.get("images") or ["board" if i == 0 else {"ai": s["text"]}]
+        st, en = scene_times[i]
+        for j, it in enumerate(items):
+            a = st + (en - st) * j / len(items)
+            b = st + (en - st) * (j + 1) / len(items)
+            if it == "board":
+                slots.append((a, b, "board"))
+                continue
+            n += 1
+            p = os.path.join(work, f"img_{i + 1:02d}_{j + 1}.png")
+            if "ira" in it:
+                n_ira += 1
+                if n_ira > IRA_LIMIT:
+                    raise RuntimeError(f"이라스토야 그림이 {IRA_LIMIT}장을 넘었습니다. 일부를 AI 그림으로 바꿔 주세요")
+                if test_mode and not os.path.exists(p):
+                    img = placeholder_image(n, "", W, IMG_H)
+                else:
+                    if not os.path.exists(p):
+                        log(f"이라스토야 그림 받는 중… ({os.path.basename(p)})")
+                        fetch_irasutoya(it["ira"], p)
+                    img = Image.open(p)
+                credits.append(it["ira"])
+                slots.append((a, b, fit_into(img, W, IMG_H)))
+            else:
+                if not os.path.exists(p):
+                    if test_mode:
+                        placeholder_image(n, "", W, IMG_H).save(p)
+                    else:
+                        log(f"AI 그림 만드는 중… ({os.path.basename(p)})")
+                        gen_image(it["ai"], cfg, p)
+                img = Image.open(p)
+                slots.append((a, b, cover(img, W, IMG_H) if it.get("fill") else fit_into(img, W, IMG_H, pad=0)))
+    with open(os.path.join(out_dir, "credits.txt"), "w", encoding="utf-8") as f:
+        f.write(f"이라스토야 그림 {n_ira}장 (영상 1편 {IRA_LIMIT}장까지)\n")
+        f.write("\n".join(credits) + "\n")
+    log(f"그림 {len(slots)}칸 (이라스토야 {n_ira}장)")
+
+    # 5) 소리
+    mix = np.zeros(int(SR * total), dtype=np.float32)
+    mix[:len(voice)] += voice[:len(mix)]
+    voiced = voice[np.abs(voice) > 0.02]
+    vrms = float(np.sqrt((voiced ** 2).mean())) if len(voiced) else 0.1
+    for i, s in enumerate(scenes):
+        if s.get("sfx"):
+            fx = load_sfx(s["sfx"])
+            act = fx[np.abs(fx) > np.abs(fx).max() * 0.05]          # 소리 나는 부분의 크기 기준
+            fx = fx / (np.sqrt((act ** 2).mean()) + 1e-9) * vrms * 10 ** (cfg["sfx_db"] / 20)
+            at = scene_times[i][0]
+            if s.get("sfx_on"):                              # 이 단어가 나올 때 맞춰서
+                k = full.find(s["sfx_on"], spans[i][0], spans[i][1])
+                if k >= 0:
+                    at = t_at(k)
+            at += float(s.get("sfx_at", 0))
+            k = max(0, int(at * SR))
+            mix[k:k + len(fx)] += fx[:len(mix) - k]
+    voiced = voice[np.abs(voice) > 0.02]
+    vrms = float(np.sqrt((voiced ** 2).mean())) if len(voiced) else 0.1
+    target = vrms * 10 ** (-cfg["bgm_gap_db"] / 20)
+    bdir = os.path.join(ROOT, "bgm")
+    cands = sorted(f for f in os.listdir(bdir) if f.lower().endswith((".mp3", ".wav", ".m4a"))) \
+        if os.path.isdir(bdir) else []
+    if not cfg.get("bgm"):
+        log("배경음악: 없음")
+    elif cands:
+        name = job.get("bgm") if job.get("bgm") in cands else cands[0]
+        log(f"배경음악: {name}")
+        b = load_bgm(os.path.join(bdir, name), total)[:len(mix)]
+        mix[:len(b)] += b / (np.sqrt((b ** 2).mean()) + 1e-9) * target
+    else:
+        log("배경음악: 직접 만든 경쾌한 기타 반주")
+        mix += make_bgm(total, target)[:len(mix)]
+    fade = int(SR * 0.25)
+    mix[-fade:] *= np.linspace(1, 0, fade)
+    wav_path = os.path.join(work, "mix.wav")
+    with wave.open(wav_path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes((np.clip(mix, -1, 1) * 32767).astype(np.int16).tobytes())
+
+    # 음량 맞추기 (loudnorm 2단계: 먼저 재고, 잰 값으로 정확히 맞춤)
+    lt = cfg["loudness"]
+    meas = subprocess.run(["ffmpeg", "-v", "info", "-i", wav_path, "-af",
+                           f"loudnorm=I={lt}:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
+                          capture_output=True, text=True).stderr
+    m = json.loads(meas[meas.rfind("{"):meas.rfind("}") + 1])
+    loudnorm = (f"loudnorm=I={lt}:TP=-1.5:LRA=11:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
+                f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:"
+                f"offset={m['target_offset']}:linear=true")
+
+    # 6) 화면
+    title = make_title(job["title"], int(job.get("title_yellow", 0)))
+    cursors = [make_cursor(1.0), make_cursor(0.85)]
+    out_mp4 = os.path.join(out_dir, f"{job_id}.mp4")
+    cmd = ["ffmpeg", "-y", "-v", "error",
+           "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
+           "-i", wav_path, "-map", "0:v", "-map", "1:a",
+           "-af", loudnorm,
+           "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p",
+           "-c:a", "aac", "-b:a", "192k", "-ar", str(SR), "-shortest", "-movflags", "+faststart", out_mp4]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    n_frames = int(total * FPS)
+    si, sub_i = 0, 0
+    log(f"영상 합성 중… ({total:.1f}초, {n_frames}프레임)")
+    row_y = IMG_TOP + (IMG_H // 9) * 4 + (IMG_H // 9) // 2
+    for fi in range(n_frames):
+        t = fi / FPS
+        while si < len(slots) - 1 and t >= slots[si][1]:
+            si += 1
+        st, en, src = slots[si]
+        frame = Image.new("RGB", (W, H), BG)
+        if src == "board":
+            frame.paste(board, (0, IMG_TOP))
+            p = min(1.0, (t - st) / 0.7)
+            p = 1 - (1 - p) ** 3
+            cx, cy = int(420 + (130 - 420) * p), int(row_y + 200 + (8 - 200) * p)
+            click = 0.75 <= t - st < 0.9
+            frame.paste(cursors[1 if click else 0], (cx, cy), cursors[1 if click else 0])
+        else:
+            prog = min(1.0, max(0.0, (t - st) / max(0.1, en - st)))
+            z = 1.0 + (ZOOM_END - 1.0) * prog
+            cw, chh = W / z, IMG_H / z
+            x0, y0 = (W - cw) / 2, (IMG_H - chh) / 2
+            frame.paste(src.resize((W, IMG_H), Image.BILINEAR, box=(x0, y0, x0 + cw, y0 + chh)), (0, IMG_TOP))
+        frame.paste(title, (0, 0), title)
+        while sub_i < len(subs) - 1 and t >= subs[sub_i][1]:
+            sub_i += 1
+        if subs and subs[sub_i][0] - 0.05 <= t < subs[sub_i][1] and src != "board":
+            layer = subs[sub_i][2]
+            frame.paste(layer, (0, SUB_CENTER_Y - layer.height // 2), layer)
+        proc.stdin.write(frame.tobytes())
+    proc.stdin.close()
+    if proc.wait() != 0:
+        raise RuntimeError("ffmpeg 실패")
+    log(f"완성: {out_mp4}")
+    return out_mp4
+
+
+if __name__ == "__main__":
+    main()

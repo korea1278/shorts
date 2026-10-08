@@ -1,0 +1,13 @@
+{
+  "id": "test",
+  "title": ["경찰도 인정해주는", "비상 상황"],
+  "title_yellow": 0,
+  "post_title": "경찰도 인정해주는 비상 상황",
+  "scenes": [
+    {"text": "경찰도 인정해주는 비상 상황", "images": ["board"]},
+    {"text": "예전에 꽉 막힌 고속도로에서 배가 너무 아파서", "images": [{"ira": "https://www.irasutoya.com/2013/12/blog-post_7091.html"}]},
+    {"text": "갓길로 미친 듯이 달리고 있었음", "images": [{"ai": "a small silver sedan speeding on a highway shoulder, simple clip-art"}]},
+    {"text": "근데 앞에 경찰차가 서 있는 거임", "images": [{"ira": "https://www.irasutoya.com/2015/12/blog-post_507.html"}], "sfx": "dundun"},
+    {"text": "선생님 많이 급하셨나 봐요", "sub": "\"많이 급하셨나 봐요\"", "color": "white", "pause": 0.3, "sfx": "boing"}
+  ]
+}
