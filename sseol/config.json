@@ -1,6 +1,5 @@
 {
   "voice_id": "fHzGR8qcnsDR2uaj9r16",
   "tts_model": "eleven_multilingual_v2",
-  "image_quality": "medium",
-  "bgm_volume": 0.12
+  "image_quality": "medium"
 }
