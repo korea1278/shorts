@@ -8,7 +8,7 @@
 레퍼런스(커뮤니티 썰 쇼츠) 형식 — 자세한 수치는 sseol/REFERENCE.md
   검은 배경 · 맨 위 아주 두꺼운 2줄 제목(노랑/흰) · 가운데 그림(이라스토야 또는 AI)
   · 그림 아래쪽 검은 상자 자막(노랑) · 시작은 게시판 목록에서 글을 클릭하는 화면
-  · 억양 큰 나레이션(쉼 거의 없음) · 웃음 포인트 효과음 · 경쾌한 배경음악 · 구독 부탁 없이 끝
+  · 자연스러운 나레이션(긴 쉼만 줄임) · 웃음 포인트 효과음 · 배경음악 없음(설정으로 켤 수 있음) · 구독 부탁 없이 끝
 
 장면 그림(images)은 여러 개 넣으면 장면 시간을 나눠 차례로 보여준다. 항목 형식:
   {"ira": "이라스토야 글 주소 또는 그림 주소"}   흰 바탕에 그림 (영상 1편 20장까지)
@@ -52,10 +52,10 @@ IRA_LIMIT = 20                              # 이라스토야 영상 1편 최대
 DEFAULT_CONFIG = {
     "voice_id": "",
     "tts_model": "eleven_multilingual_v2",
-    "voice_settings": {"stability": 0.3, "similarity_boost": 0.8, "style": 0.45,
-                       "use_speaker_boost": True, "speed": 1.15},
-    "max_pause": 0.12,                  # 이보다 긴 쉼은 줄인다 (초)
-    "pause_to": 0.04,
+    "voice_settings": {"stability": 0.5, "similarity_boost": 0.8, "style": 0.2,
+                       "use_speaker_boost": True, "speed": 1.08},
+    "max_pause": 0.3,                   # 이보다 긴 쉼만 줄인다 (자연스러운 숨은 남긴다)
+    "pause_to": 0.22,
     "image_model": "gpt-image-1",
     "image_quality": "medium",
     "image_style": (
@@ -63,7 +63,8 @@ DEFAULT_CONFIG = {
         "plain white background, single clear subject, no text, no letters, no numbers, no logos, no watermark. "
         "No real, identifiable people or celebrities; no existing cartoon characters or memes."
     ),
-    "bgm_gap_db": 9,                    # 배경음악은 목소리보다 이만큼 작게
+    "bgm": False,                       # 배경음악 (사용자 요청으로 기본 끔)
+    "bgm_gap_db": 9,                    # 배경음악을 켤 때 목소리보다 이만큼 작게
     "loudness": -14,
 }
 
@@ -412,7 +413,10 @@ def chunk_text(text, max_chars=SUB_MAX_CHARS):
         else:
             cur = cand
     if cur:
-        chunks.append(cur)
+        if chunks and len(cur.replace(" ", "")) <= 3:      # "함" 같은 짧은 꼬리는 앞 줄에 붙인다
+            chunks[-1] += " " + cur
+        else:
+            chunks.append(cur)
     return chunks
 
 
@@ -591,7 +595,9 @@ def main():
     bdir = os.path.join(ROOT, "bgm")
     cands = sorted(f for f in os.listdir(bdir) if f.lower().endswith((".mp3", ".wav", ".m4a"))) \
         if os.path.isdir(bdir) else []
-    if cands:
+    if not cfg.get("bgm"):
+        log("배경음악: 없음")
+    elif cands:
         name = job.get("bgm") if job.get("bgm") in cands else cands[0]
         log(f"배경음악: {name}")
         b = load_bgm(os.path.join(bdir, name), total)[:len(mix)]
