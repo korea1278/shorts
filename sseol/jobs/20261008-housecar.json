@@ -43,7 +43,8 @@
           "ai": "a simple cute small red hatchback car, side view"
         }
       ],
-      "sfx": "dundun"
+      "sfx": "dundun",
+      "sfx_on": "집이냐"
     },
     {
       "text": "월급 모아서 둘 중에 뭘 먼저 사야 하냐는 거임",
@@ -106,7 +107,8 @@
           "ira": "https://www.irasutoya.com/2013/12/blog-post_6366.html"
         }
       ],
-      "sfx": "ding"
+      "sfx": "kaching",
+      "sfx_on": "집을"
     },
     {
       "text": "집값이 폭등하기 전이라 가능했던 이야기",
@@ -135,7 +137,8 @@
           "ira": "https://www.irasutoya.com/2013/01/blog-post_4376.html"
         }
       ],
-      "sfx": "dundun"
+      "sfx": "dundun",
+      "sfx_on": "16억을"
     },
     {
       "text": "근데 15억 넘는 집은 대출이 최대 4억까지만 나옴",
@@ -146,7 +149,9 @@
         {
           "ira": "https://www.irasutoya.com/2015/03/blog-post_879.html"
         }
-      ]
+      ],
+      "sfx": "pop",
+      "sfx_on": "4억까지만"
     },
     {
       "text": "이제는 집이냐 차냐가 아니라",
@@ -166,7 +171,8 @@
           "ira": "https://www.irasutoya.com/2015/07/blog-post_82.html"
         }
       ],
-      "sfx": "fail"
+      "sfx": "fail",
+      "sfx_on": "꿈같은"
     }
   ]
 }

@@ -63,6 +63,7 @@ DEFAULT_CONFIG = {
         "plain white background, single clear subject, no text, no letters, no numbers, no logos, no watermark. "
         "No real, identifiable people or celebrities; no existing cartoon characters or memes."
     ),
+    "sfx_db": -16,                      # 효과음 크기 (목소리 최대 크기 기준, 낮을수록 작게)
     "bgm": False,                       # 배경음악 (사용자 요청으로 기본 끔)
     "bgm_gap_db": 9,                    # 배경음악을 켤 때 목소리보다 이만큼 작게
     "loudness": -14,
@@ -297,7 +298,21 @@ def sfx(name):
         tt = t[:n]
         out = np.sin(2 * np.pi * (500 * tt + 4000 * tt ** 2)) * _env(n, 0.002, 30)
     elif name == "ding":
-        out = (np.sin(2 * np.pi * 1568 * t) + 0.5 * np.sin(2 * np.pi * 2352 * t)) * _env(len(t), 0.003, 7)
+        out = (np.sin(2 * np.pi * 1318.5 * t) + 0.35 * np.sin(2 * np.pi * 2637 * t)
+               + 0.15 * np.sin(2 * np.pi * 3955.5 * t)) * _env(len(t), 0.003, 6)
+    elif name == "kaching":                     # 띠링 (돈 소리)
+        out = np.zeros(len(t))
+        for st, fr in ((0.0, 2093.0), (0.09, 2637.0)):
+            k = int(st * SR)
+            tt = np.arange(len(t) - k) / SR
+            out[k:] += (np.sin(2 * np.pi * fr * tt) + 0.4 * np.sin(2 * np.pi * fr * 1.5 * tt)) * _env(len(tt), 0.002, 9)
+    elif name == "tada":                        # 짜잔
+        out = np.zeros(int(SR * 0.9))
+        for st, fr in ((0.0, 523.25), (0.12, 783.99)):
+            k = int(st * SR)
+            n = len(out) - k
+            tt = np.arange(n) / SR
+            out[k:] += sum(np.sin(2 * np.pi * fr * h * tt) / h for h in (1, 2, 3)) * _env(n, 0.005, 3.5)
     elif name == "boing":
         f = 180 + 120 * np.exp(-t * 6) * np.sin(2 * np.pi * 9 * t)
         out = np.sin(2 * np.pi * np.cumsum(f) / SR) * _env(len(t), 0.005, 5)
@@ -323,6 +338,15 @@ def sfx(name):
     else:
         return np.zeros(1, np.float32)
     return (out / (np.abs(out).max() + 1e-9) * 0.22).astype(np.float32)
+
+
+def load_sfx(name):
+    """sseol/sfx/<이름>.mp3(.wav) 가 있으면 그 소리, 없으면 직접 만든 소리"""
+    for ext in (".mp3", ".wav"):
+        p = os.path.join(ROOT, "sfx", name + ext)
+        if os.path.exists(p):
+            return mp3_to_array(p)
+    return sfx(name)
 
 
 def pluck(freq, dur, rng):
@@ -584,10 +608,18 @@ def main():
     # 5) 소리
     mix = np.zeros(int(SR * total), dtype=np.float32)
     mix[:len(voice)] += voice[:len(mix)]
+    vpeak = float(np.percentile(np.abs(voice), 99.9)) if len(voice) else 0.5
     for i, s in enumerate(scenes):
         if s.get("sfx"):
-            fx = sfx(s["sfx"])
-            k = max(0, int((scene_times[i][0] + float(s.get("sfx_at", 0))) * SR))
+            fx = load_sfx(s["sfx"])
+            fx = fx / (np.abs(fx).max() + 1e-9) * vpeak * 10 ** (cfg["sfx_db"] / 20)
+            at = scene_times[i][0]
+            if s.get("sfx_on"):                              # 이 단어가 나올 때 맞춰서
+                k = full.find(s["sfx_on"], spans[i][0], spans[i][1])
+                if k >= 0:
+                    at = t_at(k)
+            at += float(s.get("sfx_at", 0))
+            k = max(0, int(at * SR))
             mix[k:k + len(fx)] += fx[:len(mix) - k]
     voiced = voice[np.abs(voice) > 0.02]
     vrms = float(np.sqrt((voiced ** 2).mean())) if len(voiced) else 0.1
