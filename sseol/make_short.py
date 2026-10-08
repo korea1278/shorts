@@ -51,11 +51,10 @@ IRA_LIMIT = 20                              # 이라스토야 영상 1편 최대
 
 DEFAULT_CONFIG = {
     "voice_id": "",
-    "tts_model": "eleven_multilingual_v2",
-    "voice_settings": {"stability": 0.5, "similarity_boost": 0.8, "style": 0.2,
-                       "use_speaker_boost": True, "speed": 1.08},
-    "max_pause": 0.3,                   # 이보다 긴 쉼만 줄인다 (자연스러운 숨은 남긴다)
-    "pause_to": 0.22,
+    "tts_model": "eleven_v3",           # 가장 자연스러운 최신 모델 (사용자 선택)
+    "voice_settings": {"stability": 0.5, "similarity_boost": 0.8},
+    "max_pause": 0.7,                   # 아주 긴 쉼만 줄인다 (자연스러운 숨은 그대로)
+    "pause_to": 0.45,
     "image_model": "gpt-image-1",
     "image_quality": "medium",
     "image_style": (
@@ -555,7 +554,7 @@ def main():
             k = seg.find(ch, pos)
             k = pos if k < 0 else k
             pos = k + len(ch)
-            subs.append([t_at(a + k), t_at(a + pos - 1, True), make_sub(ch, color, reds)])
+            subs.append([t_at(a + k), t_at(a + pos - 1, True), make_sub(re.sub(r"[.,…]+", "", ch).strip(), color, reds)])
     subs.sort(key=lambda x: x[0])
     for j in range(len(subs) - 1):
         subs[j][1] = subs[j + 1][0]
