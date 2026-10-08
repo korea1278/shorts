@@ -53,8 +53,9 @@ DEFAULT_CONFIG = {
     "voice_id": "",
     "tts_model": "eleven_v3",           # 가장 자연스러운 최신 모델 (사용자 선택)
     "voice_settings": {"stability": 0.5, "similarity_boost": 0.8},
-    "max_pause": 0.7,                   # 아주 긴 쉼만 줄인다 (자연스러운 숨은 그대로)
-    "pause_to": 0.45,
+    "tempo": 1.25,                      # 배속 (목소리 높이는 그대로, 말만 빠르게)
+    "max_pause": 0.3,                   # 배속 뒤 이보다 긴 쉼은 줄인다
+    "pause_to": 0.22,
     "image_model": "gpt-image-1",
     "image_quality": "medium",
     "image_style": (
@@ -184,6 +185,18 @@ def shorten_pauses(voice, starts, ends, max_pause, pause_to):
         return t - removed
 
     return np.concatenate(pieces), [remap(t) for t in starts], [remap(t) for t in ends]
+
+
+def speed_up(voice, starts, ends, tempo):
+    """목소리 높이는 그대로 두고 배속 (ffmpeg atempo). 글자 타이밍도 같이 줄인다."""
+    if abs(tempo - 1.0) < 1e-3:
+        return voice, starts, ends
+    pcm = (np.clip(voice, -1, 1) * 32767).astype(np.int16).tobytes()
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-f", "s16le", "-ac", "1", "-ar", str(SR), "-i", "-",
+                          "-af", f"atempo={tempo}", "-f", "s16le", "-ac", "1", "-ar", str(SR), "-"],
+                         input=pcm, check=True, capture_output=True).stdout
+    out = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    return out, [t / tempo for t in starts], [t / tempo for t in ends]
 
 
 def insert_pause(voice, starts, ends, at, dur):
@@ -516,6 +529,7 @@ def main():
             with open(mp3 + ".json", "w") as f:
                 json.dump({"meta": meta, "starts": starts, "ends": ends}, f)
         voice = mp3_to_array(mp3)
+        voice, starts, ends = speed_up(voice, starts, ends, float(cfg.get("tempo", 1.0)))
         voice, starts, ends = shorten_pauses(voice, starts, ends, cfg["max_pause"], cfg["pause_to"])
     for i in range(len(scenes) - 1, 0, -1):               # 웃음 포인트 앞 '뜸'
         if scenes[i].get("pause"):
