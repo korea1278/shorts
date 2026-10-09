@@ -494,21 +494,71 @@ def make_title(lines, yellow_line):
     return layer
 
 
+# 자막을 끊을 때 이 낱말 뒤에서 끊으면 어색하다 (뒷말을 꾸미는 말)
+SUB_GLUE_AFTER = {"안", "못", "더", "덜", "이런", "그런", "저런", "이", "그", "저", "너무", "아주", "좀", "잘", "다",
+                  "또", "꼭", "제일", "가장", "제대로", "오히려", "진짜", "정말", "한", "두", "세", "네", "몇",
+                  "무슨", "어느", "어떤", "모든", "웬", "새", "헌", "그냥", "막", "딱", "확", "왜", "어떻게"}
+# 이 낱말 앞에서 끊으면 어색하다 (앞말에 붙는 말: 고칠 수도, 빼는 건, 줘야 한다고)
+SUB_GLUE_BEFORE = ("수", "것", "거", "건", "게", "걸", "때문", "줄", "뿐", "듯", "척", "채", "만큼", "적",
+                   "한다", "하는", "했", "해", "할", "된다", "되는", "됐", "될", "싶", "보니", "봤", "본", "놓", "버")
+
+# 이렇게 끝나는 낱말은 뒷말을 꾸민다 (많다는 이유, 외우던 데, 있었던 거)
+SUB_GLUE_MODIFIER = ("다는", "라는", "하는", "되는", "있는", "없는", "던", "려는")
+# 꾸밈을 받는 말 (알린 날짜, 배울 때, 많다는 이유) — 이 앞에서 끊으면 어색하다
+SUB_GLUE_NOUN = ("이유", "사실", "날", "데", "때", "생각", "이야기", "얘기")
+
+
 def chunk_text(text, max_chars=SUB_MAX_CHARS):
-    words = text.split()
-    chunks, cur = [], ""
-    for w in words:
-        cand = (cur + " " + w).strip()
-        if len(cand.replace(" ", "")) > max_chars and cur:
-            chunks.append(cur)
-            cur = w
+    """나레이션을 자막 조각으로. 쉼표·마침표에서 먼저 끊고, 긴 마디는 말뜻이 이어지는 곳을 피해 고르게 나눈다."""
+    n = lambda w: len(re.sub(r"[\s,.?!…]", "", w))
+    clauses = [c.strip() for c in re.findall(r"[^,.?!…]+[,.?!…]*", text) if c.strip()]
+    merged = []
+    for c in clauses:                                     # "함" 같은 짧은 마디는 앞에 붙인다
+        if merged and (n(c) <= 3 or n(merged[-1]) <= 2) and n(merged[-1]) + n(c) <= max_chars + 2:
+            merged[-1] += " " + c
         else:
-            cur = cand
-    if cur:
-        if chunks and len(cur.replace(" ", "")) <= 3:      # "함" 같은 짧은 꼬리는 앞 줄에 붙인다
-            chunks[-1] += " " + cur
-        else:
-            chunks.append(cur)
+            merged.append(c)
+    chunks = []
+    for c in merged:
+        words = c.split()
+        if n(c) <= max_chars or len(words) == 1:
+            chunks.append(c)
+            continue
+        k = -(-n(c) // max_chars)                         # 몇 조각으로 나눌지
+        target = n(c) / k
+        bare = [re.sub(r"[,.?!…]", "", w) for w in words]
+
+        def penalty(i):                                   # words[i-1] 와 words[i] 사이를 끊는 값
+            p = 0.0
+            if bare[i - 1] in SUB_GLUE_AFTER:
+                p += 30
+            if bare[i].startswith(SUB_GLUE_BEFORE):
+                p += 30
+            if bare[i].startswith(SUB_GLUE_NOUN):
+                p += 30
+            if bare[i - 1].endswith(SUB_GLUE_MODIFIER):  # "많다는 / 이유로" 처럼 꾸미는 말과 꾸밈 받는 말 사이
+                p += 30
+            return p
+
+        best = {(0, 0): (0.0, [])}                        # (앞에서 쓴 낱말 수, 조각 수) → (값, 끊는 자리)
+        for parts in range(1, k + 2):
+            for (used, cnt), (cost, cuts) in list(best.items()):
+                if cnt != parts - 1:
+                    continue
+                for j in range(used + 1, len(words) + 1):
+                    piece = n(" ".join(words[used:j]))
+                    if piece > max_chars and j - used > 1:
+                        break
+                    c2 = cost + (piece - target) ** 2 + (penalty(j) if j < len(words) else 0)
+                    key = (j, parts)
+                    if key not in best or c2 < best[key][0]:
+                        best[key] = (c2, cuts + [j])
+        ends = min(((v[0] + 40 * (key[1] - k), v[1]) for key, v in best.items() if key[0] == len(words)),
+                   key=lambda x: x[0])[1]
+        last = 0
+        for j in ends:
+            chunks.append(" ".join(words[last:j]))
+            last = j
     return chunks
 
 
@@ -544,9 +594,9 @@ def make_sub(text, color, reds, style="box", label=None):
     if not plain:
         d.rectangle((x0, lh, x0 + bw, lh + bh), fill=(0, 0, 0, 235))
     x = x0 + 18
-    rs = {w for r in (reds or []) for w in r.split()}
+    rs = {w for r in (reds or []) for w in r.split()}     # 낱말 일부만 적어도 그 낱말 전체가 빨개진다
     for w, ww in zip(words, widths):
-        d.text((x, lh + bh / 2), w, font=f, fill=RED if w in rs else base, anchor="lm",
+        d.text((x, lh + bh / 2), w, font=f, fill=RED if any(r in w for r in rs) else base, anchor="lm",
                stroke_width=5 if plain else 0, stroke_fill=(0, 0, 0))
         x += ww + sp
     layer.info["cy"] = lh + bh // 2               # 글자 줄의 세로 중심 (붙일 때 기준)

@@ -20,6 +20,11 @@
       "images": [
         {
           "ai": "simple clipart of a birthday cake with candles and confetti celebrating an anniversary, no text"
+        },
+        {
+          "char": "햄찌",
+          "face": "웃음",
+          "fx": "punch"
         }
       ],
       "red": [
@@ -31,7 +36,9 @@
       "text": "근데 처음 이름은 한글날이 아니었음.",
       "images": [
         {
-          "ai": "simple clipart of a confused young man scratching his head with question marks above, no text"
+          "char": "회사원남",
+          "face": "의문",
+          "fx": "zoom"
         }
       ],
       "sfx": "huh"
@@ -51,13 +58,18 @@
       "text": "그때 붙인 이름이 바로 가갸날이었음.",
       "images": [
         {
-          "ira": "https://www.irasutoya.com/2015/01/blog-post_883.html"
+          "char": "햄찌",
+          "face": "놀람",
+          "fx": [
+            "punch",
+            "lines"
+          ]
         }
       ],
       "red": [
         "가갸날"
       ],
-      "sfx": "ding",
+      "sfx": "shock",
       "sfx_on": "가갸날"
     },
     {
@@ -97,10 +109,12 @@
       "text": "근데 날짜도 지금이랑 달랐음. 음력 9월 29일이었음.",
       "images": [
         {
-          "ira": "https://www.irasutoya.com/2018/01/blog-post_554.html"
+          "ira": "https://www.irasutoya.com/2018/02/blog-post_627.html"
         },
         {
-          "ira": "https://www.irasutoya.com/2018/02/blog-post_627.html"
+          "char": "회사원남",
+          "face": "의문",
+          "fx": "zoom"
         }
       ],
       "sfx": "huh",
@@ -112,6 +126,17 @@
         {
           "ira": "https://www.irasutoya.com/2017/02/blog-post_545.html",
           "fx": "punch"
+        },
+        {
+          "news": {
+            "outlet": "썰뉴스",
+            "section": "역사",
+            "headline": "훈민정음 해례본 발견, 한글 반포일 찾았다",
+            "reporter": "김썰 기자",
+            "date": "상상 속 뉴스",
+            "lead": "서문에 적힌 날짜를 양력으로 바꾸면 10월 9일이라고 한다."
+          },
+          "fx": "flash"
         }
       ],
       "red": [
@@ -155,6 +180,14 @@
         {
           "ai": "simple clipart of a disappointed office worker slumping at desk with a calendar, no text, no numbers",
           "fx": "bw"
+        },
+        {
+          "char": "햄찌",
+          "face": "억울",
+          "fx": [
+            "zoom",
+            "bw"
+          ]
         }
       ],
       "red": [
@@ -169,7 +202,9 @@
           "ira": "https://www.irasutoya.com/2016/05/blog-post_88.html"
         },
         {
-          "ira": "https://www.irasutoya.com/2016/05/blog-post_51.html"
+          "char": "햄찌",
+          "face": "웃음",
+          "fx": "punch"
         }
       ],
       "red": [
@@ -184,7 +219,12 @@
           "ira": "https://www.irasutoya.com/2013/11/blog-post_9684.html"
         },
         {
-          "ira": "https://www.irasutoya.com/2015/01/blog-post_883.html"
+          "char": "햄찌",
+          "face": "당황",
+          "fx": [
+            "shake",
+            "lines"
+          ]
         }
       ],
       "red": [
@@ -193,5 +233,6 @@
       "sfx": "laugh",
       "sfx_on": "감사"
     }
-  ]
+  ],
+  "sub_style": "plain"
 }
