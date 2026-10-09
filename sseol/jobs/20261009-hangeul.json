@@ -213,7 +213,7 @@
       "sfx": "kaching"
     },
     {
-      "text": "그러니까 오늘 늦잠 잔 사람은, 세종대왕님께 감사 인사부터 하셈.",
+      "text": "그러니까 오늘 늦잠 잔 사람은, 세종대왕님한테 고맙다고 해야 함.",
       "images": [
         {
           "ira": "https://www.irasutoya.com/2013/11/blog-post_9684.html"
@@ -228,10 +228,10 @@
         }
       ],
       "red": [
-        "감사 인사"
+        "고맙다고"
       ],
       "sfx": "laugh",
-      "sfx_on": "감사"
+      "sfx_on": "고맙다고"
     }
   ],
   "sub_style": "plain"
