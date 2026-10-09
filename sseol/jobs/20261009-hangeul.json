@@ -1,0 +1,203 @@
+{
+  "id": "20261009-hangeul",
+  "title": [
+    "의외로 모르는",
+    "한글날 이야기"
+  ],
+  "title_yellow": 1,
+  "post_title": "의외로 모르는 한글날 이야기",
+  "source": "https://m.bobaedream.co.kr/board/bbs_view/best/1038350/2/1",
+  "scenes": [
+    {
+      "text": "의외로 모르는 한글날 이야기.",
+      "images": [
+        "board"
+      ]
+    },
+    {
+      "text": "한글날의 첫 이름은 한글날이 아니었음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2014/05/blog-post_1559.html#2"
+        }
+      ],
+      "sfx": "huh"
+    },
+    {
+      "text": "1926년 처음 생길 때 이름은 가갸날이었음.",
+      "images": [
+        {
+          "ai": "simple old 1920s Korean scholars in hanbok gathered at a celebration meeting, flat clipart"
+        }
+      ],
+      "red": [
+        "가갸날"
+      ],
+      "sfx": "ding",
+      "sfx_on": "가갸날"
+    },
+    {
+      "text": "그때는 가갸거겨, 하면서 글을 배웠기 때문임.",
+      "images": [
+        {
+          "ai": "simple Korean traditional village school seodang, children in hanbok reading aloud from books, flat clipart"
+        },
+        {
+          "ai": "a cute child in hanbok practicing calligraphy with a brush on blank paper, flat clipart"
+        }
+      ]
+    },
+    {
+      "text": "그래서 올해가 딱 100주년인 거임.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2017/12/blog-post_833.html"
+        }
+      ],
+      "red": [
+        "100주년"
+      ],
+      "sfx": "tada"
+    },
+    {
+      "text": "근데 날짜도 처음엔 10월 9일이 아니었음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2018/02/blog-post_627.html"
+        }
+      ]
+    },
+    {
+      "text": "음력으로 지내다 보니 해마다 날짜가 바뀌었음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2018/08/blog-post_43.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2018/01/blog-post_28.html"
+        }
+      ]
+    },
+    {
+      "text": "그러다 1940년, 훈민정음 해례본이 발견됨.",
+      "images": [
+        {
+          "ai": "an old traditional Korean bound book with yellowed paper cover, opened, glowing softly, flat clipart"
+        }
+      ],
+      "red": [
+        "훈민정음 해례본"
+      ],
+      "sfx": "dundun"
+    },
+    {
+      "text": "거기에 9월 상순에 책을 냈다는 기록이 있었음.",
+      "images": [
+        {
+          "ai": "a magnifying glass over the pages of an old traditional East Asian book, flat clipart"
+        }
+      ]
+    },
+    {
+      "text": "이걸 양력으로 바꾼 날이 바로 10월 9일임.",
+      "images": [
+        {
+          "ai": "a simple wall calendar page with a red circle marked on one day, flat clipart"
+        }
+      ],
+      "red": [
+        "10월 9일"
+      ],
+      "sfx": "ding",
+      "sfx_on": "10월"
+    },
+    {
+      "text": "이 책을 사들인 사람이 간송 전형필인데,",
+      "images": [
+        {
+          "ai": "a gentle Korean gentleman in 1930s traditional hanbok and round glasses carefully holding an old book, flat clipart"
+        }
+      ]
+    },
+    {
+      "text": "그 시절 기와집 열 채를 살 돈을 냈다고 함.",
+      "images": [
+        {
+          "ai": "a row of ten traditional Korean hanok tiled-roof houses, flat clipart"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2013/04/blog-post_25.html"
+        }
+      ],
+      "red": [
+        "기와집 열 채"
+      ],
+      "sfx": "kaching"
+    },
+    {
+      "text": "전쟁 때는 베개 속에 숨기고 잤다고 함.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2013/05/blog-post_20.html"
+        },
+        {
+          "ai": "a man sleeping soundly hugging his pillow tightly, an old book peeking out of the pillow, flat clipart"
+        }
+      ]
+    },
+    {
+      "text": "지금은 국보이자 유네스코 세계기록유산임.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2013/05/blog-post_2133.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2014/07/blog-post_15.html"
+        }
+      ],
+      "red": [
+        "국보"
+      ]
+    },
+    {
+      "text": "근데 한글날은 1991년부터 쉬는 날에서 빠졌었음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2015/07/blog-post_82.html"
+        }
+      ],
+      "sfx": "fail"
+    },
+    {
+      "text": "2013년이 돼서야 다시 빨간 날이 됨.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2019/01/blog-post_753.html"
+        }
+      ],
+      "red": [
+        "빨간 날"
+      ],
+      "sfx": "pop"
+    },
+    {
+      "text": "마지막으로 한국어는 순서를 섞어도 다 알아들음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2019/12/blog-post_24.html"
+        }
+      ]
+    },
+    {
+      "text": "행복한 되세요 하루.",
+      "sub": "\"행복한 되세요 하루\"",
+      "color": "white",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2013/06/blog-post_1515.html#2"
+        }
+      ],
+      "sfx": "huh"
+    }
+  ]
+}
