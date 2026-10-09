@@ -1,0 +1,27 @@
+{
+  "id": "20261009-benedict",
+  "title": ["미군이 처음 만난", "이해 불가 적군"],
+  "title_yellow": 1,
+  "post_title": "미군이 처음 만난 이해 불가 적군",
+  "board": [],
+  "source": "https://m.dcinside.com/board/dcbest/468991",
+  "scenes": [
+    {"text": "미군이 처음 만난 이해 불가 적군.", "images": ["board"]},
+    {"text": "2차대전 때 미군은 독일군하고도 싸웠음.", "images": [{"ai": "American WWII soldier in green uniform and helmet, standing, simple clipart"}, {"ira": "https://www.irasutoya.com/2014/06/blog-post_9.html"}]},
+    {"text": "근데 독일군은 그래도 말이 통하는 적이었음.", "images": [{"ira": "https://www.irasutoya.com/2020/07/blog-post_5.html"}, {"ira": "https://www.irasutoya.com/2017/06/blog-post_43.html"}]},
+    {"text": "문제는 태평양에서 만난 일본군이었음.", "images": [{"ira": "https://www.irasutoya.com/2016/06/blog-post_458.html"}], "sfx": "dundun"},
+    {"text": "비행기째로 배에 들이받는 가미카제.", "images": [{"ira": "https://www.irasutoya.com/2014/04/blog-post_5685.html"}, {"ira": "https://www.irasutoya.com/2014/03/blog-post_2687.html"}], "red": ["가미카제"]},
+    {"text": "죽을 걸 알면서도 다 같이 돌격하는 반자이 돌격.", "images": [{"ai": "group of WWII soldiers charging forward together, dust clouds, simple clipart"}], "red": ["반자이"]},
+    {"text": "항복 대신 전멸을 택하는 옥쇄까지.", "images": [{"ira": "https://www.irasutoya.com/2017/02/blog-post_707.html"}, {"ai": "white flag with a big red prohibition circle over it, simple clipart"}], "red": ["옥쇄"]},
+    {"text": "미군 입장에선 도저히 이해가 안 되는 거임.", "images": [{"ai": "confused American WWII soldier scratching his head, simple clipart"}, {"ira": "https://www.irasutoya.com/2012/12/blog-post_516.html"}], "sfx": "huh"},
+    {"text": "그래서 1944년, 미국 정부가 결국 학자를 불렀음.", "images": [{"ai": "1940s government officials in suits discussing around a table with a map, simple clipart"}, {"ai": "1940s official making a telephone call at a desk, simple clipart"}]},
+    {"text": "인류학자 루스 베네딕트한테 일본인 분석을 맡긴 거임.", "images": [{"ira": "https://www.irasutoya.com/2016/09/blog-post_562.html"}], "red": ["루스 베네딕트"]},
+    {"text": "근데 전쟁 중이라 일본엔 갈 수가 없었음.", "images": [{"ira": "https://www.irasutoya.com/2013/02/blog-post_2906.html"}, {"ira": "https://www.irasutoya.com/2013/04/blog-post_279.html"}]},
+    {"text": "그래서 미국에 사는 일본계 사람들을 인터뷰하고,", "images": [{"ira": "https://www.irasutoya.com/2016/12/blog-post_648.html"}]},
+    {"text": "일본 영화랑 소설까지 싹 다 뒤져가며 연구했음.", "images": [{"ira": "https://www.irasutoya.com/2019/02/blog-post_35.html"}, {"ira": "https://www.irasutoya.com/2018/01/blog-post_226.html"}]},
+    {"text": "그렇게 나온 책이 바로, 국화와 칼임.", "images": [{"ai": "old hardcover book with a chrysanthemum flower and a katana sword drawn on the cover, no text, simple clipart"}, {"ira": "https://www.irasutoya.com/2012/03/blog-post_2388.html"}], "sfx": "tada", "sfx_on": "국화와", "red": ["국화와 칼"]},
+    {"text": "이 책은 지금도 일본 문화 연구의 고전으로 꼽힘.", "images": [{"ira": "https://www.irasutoya.com/2018/03/blog-post_53.html"}]},
+    {"text": "심지어 일본에서도 베스트셀러가 됐음.", "images": [{"ai": "people lining up at a bookstore to buy the same book, simple clipart"}, {"ira": "https://www.irasutoya.com/2017/12/blog-post_476.html"}], "red": ["베스트셀러"]},
+    {"text": "근데 웃긴 건, 이 책 쓴 사람이 일본 땅을 한 번도 밟아본 적이 없다는 거임.", "images": [{"ira": "https://www.irasutoya.com/2013/02/blog-post_3995.html"}, {"ai": "surprised woman scholar at a desk with books, simple clipart"}], "sfx": "boing", "sfx_on": "한", "red": ["한 번도"]}
+  ]
+}
