@@ -1,38 +1,249 @@
 {
   "id": "20261009-dialogue",
-  "title": ["엄마한테 보낼 문자", "부장님한테 보냄"],
+  "title": [
+    "엄마한테 보낼 문자",
+    "부장님한테 보냄"
+  ],
   "title_yellow": 1,
   "post_title": "엄마한테 보낼 문자를 부장님한테 보낸 썰",
   "source": "시험용 창작 대본 (대화형 기능 시험)",
   "sub_style": "plain",
   "show_speaker": true,
   "cast": {
-    "나": {"voice": "남자", "color": "sky", "char": "민수"},
-    "부장님": {"voice": "아저씨", "color": "pink", "char": "아저씨"},
-    "엄마": {"voice": "여자", "color": "green", "char": "엄마"}
+    "나": {
+      "voice": "남자",
+      "color": "sky",
+      "char": "민수"
+    },
+    "부장님": {
+      "voice": "아저씨",
+      "color": "pink",
+      "char": "아저씨"
+    },
+    "엄마": {
+      "voice": "아줌마",
+      "color": "green",
+      "char": "엄마"
+    },
+    "옆 팀 대리": {
+      "voice": "여자",
+      "color": "orange",
+      "char": "회사원여"
+    }
   },
   "scenes": [
-    {"text": "엄마한테 보낼 문자를, 부장님한테 보냈다는 썰.", "images": ["board"]},
-    {"text": "신입 때 야근하다가, 엄마한테 문자를 보냈음.", "images": [{"char": "민수", "face": "기본"}]},
-    {"speaker": "나", "text": "엄마 오늘 늦어. 사랑해.",
-     "images": [{"chat": {"title": "부장님", "msgs": [["나", "엄마 오늘 늦어 사랑해"]]}}], "sfx": "bubble"},
-    {"text": "근데 답장 말투가, 엄마가 아닌 거임.", "images": [{"char": "민수", "face": "놀람"}]},
-    {"speaker": "부장님", "mood": "당황", "text": "어, 김 사원. 나도 사랑하네.",
-     "images": [{"chat": {"title": "부장님", "msgs": [["나", "엄마 오늘 늦어 사랑해"], ["부장님", "어 김 사원 나도 사랑하네"]], "reveal": true}}],
-     "sfx": "bubble", "sfx_on": "나도"},
-    {"text": "그제야 위를 보니까, 대화방 이름이 부장님이었음.", "images": [{"char": "민수", "face": "당황"}], "sfx": "shock", "sfx_on": "부장님이었음", "red": ["부장님이었음"]},
-    {"speaker": "나", "mood": "당황", "text": "아, 아닙니다. 잘못 보냈습니다."},
-    {"text": "그날 밤, 출근길이 너무 멀게 느껴졌음.", "images": [{"map": {"from": "우리 집", "to": "회사", "note": "출근까지 40분", "seed": 4}}]},
-    {"text": "다음 날 회사 소문은, 거의 뉴스 수준이었음.",
-     "images": [{"news": {"outlet": "썰뉴스", "section": "직장", "headline": "신입사원, 부장님께 사랑 고백 문자", "reporter": "김썰 기자", "date": "상상 속 뉴스", "lead": "당사자는 엄마에게 보내려던 문자였다고 해명했다.", "img": {"char": "민수", "face": "당황"}}}],
-     "sfx": "dundun"},
-    {"text": "옆 팀 사람까지, 글을 올렸음.",
-     "images": [{"sns": {"name": "옆 팀 대리", "handle": "@next_team", "time": "1시간 전", "text": "오늘 우리 층 분위기 왜 이렇게 훈훈함?", "likes": 32, "comments": 7}}]},
-    {"text": "그때, 엄마한테 진짜 문자가 왔음.",
-     "images": [{"chat": {"title": "엄마", "msgs": [["엄마", "어제 왜 연락 없었어?"]]}}], "sfx": "bubble"},
-    {"speaker": "엄마", "mood": "화남", "text": "너 어제 왜 연락 한 통이 없어?", "sfx": "dundun"},
-    {"speaker": "나", "mood": "억울", "text": "엄마, 나 어제 사랑한다고 했어."},
-    {"speaker": "엄마", "mood": "놀람", "text": "누구한테?"},
-    {"text": "부장님한테 했다고는, 차마 말 못 했음.", "images": [{"char": "아저씨", "face": "웃음"}, {"char": "민수", "face": "억울"}], "sfx": "fail", "sfx_on": "차마"}
+    {
+      "text": "엄마한테 보낼 문자를, 부장님한테 보냈다는 썰.",
+      "images": [
+        "board"
+      ]
+    },
+    {
+      "text": "신입 때 야근하다가, 엄마한테 문자를 보냈음.",
+      "images": [
+        {
+          "char": "민수",
+          "face": "기본"
+        }
+      ]
+    },
+    {
+      "speaker": "나",
+      "text": "엄마 오늘 늦어. 사랑해.",
+      "images": [
+        {
+          "chat": {
+            "title": "부장님",
+            "msgs": [
+              [
+                "나",
+                "엄마 오늘 늦어 사랑해"
+              ]
+            ]
+          }
+        }
+      ],
+      "sfx": "bubble"
+    },
+    {
+      "text": "근데 답장 말투가, 엄마가 아닌 거임.",
+      "images": [
+        {
+          "char": "민수",
+          "face": "놀람",
+          "fx": "zoom"
+        }
+      ]
+    },
+    {
+      "speaker": "부장님",
+      "mood": "당황",
+      "text": "어, 김 사원. 나도 사랑하네.",
+      "images": [
+        {
+          "chat": {
+            "title": "부장님",
+            "msgs": [
+              [
+                "나",
+                "엄마 오늘 늦어 사랑해"
+              ],
+              [
+                "부장님",
+                "어 김 사원 나도 사랑하네"
+              ]
+            ],
+            "reveal": true
+          }
+        }
+      ],
+      "sfx": "bubble",
+      "sfx_on": "나도"
+    },
+    {
+      "text": "그제야 위를 보니까, 대화방 이름이 부장님이었음.",
+      "images": [
+        {
+          "char": "민수",
+          "face": "당황",
+          "fx": [
+            "shake",
+            "lines"
+          ]
+        },
+        {
+          "char": "햄찌",
+          "face": "놀람",
+          "fx": "punch"
+        }
+      ],
+      "sfx": "shock",
+      "sfx_on": "부장님이었음",
+      "red": [
+        "부장님이었음"
+      ]
+    },
+    {
+      "speaker": "나",
+      "mood": "당황",
+      "text": "아, 아닙니다. 잘못 보냈습니다."
+    },
+    {
+      "text": "그날 밤, 출근길이 너무 멀게 느껴졌음.",
+      "images": [
+        {
+          "map": {
+            "from": "우리 집",
+            "to": "회사",
+            "note": "출근까지 40분",
+            "seed": 4
+          }
+        }
+      ]
+    },
+    {
+      "text": "다음 날 회사 소문은, 거의 뉴스 수준이었음.",
+      "images": [
+        {
+          "news": {
+            "outlet": "썰뉴스",
+            "section": "직장",
+            "headline": "신입사원, 부장님께 사랑 고백 문자",
+            "reporter": "김썰 기자",
+            "date": "상상 속 뉴스",
+            "lead": "당사자는 엄마에게 보내려던 문자였다고 해명했다.",
+            "img": {
+              "char": "민수",
+              "face": "당황"
+            }
+          },
+          "fx": "flash"
+        }
+      ],
+      "sfx": "dundun"
+    },
+    {
+      "text": "옆 팀 사람까지, 글을 올렸음.",
+      "images": [
+        {
+          "char": "회사원여",
+          "face": "웃음"
+        }
+      ]
+    },
+    {
+      "speaker": "옆 팀 대리",
+      "mood": "웃음",
+      "text": "오늘 우리 층, 왜 이렇게 훈훈해요?",
+      "images": [
+        {
+          "sns": {
+            "name": "옆 팀 대리",
+            "handle": "@next_team",
+            "time": "1시간 전",
+            "text": "오늘 우리 층 분위기 왜 이렇게 훈훈함?",
+            "likes": 32,
+            "comments": 7
+          }
+        }
+      ]
+    },
+    {
+      "text": "그때, 엄마한테 진짜 문자가 왔음.",
+      "images": [
+        {
+          "chat": {
+            "title": "엄마",
+            "msgs": [
+              [
+                "엄마",
+                "어제 왜 연락 없었어?"
+              ]
+            ]
+          }
+        }
+      ],
+      "sfx": "bubble"
+    },
+    {
+      "speaker": "엄마",
+      "mood": "화남",
+      "text": "너 어제 왜 연락 한 통이 없어?",
+      "sfx": "dundun",
+      "fx": [
+        "shake",
+        "red"
+      ]
+    },
+    {
+      "speaker": "나",
+      "mood": "억울",
+      "text": "엄마, 나 어제 사랑한다고 했어.",
+      "fx": "dark"
+    },
+    {
+      "speaker": "엄마",
+      "mood": "놀람",
+      "text": "누구한테?"
+    },
+    {
+      "text": "부장님한테 했다고는, 차마 말 못 했음.",
+      "images": [
+        {
+          "char": "아저씨",
+          "face": "웃음"
+        },
+        {
+          "char": "햄찌",
+          "face": "억울",
+          "fx": [
+            "zoom",
+            "bw"
+          ]
+        }
+      ],
+      "sfx": "fail",
+      "sfx_on": "차마"
+    }
   ]
 }

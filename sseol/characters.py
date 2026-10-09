@@ -5,6 +5,7 @@
     python3 sseol/characters.py list                          # 인물과 표정 목록
     python3 sseol/characters.py make <이름> "<English 인물 설명>"   # AI 가상 인물 만들기 (표정 9개)
     python3 sseol/characters.py make <이름> "<설명>" 화남 놀람        # 일부 표정만 (다시) 만들기
+    python3 sseol/characters.py make <이름> "<설명>" --meme           # 밈 같은 과장된 리액션 마스코트 (우리만의 캐릭터)
 
 AI 인물은 처음에 '기본' 얼굴을 만들고, 그 그림을 바탕으로 표정만 바꿔 같은 사람처럼 보이게 한다.
 실존 인물·연예인을 닮게 만들지 않는다 (설명에 실존 인물 이름을 쓰지 않는다).
@@ -32,6 +33,10 @@ FACE_PROMPTS = {
     "깨달음": "eureka moment, eyes bright, one finger raised",
     "의문": "confused, tilting head, one eyebrow raised",
 }
+MEME_STYLE = ("Bold, exaggerated internet reaction-sticker style, thick black outlines, flat colors, "
+              "very expressive over-the-top face, simple shapes, transparent background, no text, no logos. "
+              "An ORIGINAL mascot: must not resemble Pepe the Frog, Doge, Wojak, Grumpy Cat or any existing "
+              "meme, cartoon or brand character.")
 STYLE = ("Simple, cute Japanese-style flat clip-art illustration with soft colors and thin outlines, "
          "upper body, facing the viewer, transparent background, no text, no logos. "
          "A fictional person who does not resemble any real person or celebrity; not an existing cartoon character.")
@@ -97,7 +102,8 @@ def shrink(png):
     im.quantize(colors=256, method=Image.Quantize.FASTOCTREE).save(png, optimize=True)
 
 
-def make(name, desc, faces=None):
+def make(name, desc, faces=None, meme=False):
+    style = MEME_STYLE if meme else STYLE
     idx = load_index()
     faces = faces or list(FACE_PROMPTS)
     d = os.path.join(CHAR_DIR, name)
@@ -105,7 +111,7 @@ def make(name, desc, faces=None):
     base = os.path.join(d, "기본.png")
     if not os.path.exists(base):
         print("▶ 기본 얼굴 만드는 중…", flush=True)
-        generate(f"{desc}, {FACE_PROMPTS['기본']}.\n\nStyle: {STYLE}", base)
+        generate(f"{desc}, {FACE_PROMPTS['기본']}.\n\nStyle: {style}", base)
         shrink(base)
     for face in faces:
         if face == "기본" and os.path.exists(base):
@@ -113,10 +119,12 @@ def make(name, desc, faces=None):
         out = os.path.join(d, f"{face}.png")
         print(f"▶ 표정 '{face}' 만드는 중…", flush=True)
         edit(base, f"Keep exactly the same person, hairstyle, clothes and drawing style. "
-                   f"Change only the facial expression and pose to: {FACE_PROMPTS[face]}.\n\nStyle: {STYLE}", out)
+                   f"Change only the facial expression and pose to: {FACE_PROMPTS[face]}.\n\nStyle: {style}", out)
         shrink(out)
     ch = idx["characters"].setdefault(name, {"desc": desc, "source": "ai", "faces": {}})
     ch["desc"], ch["source"] = desc, "ai"
+    if meme:
+        ch["meme"] = True
     for face in FACE_PROMPTS:
         if os.path.exists(os.path.join(d, f"{face}.png")):
             ch["faces"][face] = f"{name}/{face}.png"
@@ -130,7 +138,8 @@ def main():
         for name, ch in idx["characters"].items():
             print(f"{name:8s} [{ch['source']}] {ch.get('desc', '')}\n         표정: {' '.join(ch['faces'])}")
     elif len(sys.argv) >= 4 and sys.argv[1] == "make":
-        make(sys.argv[2], sys.argv[3], sys.argv[4:] or None)
+        rest = [a for a in sys.argv[4:] if a != "--meme"]
+        make(sys.argv[2], sys.argv[3], rest or None, "--meme" in sys.argv)
     else:
         print(__doc__)
 

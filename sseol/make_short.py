@@ -16,6 +16,7 @@
   "board"                                      게시판 목록 클릭 화면 (보통 첫 장면)
   {"char": "민수", "face": "화남"}              등장인물 표정 (sseol/assets/characters/index.json)
   {"news"|"sns"|"chat"|"map": {...}}           가짜 기사·SNS·문자·지도 화면 (sseol/templates.py)
+  그림 항목이나 장면에 "fx": "zoom" 또는 ["shake", "lines"] — 밈 효과 (FX 참고)
 
 대화형 썰 (여러 목소리)
   장면에 "speaker": "엄마" 를 쓰면 그 대사는 그 사람 목소리로 따로 만든다 (없으면 나레이션).
@@ -29,6 +30,7 @@ API 키는 환경변수(ELEVENLABS_API_KEY, OPENAI_API_KEY)가 있으면 쓰고,
 없으면 클로드 코드 클라우드 환경의 "API credentials"가 자동으로 붙여준다고 보고 키 없이 요청한다.
 """
 import base64
+import hashlib
 import json
 import math
 import os
@@ -72,6 +74,17 @@ MOODS = {
     "고민": ("purple", "[thoughtful]", "고민"),
 }
 NARRATOR = "나레이션"
+# 밈 효과 (그림 항목 또는 장면의 "fx")
+FX = {
+    "zoom": "얼굴 쪽으로 빠르게 확대 (충격·깨달음)",
+    "punch": "크게 튀어나왔다가 제자리 (등장·강조)",
+    "shake": "화면 흔들림 (분노·충격)",
+    "flash": "하얗게 번쩍 (반전 순간)",
+    "lines": "만화 집중선 (놀람·강조)",
+    "red": "빨간 화면 (분노)",
+    "dark": "어두운 가장자리 (절망·공포)",
+    "bw": "흑백 (회상·허무)",
+}
 CHAR_DIR = os.path.join(ROOT, "assets", "characters")
 ZOOM_END = 1.04
 IRA_LIMIT = 20                              # 이라스토야 영상 1편 최대 장수
@@ -548,6 +561,43 @@ def load_characters():
         return json.load(f).get("characters", {})
 
 
+# ── 밈 효과 ─────────────────────────────────────────────
+def static_fx(img, fx):
+    """색을 바꾸는 효과는 그림에 한 번만 입힌다"""
+    if "bw" in fx:
+        img = img.convert("L").convert("RGB")
+    if "red" in fx:
+        img = Image.blend(img, Image.new("RGB", img.size, (230, 20, 20)), 0.33)
+    if "red" in fx or "dark" in fx:
+        yy, xx = np.mgrid[0:img.height, 0:img.width]
+        r = np.sqrt(((xx - img.width / 2) / (img.width / 2)) ** 2 + ((yy - img.height / 2) / (img.height / 2)) ** 2)
+        k = np.clip(1.25 - r * (0.75 if "dark" in fx else 0.45), 0.15, 1.0)[..., None]
+        img = Image.fromarray((np.asarray(img, np.float32) * k).astype(np.uint8))
+    return img
+
+
+_LINES = {}
+
+
+def speed_lines(v):
+    """만화 집중선 (가장자리에서 가운데로 모이는 검은 선). 4가지를 번갈아 써서 살짝 움직이게"""
+    if v not in _LINES:
+        rng = np.random.default_rng(v + 11)
+        im = Image.new("RGBA", (W, IMG_H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        cx, cy, R = W / 2, IMG_H / 2, math.hypot(W, IMG_H)
+        for _ in range(110):
+            ang = rng.uniform(0, 2 * math.pi)
+            r0 = rng.uniform(0.36, 0.5) * min(W, IMG_H) * 1.15
+            wd = rng.uniform(0.004, 0.013)
+            pts = [(cx + r0 * math.cos(ang), cy + r0 * math.sin(ang)),
+                   (cx + R * math.cos(ang - wd), cy + R * math.sin(ang - wd)),
+                   (cx + R * math.cos(ang + wd), cy + R * math.sin(ang + wd))]
+            d.polygon(pts, fill=(0, 0, 0, 225))
+        _LINES[v] = im
+    return _LINES[v]
+
+
 # ── 메인 ────────────────────────────────────────────────
 def main():
     if len(sys.argv) < 2:
@@ -619,8 +669,9 @@ def main():
         for gi, (g0, g1, v, tag) in enumerate(groups):
             ca, cb = spans[g0][0], spans[g1][1]
             text = full[ca:cb]
-            mp3 = os.path.join(work, f"voice_{gi + 1:02d}.mp3")
             meta = json.dumps([text, v, cfg["tts_model"], tag], ensure_ascii=False, sort_keys=True)
+            # 파일 이름을 내용으로 정해서, 장면을 넣거나 빼도 안 바뀐 대사는 다시 만들지 않는다
+            mp3 = os.path.join(work, f"voice_{hashlib.sha1(meta.encode()).hexdigest()[:10]}.mp3")
             saved = {}
             if os.path.exists(mp3) and os.path.exists(mp3 + ".json"):
                 with open(mp3 + ".json") as f:
@@ -757,6 +808,16 @@ def main():
                 gen_image(it["ai"], cfg, p)
         return Image.open(p), "cover" if it.get("fill") else "full"
 
+    def add(slot):
+        """칸 추가 + 밈 효과 중 색 바꾸기(red·dark·bw)는 미리 그림에 입힌다"""
+        a, b, img = slot
+        bad = [f for f in cur_fx if f not in FX]
+        if bad:
+            raise RuntimeError(f"모르는 효과 {bad}. 쓸 수 있는 것: {', '.join(FX)}")
+        if img != "board":
+            img = static_fx(img, cur_fx)
+        slots.append((a, b, img, cur_fx))
+
     for i, s in enumerate(scenes):
         items = s.get("images")
         if not items:
@@ -767,8 +828,10 @@ def main():
         for j, it in enumerate(items):
             a = st + (en - st) * j / len(items)
             b = st + (en - st) * (j + 1) / len(items)
+            fx = (it.get("fx") if isinstance(it, dict) else None) or s.get("fx") or []
+            cur_fx = [fx] if isinstance(fx, str) else list(fx)
             if it == "board":
-                slots.append((a, b, "board"))
+                add((a, b, "board"))
                 continue
             n += 1
             p = os.path.join(work, f"img_{i + 1:02d}_{j + 1}.png")
@@ -780,18 +843,18 @@ def main():
                 if kind == "chat" and spec.get("reveal"):           # 말풍선이 하나씩 올라온다
                     m = max(1, len(spec.get("msgs", [])))
                     for k in range(m):
-                        slots.append((a + (b - a) * k / m, a + (b - a) * (k + 1) / m,
+                        add((a + (b - a) * k / m, a + (b - a) * (k + 1) / m,
                                       templates.render_chat(spec, W, IMG_H, tfont, k + 1)))
                 elif kind == "chat":
-                    slots.append((a, b, templates.render_chat(spec, W, IMG_H, tfont)))
+                    add((a, b, templates.render_chat(spec, W, IMG_H, tfont)))
                 elif kind == "map":
-                    slots.append((a, b, templates.render_map(spec, W, IMG_H, tfont)))
+                    add((a, b, templates.render_map(spec, W, IMG_H, tfont)))
                 else:
                     render = templates.render_news if kind == "news" else templates.render_sns
-                    slots.append((a, b, render(spec, W, IMG_H, tfont, pic)))
+                    add((a, b, render(spec, W, IMG_H, tfont, pic)))
                 continue
             img, how = picture(it, p)
-            slots.append((a, b, cover(img, W, IMG_H) if how == "cover"
+            add((a, b, cover(img, W, IMG_H) if how == "cover"
                           else fit_into(img, W, IMG_H, pad=0 if how == "full" else 36)))
     n_ira = len(ira_files)
     with open(os.path.join(out_dir, "credits.txt"), "w", encoding="utf-8") as f:
@@ -871,7 +934,7 @@ def main():
         t = fi / FPS
         while si < len(slots) - 1 and t >= slots[si][1]:
             si += 1
-        st, en, src = slots[si]
+        st, en, src, fx = slots[si]
         frame = Image.new("RGB", (W, H), BG)
         if src == "board":
             frame.paste(board, (0, IMG_TOP))
@@ -883,9 +946,28 @@ def main():
         else:
             prog = min(1.0, max(0.0, (t - st) / max(0.1, en - st)))
             z = 1.0 + (ZOOM_END - 1.0) * prog
+            dt = t - st
+            cx, cy = W / 2, IMG_H / 2
+            if "zoom" in fx:                                  # 0.3초 만에 얼굴 쪽으로 1.35배
+                e = 1 - (1 - min(1.0, dt / 0.3)) ** 3
+                z *= 1 + 0.35 * e
+                cy = IMG_H / 2 - IMG_H * 0.1 * e
+            if "punch" in fx:                                 # 1.25배에서 0.15초 만에 제자리
+                z *= 1 + 0.25 * max(0.0, 1 - dt / 0.15)
+            if "shake" in fx and dt < 0.6:
+                z *= 1.05
+                amp = 22 * (1 - dt / 0.6)
+                cx += amp * math.sin(dt * 95)
+                cy += amp * math.cos(dt * 71)
             cw, chh = W / z, IMG_H / z
-            x0, y0 = (W - cw) / 2, (IMG_H - chh) / 2
-            frame.paste(src.resize((W, IMG_H), Image.BILINEAR, box=(x0, y0, x0 + cw, y0 + chh)), (0, IMG_TOP))
+            x0, y0 = cx - cw / 2, cy - chh / 2
+            pic = src.resize((W, IMG_H), Image.BILINEAR, box=(x0, y0, x0 + cw, y0 + chh))
+            if "lines" in fx:
+                lines_fx = speed_lines(fi // 3 % 4)
+                pic.paste(lines_fx, (0, 0), lines_fx)
+            if "flash" in fx and dt < 0.25:
+                pic = Image.blend(pic, Image.new("RGB", pic.size, (255, 255, 255)), 0.9 * (1 - dt / 0.25))
+            frame.paste(pic, (0, IMG_TOP))
         frame.paste(title, (0, 0), title)
         while sub_i < len(subs) - 1 and t >= subs[sub_i][1]:
             sub_i += 1
