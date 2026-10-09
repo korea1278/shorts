@@ -1,0 +1,197 @@
+{
+  "id": "20261009-hangeul",
+  "title": [
+    "한글날이 원래",
+    "가갸날이었다고?"
+  ],
+  "title_yellow": 1,
+  "post_title": "한글날이 원래 가갸날이었다고?",
+  "board": [],
+  "source": "https://m.bobaedream.co.kr/board/bbs_view/best/1038350/2/1",
+  "scenes": [
+    {
+      "text": "한글날이 원래 가갸날이었다고?",
+      "images": [
+        "board"
+      ]
+    },
+    {
+      "text": "오늘은 한글날인데, 올해로 딱 100주년임.",
+      "images": [
+        {
+          "ai": "simple clipart of a birthday cake with candles and confetti celebrating an anniversary, no text"
+        }
+      ],
+      "red": [
+        "100주년"
+      ],
+      "sfx": "pop"
+    },
+    {
+      "text": "근데 처음 이름은 한글날이 아니었음.",
+      "images": [
+        {
+          "ai": "simple clipart of a confused young man scratching his head with question marks above, no text"
+        }
+      ],
+      "sfx": "huh"
+    },
+    {
+      "text": "1926년, 일제강점기에 조선어연구회가 첫 기념식을 열었음.",
+      "images": [
+        {
+          "ai": "simple clipart of old-fashioned 1920s Korean scholars in traditional clothes and round glasses sitting around a table discussing, no text"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2016/03/blog-post_42.html"
+        }
+      ]
+    },
+    {
+      "text": "그때 붙인 이름이 바로 가갸날이었음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2015/01/blog-post_883.html"
+        }
+      ],
+      "red": [
+        "가갸날"
+      ],
+      "sfx": "ding",
+      "sfx_on": "가갸날"
+    },
+    {
+      "text": "한글 배울 때, 가갸거겨 하고 외우던 데서 따온 거임.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2012/11/blog-post_2743.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2012/12/blog-post_8670.html"
+        }
+      ],
+      "red": [
+        "가갸거겨"
+      ]
+    },
+    {
+      "text": "그 시절엔 한글이라는 이름이 낯설었다고 함.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2019/01/blog-post_891.html"
+        }
+      ]
+    },
+    {
+      "text": "그러다 2년 뒤인 1928년에, 한글날로 이름을 바꿨음.",
+      "images": [
+        {
+          "ai": "simple clipart of a hand changing a name tag on a wooden signboard, blank sign, no text"
+        }
+      ],
+      "red": [
+        "한글날"
+      ]
+    },
+    {
+      "text": "근데 날짜도 지금이랑 달랐음. 음력 9월 29일이었음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2018/01/blog-post_554.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2018/02/blog-post_627.html"
+        }
+      ],
+      "sfx": "huh",
+      "sfx_on": "음력"
+    },
+    {
+      "text": "그러다 1940년, 훈민정음 해례본이 발견됨.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2017/02/blog-post_545.html",
+          "fx": "punch"
+        }
+      ],
+      "red": [
+        "훈민정음",
+        "해례본"
+      ],
+      "sfx": "dundun"
+    },
+    {
+      "text": "거기에 한글을 알린 날짜가 적혀 있었던 거임.",
+      "images": [
+        {
+          "ai": "simple clipart of an old yellowed antique book opened with blank pages and a magnifying glass, no letters, no writing"
+        }
+      ]
+    },
+    {
+      "text": "그걸 양력으로 바꾼 날이 바로 10월 9일임.",
+      "images": [
+        {
+          "ai": "simple clipart of a calendar page with a big red circle, no text, no numbers"
+        }
+      ],
+      "red": [
+        "10월 9일"
+      ],
+      "sfx": "tada",
+      "sfx_on": "10월"
+    },
+    {
+      "text": "광복 뒤엔 쉬는 날이 됐는데,",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2014/10/blog-post_60.html"
+        }
+      ]
+    },
+    {
+      "text": "한때 공휴일이 너무 많다는 이유로 빠지기도 했음.",
+      "images": [
+        {
+          "ai": "simple clipart of a disappointed office worker slumping at desk with a calendar, no text, no numbers",
+          "fx": "bw"
+        }
+      ],
+      "red": [
+        "빠지기도"
+      ],
+      "sfx": "fail"
+    },
+    {
+      "text": "그러다 2013년부터 다시 빨간 날이 됐음.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2016/05/blog-post_88.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2016/05/blog-post_51.html"
+        }
+      ],
+      "red": [
+        "빨간 날"
+      ],
+      "sfx": "kaching"
+    },
+    {
+      "text": "그러니까 오늘 늦잠 잔 사람은, 세종대왕님께 감사 인사부터 하셈.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2013/11/blog-post_9684.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2015/01/blog-post_883.html"
+        }
+      ],
+      "red": [
+        "감사 인사"
+      ],
+      "sfx": "laugh",
+      "sfx_on": "감사"
+    }
+  ]
+}
