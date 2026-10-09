@@ -106,6 +106,19 @@
         "놀람": "지은/놀람.png",
         "당황": "지은/당황.png"
       }
+    },
+    "햄찌": {
+      "desc": "an original chubby round cream-colored hamster mascot with a huge head, tiny body and small round ears",
+      "source": "ai",
+      "faces": {
+        "기본": "햄찌/기본.png",
+        "웃음": "햄찌/웃음.png",
+        "화남": "햄찌/화남.png",
+        "억울": "햄찌/억울.png",
+        "놀람": "햄찌/놀람.png",
+        "당황": "햄찌/당황.png"
+      },
+      "meme": true
     }
   }
 }
