@@ -1,0 +1,111 @@
+{
+  "_설명": "등장인물 표정 라이브러리. 장면 images 에 {\"char\": \"이름\", \"face\": \"화남\"} 로 쓴다. ira = 이라스토야 글 주소#파일이름 일부 (그림 파일은 저장소에 넣지 않고 만들 때 받는다, 영상 1편 20장 제한에 포함). ai = 이 폴더의 PNG (AI로 만든 가상 인물, 실존 인물 아님).",
+  "faces": [
+    "기본",
+    "웃음",
+    "화남",
+    "억울",
+    "놀람",
+    "당황",
+    "고민",
+    "깨달음",
+    "의문"
+  ],
+  "characters": {
+    "회사원남": {
+      "desc": "정장 입은 남자 회사원 (이라스토야)",
+      "source": "ira",
+      "faces": {
+        "기본": "https://www.irasutoya.com/2019/04/blog-post_87.html#1_smile",
+        "웃음": "https://www.irasutoya.com/2019/04/blog-post_87.html#1_4_laugh",
+        "화남": "https://www.irasutoya.com/2019/04/blog-post_87.html#1_2_angry",
+        "억울": "https://www.irasutoya.com/2019/04/blog-post_87.html#1_3_cry",
+        "놀람": "https://www.irasutoya.com/2019/04/blog-post_87.html#2_3_surprise",
+        "당황": "https://www.irasutoya.com/2019/04/blog-post_87.html#2_2_shock",
+        "고민": "https://www.irasutoya.com/2019/04/blog-post_87.html#2_4_think",
+        "깨달음": "https://www.irasutoya.com/2019/04/blog-post_87.html#2_1_idea",
+        "의문": "https://www.irasutoya.com/2019/04/blog-post_87.html#3_1_question"
+      }
+    },
+    "회사원여": {
+      "desc": "정장 입은 여자 회사원 (이라스토야)",
+      "source": "ira",
+      "faces": {
+        "기본": "https://www.irasutoya.com/2014/05/blog-post_4842.html#smile",
+        "웃음": "https://www.irasutoya.com/2014/05/blog-post_4842.html#laugh",
+        "화남": "https://www.irasutoya.com/2014/05/blog-post_4842.html#angry",
+        "억울": "https://www.irasutoya.com/2014/05/blog-post_4842.html#cry",
+        "놀람": "https://www.irasutoya.com/2014/05/blog-post_4655.html#surprise",
+        "당황": "https://www.irasutoya.com/2014/05/blog-post_4655.html#shock",
+        "고민": "https://www.irasutoya.com/2014/05/blog-post_4655.html#think",
+        "깨달음": "https://www.irasutoya.com/2014/05/blog-post_4655.html#idea"
+      }
+    },
+    "앞치마남": {
+      "desc": "앞치마 두른 남자, 가게 사장님·아빠 (이라스토야)",
+      "source": "ira",
+      "faces": {
+        "기본": "https://www.irasutoya.com/2015/03/blog-post_538.html#smile",
+        "웃음": "https://www.irasutoya.com/2015/03/blog-post_538.html#laugh",
+        "화남": "https://www.irasutoya.com/2015/03/blog-post_538.html#angry",
+        "억울": "https://www.irasutoya.com/2015/03/blog-post_538.html#cry",
+        "놀람": "https://www.irasutoya.com/2015/03/blog-post_530.html#surprise",
+        "당황": "https://www.irasutoya.com/2015/03/blog-post_530.html#shock",
+        "고민": "https://www.irasutoya.com/2015/03/blog-post_530.html#think",
+        "깨달음": "https://www.irasutoya.com/2015/03/blog-post_530.html#idea"
+      }
+    },
+    "엄마": {
+      "desc": "엄마·아주머니 (이라스토야)",
+      "source": "ira",
+      "faces": {
+        "기본": "https://www.irasutoya.com/2012/06/blog-post_28.html#smile",
+        "웃음": "https://www.irasutoya.com/2012/06/blog-post_28.html#laugh",
+        "화남": "https://www.irasutoya.com/2012/06/blog-post_28.html#angry",
+        "억울": "https://www.irasutoya.com/2012/06/blog-post_28.html#cry",
+        "놀람": "https://www.irasutoya.com/2013/04/blog-post_7305.html#surprise",
+        "당황": "https://www.irasutoya.com/2013/04/blog-post_7305.html#shock",
+        "고민": "https://www.irasutoya.com/2013/04/blog-post_7305.html#think",
+        "깨달음": "https://www.irasutoya.com/2013/04/blog-post_7305.html#idea"
+      }
+    },
+    "아저씨": {
+      "desc": "중년 아저씨 (이라스토야)",
+      "source": "ira",
+      "faces": {
+        "기본": "https://www.irasutoya.com/2013/10/blog-post_3448.html#smile",
+        "웃음": "https://www.irasutoya.com/2013/10/blog-post_3448.html#laugh",
+        "화남": "https://www.irasutoya.com/2013/10/blog-post_3448.html#angry",
+        "억울": "https://www.irasutoya.com/2013/10/blog-post_3448.html#cry",
+        "놀람": "https://www.irasutoya.com/2013/06/blog-post_1667.html#surprise",
+        "당황": "https://www.irasutoya.com/2013/06/blog-post_1667.html#shock",
+        "고민": "https://www.irasutoya.com/2013/06/blog-post_1667.html#think",
+        "깨달음": "https://www.irasutoya.com/2013/06/blog-post_1667.html#idea"
+      }
+    },
+    "민수": {
+      "desc": "a fictional Korean man in his late 20s with short black hair, wearing a plain navy hoodie",
+      "source": "ai",
+      "faces": {
+        "기본": "민수/기본.png",
+        "웃음": "민수/웃음.png",
+        "화남": "민수/화남.png",
+        "억울": "민수/억울.png",
+        "놀람": "민수/놀람.png",
+        "당황": "민수/당황.png"
+      }
+    },
+    "지은": {
+      "desc": "a fictional Korean woman in her late 20s with shoulder-length brown hair, wearing a plain beige cardigan",
+      "source": "ai",
+      "faces": {
+        "기본": "지은/기본.png",
+        "웃음": "지은/웃음.png",
+        "화남": "지은/화남.png",
+        "억울": "지은/억울.png",
+        "놀람": "지은/놀람.png",
+        "당황": "지은/당황.png"
+      }
+    }
+  }
+}

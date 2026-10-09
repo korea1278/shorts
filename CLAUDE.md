@@ -93,8 +93,34 @@
    다운로드 링크: `https://github.com/korea1278/shorts/raw/video-<id>/sseol/output/<id>/<id>.mp4`
    upload.txt 내용은 채팅에도 그대로 붙여준다. 작업 브랜치에는 영상 파일을 올리지 않는다.
 
+## 대화형 썰 (여러 목소리) — 대사가 많은 썰에 쓴다
+레퍼런스(대화형): 검은 배경, 2줄 제목, 가운데 그림, **그림 아래 상자 없는 색 자막**, 여러 목소리 대화.
+- job에 `"cast"`와 `"sub_style": "plain"`을 넣고, 대사 장면에 `"speaker"`를 쓴다 (없으면 나레이션).
+  ```json
+  "sub_style": "plain", "show_speaker": true,
+  "cast": {"나": {"voice": "남자", "color": "sky", "char": "민수"},
+           "엄마": {"voice": "여자", "color": "green", "char": "엄마"}},
+  "scenes": [{"speaker": "엄마", "mood": "화남", "text": "너 어제 왜 연락이 없어?"}]
+  ```
+  - `voice`: `sseol/config.json`의 `voices` 이름 (나레이션·남자·남자2·아저씨·여자) 또는 일레븐랩스 목소리 ID
+  - `mood`: 화남(빨강)·억울(노랑)·놀람(하늘)·당황(주황)·웃음(초록)·슬픔(파랑)·고민(보라) → 자막 색 + 목소리 감정 + 표정
+  - 자막 색 우선순위: 장면 `color` > `mood` > cast `color` > 나레이션(흰색). `show_speaker`면 자막 위에 화자 이름
+  - `char`를 정해 두면 그림(`images`)이 없는 대사 장면은 그 인물의 mood 표정이 자동으로 나온다
+- 같은 목소리·감정이 이어지는 장면은 한 번에 만들고, 화자가 바뀌면 따로 만들어 이어 붙인다 (재사용됨)
+- 표정 라이브러리: `python3 sseol/characters.py list` — 이라스토야 인물(회사원남·회사원여·앞치마남·엄마·아저씨)과
+  AI 가상 인물(민수·지은). 장면 그림 `{"char": "민수", "face": "놀람"}`. 새 AI 인물: `python3 sseol/characters.py make <이름> "<English 설명>"`
+- 가짜 화면 템플릿 (`sseol/templates.py`, 화면 구석에 "재구성 화면" 표시가 자동으로 들어감):
+  `{"chat": {"title": "엄마", "msgs": [["엄마", "밥은?"], ["나", "먹었어"]], "reveal": true}}` 문자 (reveal = 말풍선이 하나씩)
+  `{"news": {"outlet": "썰뉴스", "headline": "...", "lead": "...", "img": {"char": "민수", "face": "당황"}}}` 기사
+  `{"sns": {"name": "옆 팀 대리", "handle": "@next_team", "text": "...", "likes": 32, "comments": 7}}` SNS 글
+  `{"map": {"from": "우리 집", "to": "회사", "note": "출근까지 40분", "seed": 4}}` 지어낸 동네 지도
+- **금지**: 실제 언론사·방송사·SNS·메신저·지도 이름과 로고 (엔진이 막는다), 실존 인물 얼굴,
+  실존 인물이 한 말처럼 지어낸 대사·기사·SNS 글. 가상 기사는 썰 속 상상·과장임이 드러나게 쓴다 (예: 날짜에 "상상 속 뉴스")
+- 시험 영상 예시: `sseol/jobs/20261009-dialogue.json`
+
 ## 설정
 - 목소리: `sseol/config.json` 의 `voice_id` (Hojin Lim). 바꾸려면 일레븐랩스 목소리 ID를 넣는다.
+  대화형 역할 목소리는 같은 파일의 `voices` (일레븐랩스 내 목소리에 추가된 것만 쓸 수 있다).
 - 배경음악: **기본 없음** (사용자 요청: 어지럽다). 켜려면 `sseol/config.json`에 `"bgm": true`.
 - 목소리: 최신 모델 `eleven_v3`로 자연스럽게 만든 뒤 **1.25배속**(`tempo`, 목소리 높이는 그대로). 배속 뒤 0.3초 넘는 쉼만 0.22초로.
   쇼츠는 빠르게 보니 느리면 안 된다 (사용자 요청). 받아쓰기로 뭉개진 단어가 있으면 문장을 또박또박 읽히게 바꿔 다시 만든다.

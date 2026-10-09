@@ -14,6 +14,16 @@
   {"ira": "이라스토야 글 주소 또는 그림 주소"}   흰 바탕에 그림 (영상 1편 20장까지)
   {"ai": "English prompt"}                     AI 그림
   "board"                                      게시판 목록 클릭 화면 (보통 첫 장면)
+  {"char": "민수", "face": "화남"}              등장인물 표정 (sseol/assets/characters/index.json)
+  {"news"|"sns"|"chat"|"map": {...}}           가짜 기사·SNS·문자·지도 화면 (sseol/templates.py)
+
+대화형 썰 (여러 목소리)
+  장면에 "speaker": "엄마" 를 쓰면 그 대사는 그 사람 목소리로 따로 만든다 (없으면 나레이션).
+  job 의 "cast": {"엄마": {"voice": "여자", "color": "yellow", "char": "엄마"}}
+    voice = config.json 의 voices 이름 (또는 일레븐랩스 목소리 ID), color = 자막 색, char = 표정 라이브러리 인물
+  장면 "mood": 화남·억울·놀람·당황·웃음·슬픔·고민 → 자막 색, 목소리 감정(v3 태그), 인물 표정이 같이 바뀐다.
+  자막 색 우선순위: 장면 color > mood > cast color > 나레이션 색(대화형은 흰색)
+  job "sub_style": "plain" 이면 상자 없이 그림 아래 검은 바탕에 색 글자 (레퍼런스 대화형), 기본 "box".
 
 API 키는 환경변수(ELEVENLABS_API_KEY, OPENAI_API_KEY)가 있으면 쓰고,
 없으면 클로드 코드 클라우드 환경의 "API credentials"가 자동으로 붙여준다고 보고 키 없이 요청한다.
@@ -33,6 +43,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import irasutoya  # noqa: E402
+import templates  # noqa: E402
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 W, H, FPS = 1080, 1920, 30
@@ -45,12 +56,31 @@ TITLE_MAX_W = 1040
 IMG_TOP, IMG_H = 480, 960                   # 그림 영역 (가로 꽉 참)
 SUB_CENTER_Y = 1362                         # 자막 상자 중심 (그림 아래쪽 안)
 SUB_MAX_CHARS = 12                          # 자막 한 줄 최대 글자 수 (공백 제외)
+SUB_PLAIN_Y = 1560                          # 상자 없는 자막 중심 (그림 아래 검은 바탕)
 WHITE, YELLOW, RED = (255, 255, 255), (255, 236, 0), (255, 50, 40)
+COLORS = {"white": WHITE, "yellow": YELLOW, "red": RED, "sky": (80, 200, 255), "blue": (90, 140, 255),
+          "orange": (255, 150, 30), "green": (80, 230, 120), "pink": (255, 120, 190), "purple": (190, 130, 255),
+          "gray": (190, 190, 190)}
+# 감정: 자막 색 · 일레븐랩스 v3 감정 태그 · 표정 라이브러리 얼굴
+MOODS = {
+    "화남": ("red", "[angry]", "화남"),
+    "억울": ("yellow", "[frustrated]", "억울"),
+    "놀람": ("sky", "[surprised]", "놀람"),
+    "당황": ("orange", "[nervous]", "당황"),
+    "웃음": ("green", "[laughing]", "웃음"),
+    "슬픔": ("blue", "[sad]", "억울"),
+    "고민": ("purple", "[thoughtful]", "고민"),
+}
+NARRATOR = "나레이션"
+CHAR_DIR = os.path.join(ROOT, "assets", "characters")
 ZOOM_END = 1.04
 IRA_LIMIT = 20                              # 이라스토야 영상 1편 최대 장수
 
 DEFAULT_CONFIG = {
-    "voice_id": "",
+    "voice_id": "",                     # 나레이션 목소리 (voices 에 "나레이션" 이 없을 때)
+    "voices": {},                       # 대화형 썰 역할별 목소리 {"여자": {"voice_id": ..., "voice_settings": {...}}}
+    "mood_tags": True,                  # mood 에 맞춰 v3 감정 태그를 붙인다
+    "dialogue_gap": 0.25,               # 화자가 바뀔 때 사이 쉼 (배속 전)
     "tts_model": "eleven_v3",           # 가장 자연스러운 최신 모델 (사용자 선택)
     "voice_settings": {"stability": 0.5, "similarity_boost": 0.8},
     "tempo": 1.25,                      # 배속 (목소리 높이는 그대로, 말만 빠르게)
@@ -121,20 +151,30 @@ def font_path(kind):
 
 
 # ── 나레이션 ────────────────────────────────────────────
-def tts_elevenlabs(text, cfg, out_mp3):
-    if not cfg.get("voice_id"):
+def tts_elevenlabs(text, voice, cfg, out_mp3, tag=""):
+    """voice = {"voice_id", "voice_settings"}. tag(v3 감정 태그)는 앞에 붙여 읽히고, 글자 타이밍에서는 뺀다."""
+    if not voice.get("voice_id"):
         raise RuntimeError("sseol/config.json 에 voice_id(일레븐랩스 목소리 ID)를 넣어주세요")
     headers = {}
     if os.environ.get("ELEVENLABS_API_KEY"):
         headers["xi-api-key"] = os.environ["ELEVENLABS_API_KEY"]
-    url = (f"https://api.elevenlabs.io/v1/text-to-speech/{cfg['voice_id']}/with-timestamps"
+    url = (f"https://api.elevenlabs.io/v1/text-to-speech/{voice['voice_id']}/with-timestamps"
            f"?output_format=mp3_44100_128")
-    res = http_json(url, {"text": text, "model_id": cfg["tts_model"],
-                          "voice_settings": cfg["voice_settings"]}, headers)
+    sent = f"{tag} {text}" if tag else text
+    res = http_json(url, {"text": sent, "model_id": cfg["tts_model"],
+                          "voice_settings": voice["voice_settings"]}, headers)
     with open(out_mp3, "wb") as f:
         f.write(base64.b64decode(res["audio_base64"]))
     al = res.get("alignment") or res.get("normalized_alignment")
-    return al["character_start_times_seconds"], al["character_end_times_seconds"]
+    chars = "".join(al.get("characters", []))
+    st, en = al["character_start_times_seconds"], al["character_end_times_seconds"]
+    if chars.endswith(text) and len(st) == len(chars):
+        k = len(chars) - len(text)
+        return st[k:], en[k:]
+    # 글자 수가 안 맞으면(정규화 등) 전체 길이에 고르게 나눈다
+    a, b = (st[0] if st else 0.0), (en[-1] if en else 1.0)
+    step = (b - a) / max(1, len(text))
+    return [a + i * step for i in range(len(text))], [a + (i + 1) * step for i in range(len(text))]
 
 
 def mp3_to_array(path):
@@ -221,15 +261,18 @@ def gen_image(prompt, cfg, out_png):
 
 
 def fetch_irasutoya(ref, out_png):
-    """글 주소면 그 글의 첫 그림(또는 #2 처럼 번호), 그림 주소면 그대로 받는다."""
-    url, n = ref, 1
-    m = re.match(r"(.*)#(\d+)$", ref)
+    """글 주소면 그 글의 첫 그림(또는 #2 처럼 번호, #angry 처럼 파일 이름 일부), 그림 주소면 그대로 받는다."""
+    url, n, key = ref, 1, None
+    m = re.match(r"(.*)#([^#/]+)$", ref)
     if m:
-        url, n = m.group(1), int(m.group(2))
+        url = m.group(1)
+        n, key = (int(m.group(2)), None) if m.group(2).isdigit() else (1, m.group(2))
     if re.search(r"irasutoya\.com/\d{4}/\d{2}/", url):
         imgs = irasutoya.images(url)
+        if key:
+            imgs = [u for u in imgs if key in u.rsplit("/", 1)[-1]]
         if not imgs:
-            raise RuntimeError(f"이라스토야 그림을 못 찾음: {url}")
+            raise RuntimeError(f"이라스토야 그림을 못 찾음: {ref}")
         url = imgs[min(n, len(imgs)) - 1]
     data = irasutoya.get(url)
     with open(out_png, "wb") as f:
@@ -456,9 +499,20 @@ def chunk_text(text, max_chars=SUB_MAX_CHARS):
     return chunks
 
 
-def make_sub(text, color, reds):
-    """검은 상자 + 노란(또는 흰) 글자. reds 에 든 단어는 빨간색."""
-    f = fit_font(font_path("bold"), [text], W - 100, 62, 42)
+def rgb(color):
+    """색 이름(white, yellow, red, sky, orange, green ...) 또는 "#RRGGBB" → (r, g, b)"""
+    if isinstance(color, (list, tuple)):
+        return tuple(color)
+    if isinstance(color, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+        return tuple(int(color[i:i + 2], 16) for i in (1, 3, 5))
+    return COLORS.get(color, YELLOW)
+
+
+def make_sub(text, color, reds, style="box", label=None):
+    """box: 검은 상자 + 색 글자 / plain: 상자 없이 검은 테두리 색 글자 (그림 아래 검은 바탕용).
+    reds 에 든 단어는 빨간색. label 이 있으면 위에 작게 화자 이름."""
+    plain = style == "plain"
+    f = fit_font(font_path("bold"), [text], W - 100, 68 if plain else 62, 42)
     tmp = ImageDraw.Draw(Image.new("RGB", (10, 10)))
     words = text.split(" ")
     sp = tmp.textlength(" ", font=f)
@@ -466,17 +520,32 @@ def make_sub(text, color, reds):
     tw = sum(widths) + sp * (len(words) - 1)
     asc, desc = f.getmetrics()
     bw, bh = int(tw + 36), int(asc + desc + 14)
-    layer = Image.new("RGBA", (W, bh), (0, 0, 0, 0))
+    lh = 64 if label else 0
+    layer = Image.new("RGBA", (W, bh + lh), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     x0 = (W - bw) // 2
-    d.rectangle((x0, 0, x0 + bw, bh), fill=(0, 0, 0, 235))
+    base = rgb(color)
+    if label:
+        d.text((W / 2, lh / 2 - 6), label, font=ImageFont.truetype(font_path("bold"), 42), fill=base,
+               anchor="mm", stroke_width=3, stroke_fill=(0, 0, 0))
+    if not plain:
+        d.rectangle((x0, lh, x0 + bw, lh + bh), fill=(0, 0, 0, 235))
     x = x0 + 18
-    base = YELLOW if color == "yellow" else WHITE if color == "white" else RED
     rs = {w for r in (reds or []) for w in r.split()}
     for w, ww in zip(words, widths):
-        d.text((x, bh / 2), w, font=f, fill=RED if w in rs else base, anchor="lm")
+        d.text((x, lh + bh / 2), w, font=f, fill=RED if w in rs else base, anchor="lm",
+               stroke_width=5 if plain else 0, stroke_fill=(0, 0, 0))
         x += ww + sp
+    layer.info["cy"] = lh + bh // 2               # 글자 줄의 세로 중심 (붙일 때 기준)
     return layer
+
+
+def load_characters():
+    p = os.path.join(CHAR_DIR, "index.json")
+    if not os.path.exists(p):
+        return {}
+    with open(p, encoding="utf-8") as f:
+        return json.load(f).get("characters", {})
 
 
 # ── 메인 ────────────────────────────────────────────────
@@ -505,8 +574,38 @@ def main():
         full += t
     log(f"나레이션 {len(full)}자 (공백 제외 {len(full.replace(' ', ''))}자), 장면 {len(scenes)}개")
 
-    # 2) 나레이션 생성
-    mp3 = os.path.join(work, "voice.mp3")
+    # 2) 나레이션 생성 — 같은 목소리·감정이 이어지는 장면끼리 묶어 한 번에 만든다
+    cast = job.get("cast") or {}
+    voices = cfg.get("voices") or {}
+
+    def speaker_of(s):
+        return s.get("speaker") or NARRATOR
+
+    def voice_of(name):
+        key = (cast.get(name) or {}).get("voice", name)
+        v = voices.get(key)
+        if v is None and re.fullmatch(r"[A-Za-z0-9]{16,}", str(key)):
+            v = key                                         # 일레븐랩스 목소리 ID 를 바로 쓴 경우
+        if v is None:
+            if name != NARRATOR:
+                log(f"⚠ '{name}' 목소리가 config.json voices 에 없어 나레이션 목소리로 읽습니다")
+            v = voices.get(NARRATOR) or cfg["voice_id"]
+        if isinstance(v, str):
+            v = {"voice_id": v}
+        return {"voice_id": v.get("voice_id", ""), "voice_settings": v.get("voice_settings", cfg["voice_settings"])}
+
+    groups = []                                             # [첫 장면, 끝 장면, 목소리, 감정 태그]
+    for i, s in enumerate(scenes):
+        v = voice_of(speaker_of(s))
+        tag = MOODS[s["mood"]][1] if cfg.get("mood_tags") and s.get("mood") in MOODS else ""
+        if groups and groups[-1][2] == v and groups[-1][3] == tag:
+            groups[-1][1] = i
+        else:
+            groups.append([i, i, v, tag])
+    speakers = sorted({speaker_of(s) for s in scenes})
+    if speakers != [NARRATOR]:
+        log(f"대화형: 화자 {len(speakers)}명 ({', '.join(speakers)}), 목소리 묶음 {len(groups)}개")
+
     if test_mode:
         per = 0.15
         starts = [i * per for i in range(len(full))]
@@ -514,21 +613,41 @@ def main():
         voice = np.zeros(int(SR * (len(full) * per)), dtype=np.float32)
         log("시험 모드: 무음 나레이션")
     else:
-        meta = json.dumps([full, cfg["voice_id"], cfg["tts_model"], cfg["voice_settings"]], ensure_ascii=False)
-        cached = False
-        if os.path.exists(mp3) and os.path.exists(mp3 + ".json"):
-            with open(mp3 + ".json") as f:
-                saved = json.load(f)
+        pieces, starts, ends, t0 = [], [0.0] * len(full), [0.0] * len(full), 0.0
+        gap = float(cfg.get("dialogue_gap", 0.25))
+        reused = 0
+        for gi, (g0, g1, v, tag) in enumerate(groups):
+            ca, cb = spans[g0][0], spans[g1][1]
+            text = full[ca:cb]
+            mp3 = os.path.join(work, f"voice_{gi + 1:02d}.mp3")
+            meta = json.dumps([text, v, cfg["tts_model"], tag], ensure_ascii=False, sort_keys=True)
+            saved = {}
+            if os.path.exists(mp3) and os.path.exists(mp3 + ".json"):
+                with open(mp3 + ".json") as f:
+                    saved = json.load(f)
             if saved.get("meta") == meta:
-                starts, ends = saved["starts"], saved["ends"]
-                cached = True
-                log("이전에 만든 나레이션 재사용")
-        if not cached:
-            log("일레븐랩스 나레이션 만드는 중…")
-            starts, ends = tts_elevenlabs(full, cfg, mp3)
-            with open(mp3 + ".json", "w") as f:
-                json.dump({"meta": meta, "starts": starts, "ends": ends}, f)
-        voice = mp3_to_array(mp3)
+                st, en = saved["starts"], saved["ends"]
+                reused += 1
+            else:
+                log(f"일레븐랩스 목소리 만드는 중… ({gi + 1}/{len(groups)}) {speaker_of(scenes[g0])} {tag}".rstrip())
+                st, en = tts_elevenlabs(text, v, cfg, mp3, tag)
+                with open(mp3 + ".json", "w") as f:
+                    json.dump({"meta": meta, "starts": st, "ends": en}, f)
+            arr = mp3_to_array(mp3)
+            act = arr[np.abs(arr) > 0.02]                   # 목소리마다 크기가 달라서 같은 크기로 맞춘다
+            if len(act):
+                arr = np.clip(arr * (0.1 / (np.sqrt((act ** 2).mean()) + 1e-9)), -1, 1)
+            if gi:
+                pieces.append(np.zeros(int(SR * gap), np.float32))
+                starts[ca - 1], ends[ca - 1] = t0, t0 + gap  # 묶음 사이 띄어쓰기 자리
+                t0 += gap
+            for k in range(len(text)):
+                starts[ca + k], ends[ca + k] = t0 + st[k], t0 + en[k]
+            pieces.append(arr.astype(np.float32))
+            t0 += len(arr) / SR
+        if reused:
+            log(f"이전에 만든 목소리 {reused}개 재사용")
+        voice = np.concatenate(pieces)
         voice, starts, ends = speed_up(voice, starts, ends, float(cfg.get("tempo", 1.0)))
         voice, starts, ends = shorten_pauses(voice, starts, ends, cfg["max_pause"], cfg["pause_to"])
     for i in range(len(scenes) - 1, 0, -1):               # 웃음 포인트 앞 '뜸'
@@ -550,17 +669,32 @@ def main():
         scene_times.append((st, en))
 
     # 3) 자막 (장면별 sub 가 있으면 그 글로, 없으면 나레이션을 잘라서)
+    dialogue = speakers != [NARRATOR] or bool(cast)
+    narr_color = job.get("narration_color", "white" if dialogue else "yellow")
+
+    def color_of(s):
+        if s.get("color"):
+            return s["color"]
+        if s.get("mood") in MOODS:
+            return MOODS[s["mood"]][0]
+        return (cast.get(speaker_of(s)) or {}).get("color") or narr_color
+
     subs = []
     for i, s in enumerate(scenes):
         a, b = spans[i]
-        color, reds = s.get("color", "yellow"), s.get("red", [])
+        color, reds = color_of(s), s.get("red", [])
+        style = s.get("sub_style", job.get("sub_style", "box"))
+        label = speaker_of(s) if job.get("show_speaker") and speaker_of(s) != NARRATOR else None
+        y = SUB_PLAIN_Y if style == "plain" else SUB_CENTER_Y
+
+        def sub(text):
+            return make_sub(text, color, reds, style, label), y
         if s.get("sub") is not None:
             lines = s["sub"] if isinstance(s["sub"], list) else [s["sub"]]
             st, en = scene_times[i]
             for j, l in enumerate(lines):
                 if l:
-                    subs.append([st + (en - st) * j / len(lines), st + (en - st) * (j + 1) / len(lines),
-                                 make_sub(l, color, reds)])
+                    subs.append([st + (en - st) * j / len(lines), st + (en - st) * (j + 1) / len(lines), *sub(l)])
             continue
         seg = full[a:b]
         pos = 0
@@ -568,7 +702,7 @@ def main():
             k = seg.find(ch, pos)
             k = pos if k < 0 else k
             pos = k + len(ch)
-            subs.append([t_at(a + k), t_at(a + pos - 1, True), make_sub(re.sub(r"[.,…]+", "", ch).strip(), color, reds)])
+            subs.append([t_at(a + k), t_at(a + pos - 1, True), *sub(re.sub(r"[.,…]+", "", ch).strip())])
     subs.sort(key=lambda x: x[0])
     for j in range(len(subs) - 1):
         subs[j][1] = subs[j + 1][0]
@@ -579,9 +713,56 @@ def main():
     post_title = job.get("post_title") or " ".join(job["title"])
     board = make_board(post_title, job.get("board") or DEFAULT_BOARD)
     slots = []           # (시작, 끝, 그림 또는 "board")
-    credits, n_ira, n = [], 0, 0
+    credits, ira_files, n = [], {}, 0
+    chars = load_characters()
+    fonts_cache = {}
+
+    def tfont(size, kind="bold"):
+        if (size, kind) not in fonts_cache:
+            fonts_cache[size, kind] = ImageFont.truetype(font_path(kind), size)
+        return fonts_cache[size, kind]
+
+    def ira_image(ref, p):
+        """같은 그림은 한 번만 받고 한 장으로 센다"""
+        if ref not in ira_files:
+            if len(ira_files) >= IRA_LIMIT:
+                raise RuntimeError(f"이라스토야 그림이 {IRA_LIMIT}장을 넘었습니다. 일부를 AI 그림으로 바꿔 주세요")
+            ira_files[ref] = p
+            credits.append(ref)
+        p = ira_files[ref]
+        if test_mode and not os.path.exists(p):
+            return placeholder_image(n, "", W, IMG_H)
+        if not os.path.exists(p):
+            log(f"이라스토야 그림 받는 중… ({os.path.basename(p)})")
+            fetch_irasutoya(ref, p)
+        return Image.open(p)
+
+    def picture(it, p):
+        """그림 항목 → (그림, 넣는 방식: pad 흰 여백 / full 여백 없음 / cover 꽉 채움)"""
+        if "char" in it:
+            ch = chars.get(it["char"])
+            if not ch:
+                raise RuntimeError(f"등장인물 '{it['char']}' 이 sseol/assets/characters/index.json 에 없습니다")
+            ref = ch["faces"].get(it.get("face") or "기본") or ch["faces"].get("기본")
+            if ch.get("source") == "ira":
+                return ira_image(ref, os.path.join(work, "char_" + re.sub(r"\W", "_", ref[-40:]) + ".png")), "pad"
+            return Image.open(os.path.join(CHAR_DIR, ref)).convert("RGBA"), "pad"
+        if "ira" in it:
+            return ira_image(it["ira"], p), "pad"
+        if not os.path.exists(p):
+            if test_mode:
+                placeholder_image(n, "", W, IMG_H).save(p)
+            else:
+                log(f"AI 그림 만드는 중… ({os.path.basename(p)})")
+                gen_image(it["ai"], cfg, p)
+        return Image.open(p), "cover" if it.get("fill") else "full"
+
     for i, s in enumerate(scenes):
-        items = s.get("images") or ["board" if i == 0 else {"ai": s["text"]}]
+        items = s.get("images")
+        if not items:
+            c = (cast.get(speaker_of(s)) or {}).get("char")
+            face = MOODS[s["mood"]][2] if s.get("mood") in MOODS else "기본"
+            items = ["board"] if i == 0 else [{"char": c, "face": face}] if c else [{"ai": s["text"]}]
         st, en = scene_times[i]
         for j, it in enumerate(items):
             a = st + (en - st) * j / len(items)
@@ -591,28 +772,28 @@ def main():
                 continue
             n += 1
             p = os.path.join(work, f"img_{i + 1:02d}_{j + 1}.png")
-            if "ira" in it:
-                n_ira += 1
-                if n_ira > IRA_LIMIT:
-                    raise RuntimeError(f"이라스토야 그림이 {IRA_LIMIT}장을 넘었습니다. 일부를 AI 그림으로 바꿔 주세요")
-                if test_mode and not os.path.exists(p):
-                    img = placeholder_image(n, "", W, IMG_H)
+            kind = next((k for k in templates.TEMPLATES if k in it), None)
+            if kind:
+                spec = it[kind]
+                templates.check_names(kind, spec)
+                pic = picture(spec["img"], p)[0] if spec.get("img") else None
+                if kind == "chat" and spec.get("reveal"):           # 말풍선이 하나씩 올라온다
+                    m = max(1, len(spec.get("msgs", [])))
+                    for k in range(m):
+                        slots.append((a + (b - a) * k / m, a + (b - a) * (k + 1) / m,
+                                      templates.render_chat(spec, W, IMG_H, tfont, k + 1)))
+                elif kind == "chat":
+                    slots.append((a, b, templates.render_chat(spec, W, IMG_H, tfont)))
+                elif kind == "map":
+                    slots.append((a, b, templates.render_map(spec, W, IMG_H, tfont)))
                 else:
-                    if not os.path.exists(p):
-                        log(f"이라스토야 그림 받는 중… ({os.path.basename(p)})")
-                        fetch_irasutoya(it["ira"], p)
-                    img = Image.open(p)
-                credits.append(it["ira"])
-                slots.append((a, b, fit_into(img, W, IMG_H)))
-            else:
-                if not os.path.exists(p):
-                    if test_mode:
-                        placeholder_image(n, "", W, IMG_H).save(p)
-                    else:
-                        log(f"AI 그림 만드는 중… ({os.path.basename(p)})")
-                        gen_image(it["ai"], cfg, p)
-                img = Image.open(p)
-                slots.append((a, b, cover(img, W, IMG_H) if it.get("fill") else fit_into(img, W, IMG_H, pad=0)))
+                    render = templates.render_news if kind == "news" else templates.render_sns
+                    slots.append((a, b, render(spec, W, IMG_H, tfont, pic)))
+                continue
+            img, how = picture(it, p)
+            slots.append((a, b, cover(img, W, IMG_H) if how == "cover"
+                          else fit_into(img, W, IMG_H, pad=0 if how == "full" else 36)))
+    n_ira = len(ira_files)
     with open(os.path.join(out_dir, "credits.txt"), "w", encoding="utf-8") as f:
         f.write(f"이라스토야 그림 {n_ira}장 (영상 1편 {IRA_LIMIT}장까지)\n")
         f.write("\n".join(credits) + "\n")
@@ -709,8 +890,8 @@ def main():
         while sub_i < len(subs) - 1 and t >= subs[sub_i][1]:
             sub_i += 1
         if subs and subs[sub_i][0] - 0.05 <= t < subs[sub_i][1] and src != "board":
-            layer = subs[sub_i][2]
-            frame.paste(layer, (0, SUB_CENTER_Y - layer.height // 2), layer)
+            layer, y = subs[sub_i][2], subs[sub_i][3]
+            frame.paste(layer, (0, y - layer.info["cy"]), layer)
         proc.stdin.write(frame.tobytes())
     proc.stdin.close()
     if proc.wait() != 0:

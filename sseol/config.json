@@ -1,5 +1,12 @@
 {
   "voice_id": "fHzGR8qcnsDR2uaj9r16",
   "tts_model": "eleven_v3",
-  "image_quality": "medium"
+  "image_quality": "medium",
+  "voices": {
+    "나레이션": {"voice_id": "fHzGR8qcnsDR2uaj9r16", "name": "Hojin Lim (30대 남자, 차분)"},
+    "남자": {"voice_id": "LKOcTG4J4tYTPR9DnLeM", "name": "Mr. K Pro (20대 남자, 자연스러움)"},
+    "남자2": {"voice_id": "1W00IGEmNmwmsDeYy7ag", "name": "KKC (20대 남자, 밝음)"},
+    "아저씨": {"voice_id": "cYyVn89lwtbirLD6kLga", "name": "Btx (중년 남자)"},
+    "여자": {"voice_id": "ETPP7D0aZVdEj12Aa7ho", "name": "Selly Han (중년 여자, 따뜻함)"}
+  }
 }

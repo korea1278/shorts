@@ -8,7 +8,7 @@
   1. 받아쓰기(OpenAI Whisper)와 대본 비교 → 다르게 들린 부분만 보여줌 (뭉개진 발음 찾기)
   2. 영상 중간의 빈 구간 (0.3초 넘는 침묵)
   3. 음량 (유튜브 기준 -14 LUFS 근처인지)
-  4. 길이·말 빠르기, 이라스토야 장수
+  4. 길이·말 빠르기, 화자 수, 이라스토야 장수
   5. 모아 보기 그림 sseol/output/<id>/check.png (약 2.4초 간격 화면) — 이것 한 장만 열어 보면 된다
 """
 import difflib
@@ -110,6 +110,11 @@ def main():
         if not -17 <= lufs <= -12:
             problems += 1
 
+    # 화자 (대화형 썰)
+    who = sorted({s.get("speaker") or "나레이션" for s in job["scenes"]})
+    if who != ["나레이션"]:
+        report.append(f"화자 {len(who)}명: {', '.join(who)}")
+
     # 이라스토야 장수
     cr = os.path.join(out, "credits.txt")
     if os.path.exists(cr):
@@ -118,7 +123,7 @@ def main():
     # 모아 보기 그림
     sheet = os.path.join(out, "check.png")
     run(["ffmpeg", "-v", "error", "-y", "-i", mp4, "-vf",
-         "fps=1/2.4,crop=1080:1500:0:0,scale=180:-1,tile=8x3", "-frames:v", "1", "-update", "1", sheet])
+         "fps=1/2.4,crop=1080:1620:0:0,scale=180:-1,tile=8x3", "-frames:v", "1", "-update", "1", sheet])
     report.append(f"모아 보기 그림: {sheet}")
 
     print("\n".join(report))
