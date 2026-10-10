@@ -1070,9 +1070,16 @@ def main():
     for i, s in enumerate(scenes):
         items = s.get("images")
         if not items:
-            c = (cast.get(speaker_of(s)) or {}).get("char")
+            role = cast.get(speaker_of(s)) or {}
+            c = role.get("char")
             face = MOODS[s["mood"]][2] if s.get("mood") in MOODS else "기본"
-            items = ["board"] if i == 0 else [{"char": c, "face": face}] if c else [{"ai": s["text"]}]
+            auto = {"char": c, "face": face}
+            if role.get("pos"):                              # 말하는 사람 자리 (나는 왼쪽, 엄마는 오른쪽)
+                auto["pos"] = role["pos"]
+            items = ["board"] if i == 0 else [auto] if c else [{"ai": s["text"]}]
+        if s.get("bg"):                                      # 장면 "bg" 는 그 장면 그림 모두에 (배경 위에서 말함)
+            items = [dict(it, bg=s["bg"]) if isinstance(it, dict) and "bg" not in it
+                     and not any(k in it for k in templates.TEMPLATES) else it for it in items]
         st, en = scene_times[i]
         for j, it in enumerate(items):
             a = st + (en - st) * j / len(items)
@@ -1173,7 +1180,8 @@ def main():
                            f"loudnorm=I={lt}:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
                           capture_output=True, text=True).stderr
     m = json.loads(meas[meas.rfind("{"):meas.rfind("}") + 1])
-    loudnorm = (f"loudnorm=I={lt}:TP=-1.5:LRA=11:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
+    loudnorm = "anull" if "inf" in str(m["input_i"]) else (  # 시험(무음)이면 음량 맞추기 건너뜀
+        f"loudnorm=I={lt}:TP=-1.5:LRA=11:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
                 f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:"
                 f"offset={m['target_offset']}:linear=true")
 
