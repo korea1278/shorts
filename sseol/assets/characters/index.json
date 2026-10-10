@@ -119,6 +119,21 @@
         "당황": "햄찌/당황.png"
       },
       "meme": true
+    },
+    "켄": {
+      "desc": "a fictional young Japanese man in his mid 20s with neat black hair, wearing a plain white hoodie with black drawstrings",
+      "source": "ai",
+      "faces": {
+        "기본": "켄/기본.png",
+        "웃음": "켄/웃음.png",
+        "화남": "켄/화남.png",
+        "억울": "켄/억울.png",
+        "놀람": "켄/놀람.png",
+        "당황": "켄/당황.png",
+        "고민": "켄/고민.png",
+        "깨달음": "켄/깨달음.png",
+        "의문": "켄/의문.png"
+      }
     }
   }
 }

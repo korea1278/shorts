@@ -1,0 +1,30 @@
+{
+  "id": "20261010-gejang",
+  "title": ["간장게장 한 입에", "무너진 일본인"],
+  "title_yellow": 0,
+  "post_title": "간장게장 한 입에 무너진 일본인",
+  "source": "https://m.bobaedream.co.kr/board/bbs_view/best/1038577/2/1",
+  "bgs": {
+    "가게앞": {"ai": "A street in Seoul in front of a small traditional Korean seafood restaurant entrance with a glass door, daytime, no people"},
+    "식당안": {"ai": "Inside a cozy Korean restaurant with wooden booth seats, a wooden table and paper windows, no people"}
+  },
+  "scenes": [
+    {"text": "간장게장 한 입에 무너진 일본인.", "images": ["board"]},
+    {"text": "한국 여행 삼 일 차인 일본 유튜버가,", "images": [{"bg": "가게앞", "char": "켄", "face": "기본"}]},
+    {"text": "게장 맛집으로 유명한 식당에 갔다는 썰임.", "images": [{"bg": "가게앞", "keep": true, "ai": "A cute restaurant signboard that says '간장게장' with a drawing of a crab", "pos": "right", "size": 0.42, "y": 0.35}], "sfx": "pop"},
+    {"text": "벽에는 유명인 사인이 빼곡했음.", "images": [{"ai": "A restaurant wall completely covered with many framed autograph boards with scribbled signatures, no readable names", "fill": true}]},
+    {"text": "메뉴판을 보더니, 좋은 가격이네요, 하더라.", "images": [{"ai": "A Korean restaurant menu board with a crab picture that says '간장게장 97,000원'", "in": "up"}, {"bg": "식당안", "char": "켄", "face": "웃음"}], "sfx": "kaching", "sfx_on": "가격이네요"},
+    {"text": "간장게장이랑 양념게장을 둘 다 시켰음.", "images": [{"bg": "식당안", "char": "켄", "face": "기본"}]},
+    {"text": "주황색 알이 꽉 찬 게가 나오자 눈이 커짐.", "images": [{"ai": "A cute clipart plate of Korean soy sauce marinated crabs, shells open showing bright orange crab roe", "in": "pop"}, {"bg": "식당안", "char": "켄", "face": "놀람"}], "sfx": "tada"},
+    {"text": "한 입 먹더니, 달다, 엄청 신선해.", "images": [{"bg": "식당안", "char": "켄", "face": "웃음"}]},
+    {"text": "그러더니 정색하고, 이건 위험하다, 라고 함.", "images": [{"bg": "식당안", "char": "켄", "face": "놀람", "fx": ["zoom", "lines"]}], "sfx": "dundun", "sfx_on": "위험하다", "red": ["위험하다"]},
+    {"text": "게딱지에 밥까지 넣어서 비벼 먹더니,", "images": [{"ai": "A crab shell filled with white rice mixed with orange crab roe and soy sauce, with a spoon", "in": "pop"}]},
+    {"text": "이거 생각해 낸 사람 천재 아니냐며 감탄함.", "images": [{"bg": "식당안", "char": "켄", "face": "깨달음", "fx": "punch"}], "sfx": "shock", "red": ["천재"]},
+    {"text": "양념게장까지 먹고 나서는,", "images": [{"bg": "식당안", "keep": true, "ai": "A plate of Korean spicy marinated crab (yangnyeom gejang) covered in red chili sauce", "pos": "right", "size": 0.45, "y": 0.6}], "sfx": "pop"},
+    {"text": "어느 쪽이 더 맛있는지 못 고르겠다고 함.", "images": [{"bg": "식당안", "char": "켄", "face": "고민"}], "sfx": "huh"},
+    {"text": "다 먹고는 한참 하늘만 보고 앉아 있었음.", "images": [{"bg": "식당안", "char": "켄", "face": "기본", "fx": "bw"}]},
+    {"text": "그리고 남긴 한마디, 또 오겠습니다.", "images": [{"bg": "식당안", "char": "켄", "face": "웃음"}], "sfx": "ding", "sfx_on": "오겠습니다"},
+    {"text": "근데 한국 사람들 댓글이 더 웃겼음.", "images": [{"char": "햄찌", "face": "웃음"}]},
+    {"text": "거기 다른 데보다 두 배 비싼 집인데?", "images": [{"char": "햄찌", "face": "놀람", "fx": "punch"}], "sfx": "scratch", "red": ["두 배"]}
+  ]
+}
