@@ -111,7 +111,7 @@ DEFAULT_CONFIG = {
     "max_pause": 0.3,                   # 배속 뒤 이보다 긴 쉼은 줄인다
     "pause_to": 0.22,
     "image_model": "gpt-image-2",       # 한글 글자를 정확히 쓴다 (gpt-image-1 은 책에 영어를 써 넣었음)
-    "image_quality": "medium",
+    "image_quality": "low",
     "image_style": (
         "Simple, cute Japanese-style flat clip-art illustration with soft pastel colors and thin outlines, "
         "plain pure white background, single clear subject, no logos, no watermark. "
@@ -283,7 +283,7 @@ def insert_pause(voice, starts, ends, at, dur):
 
 
 # ── 그림 ────────────────────────────────────────────────
-def gen_image(prompt, cfg, out_png, kind="pic"):
+def gen_image(prompt, cfg, out_png, kind="pic", quality=None):
     """kind: pic 보통 그림 · bg 배경 (사람 없음) · cut 배경 위에 올릴 물건·인물 (흰 바탕을 나중에 지운다)"""
     headers = {}
     if os.environ.get("OPENAI_API_KEY"):
@@ -294,7 +294,7 @@ def gen_image(prompt, cfg, out_png, kind="pic"):
     res = http_json("https://api.openai.com/v1/images/generations",
                     {"model": cfg["image_model"],
                      "prompt": f"{prompt}\n\nStyle: {style}\n{cfg['text_rule']}",
-                     "size": "1024x1024" if kind == "cut" else "1536x1024", "quality": cfg["image_quality"],
+                     "size": "1024x1024" if kind == "cut" else "1536x1024", "quality": quality or cfg["image_quality"],
                      "n": 1}, headers)
     with open(out_png, "wb") as f:
         f.write(base64.b64decode(res["data"][0]["b64_json"]))
@@ -595,13 +595,27 @@ SUB_GLUE_AFTER = {"안", "못", "더", "덜", "이런", "그런", "저런", "이
                   "또", "꼭", "제일", "가장", "제대로", "오히려", "진짜", "정말", "한", "두", "세", "네", "몇",
                   "무슨", "어느", "어떤", "모든", "웬", "새", "헌", "그냥", "막", "딱", "확", "왜", "어떻게"}
 # 이 낱말 앞에서 끊으면 어색하다 (앞말에 붙는 말: 고칠 수도, 빼는 건, 줘야 한다고)
-SUB_GLUE_BEFORE = ("수", "것", "거", "건", "게", "걸", "때문", "줄", "뿐", "듯", "척", "채", "만큼", "적",
-                   "한다", "하는", "했", "해", "할", "된다", "되는", "됐", "될", "싶", "보니", "봤", "본", "놓", "버")
+#  매인 이름씨(수·것·거…)는 낱말 전체이거나 뒤에 토씨만 붙었을 때만 (건너온·거대한·게임처럼 그냥 시작이 같은 낱말은 아님)
+SUB_GLUE_BEFORE = ("수", "것", "거", "건", "게", "걸", "때문", "줄", "뿐", "듯", "척", "채", "만큼", "적")
+SUB_PARTICLE = ("", "이", "가", "은", "는", "을", "를", "도", "만", "에", "에서", "엔", "임", "야", "이야", "였", "이었",
+                "인", "인데", "일", "으로", "로", "밖에", "처럼", "까지", "이다", "이라", "라", "였음", "이었음", "있", "없")
+#  도움 풀이씨(한다·싶다·보니…)는 앞말이 -아/-어/-고/-게/-지 로 끝날 때만 (먹고 싶음, 해 보니, 줘야 한다고)
+SUB_GLUE_AUX = ("한다", "하는", "했", "해", "할", "된다", "되는", "됐", "될", "싶", "보니", "봤", "본", "놓", "버")
+SUB_AUX_PREV = ("아", "어", "여", "야", "워", "와", "고", "게", "지", "해", "줘", "봐", "놔", "둬", "서")
+# 이어 주는 끝 (먹고 / 와서 / 했더니) — 여기서 끊으면 자연스럽다. 단, 뒷말이 꾸미는 말이면 한 덩어리 (배 타고 건너온)
+SUB_CONNECT = ("고", "서", "면", "니", "는데", "은데", "더니", "니까", "지만", "려고", "다가")
 
 # 이렇게 끝나는 낱말은 뒷말을 꾸민다 (많다는 이유, 외우던 데, 있었던 거)
 SUB_GLUE_MODIFIER = ("다는", "라는", "하는", "되는", "있는", "없는", "던", "려는")
 # 꾸밈을 받는 말 (알린 날짜, 배울 때, 많다는 이유) — 이 앞에서 끊으면 어색하다
 SUB_GLUE_NOUN = ("이유", "사실", "날", "데", "때", "생각", "이야기", "얘기")
+
+
+def adnominal(w):
+    """꾸미는 꼴인지 (건너온·거대한·먹던·갈): 끝 글자 받침이 ㄴ·ㄹ 이거나 '던'으로 끝남"""
+    if not w or not ("가" <= w[-1] <= "힣"):
+        return False
+    return (ord(w[-1]) - 0xAC00) % 28 in (4, 8) or w.endswith("던")
 
 
 def chunk_text(text, max_chars=SUB_MAX_CHARS):
@@ -628,9 +642,17 @@ def chunk_text(text, max_chars=SUB_MAX_CHARS):
             p = 0.0
             if bare[i - 1] in SUB_GLUE_AFTER:
                 p += 30
-            if bare[i].startswith(SUB_GLUE_BEFORE):
+            if any(bare[i] == g + t for g in SUB_GLUE_BEFORE for t in SUB_PARTICLE):
                 p += 30
-            if bare[i].startswith(SUB_GLUE_NOUN):
+            if bare[i].startswith(SUB_GLUE_AUX) and bare[i - 1].endswith(SUB_AUX_PREV):
+                p += 30
+            if bare[i - 1].endswith(SUB_CONNECT) and not words[i - 1][-1:] in ",.?!…":
+                # "배 타고 / 건너온 거대한": 뒷말이 꾸미는 말(받침 ㄴ·ㄹ)이고 그 뒤에 꾸밈 받는 말이 오면 한 덩어리
+                if i + 1 < len(bare) and adnominal(bare[i]):
+                    p += 12
+                else:
+                    p -= 4
+            if bare[i].startswith(SUB_GLUE_NOUN) and adnominal(bare[i - 1]):   # 생각보다·날씨 는 아님
                 p += 30
             if bare[i - 1].endswith(SUB_GLUE_MODIFIER):  # "많다는 / 이유로" 처럼 꾸미는 말과 꾸밈 받는 말 사이
                 p += 30
@@ -958,7 +980,7 @@ def main():
                 placeholder_image(n, "", W, IMG_H).save(p)
             else:
                 log(f"AI 그림 만드는 중… ({os.path.basename(p)})")
-                gen_image(it["ai"], cfg, p, "cut" if cut else "pic")
+                gen_image(it["ai"], cfg, p, "cut" if cut else "pic", it.get("quality"))
         return Image.open(p), "cover" if it.get("fill") else "full"
 
     bgs, bg_cache, cut_cache = job.get("bgs") or {}, {}, {}
@@ -981,7 +1003,7 @@ def main():
                 im = placeholder_image(len(bg_cache) + 50, "", W, IMG_H)
             else:
                 log(f"AI 배경 만드는 중… ({ref if isinstance(ref, str) else os.path.basename(bp)})")
-                gen_image(spec["ai"], cfg, bp, "bg")
+                gen_image(spec["ai"], cfg, bp, "bg", spec.get("quality"))
                 im = Image.open(bp)
             bg_cache[key] = cover(im, int(W * 1.12), int(IMG_H * 1.12))   # 천천히 움직일 여유
         return key, bg_cache[key]
