@@ -1,0 +1,202 @@
+{
+  "id": "20261010-tongsinsa",
+  "title": [
+    "일본이 그림으로",
+    "남긴 조선 사절단"
+  ],
+  "title_yellow": 1,
+  "post_title": "에도시대 일본에서 그려진 조선통신사의 모습",
+  "board": [],
+  "source": "https://m.dcinside.com/board/dcbest/469206",
+  "bgs": {
+    "에도거리": {
+      "ai": "Simple clipart of an empty Edo period Japanese town street with wooden shops and tiled roofs, daytime, no people, no text"
+    }
+  },
+  "scenes": [
+    {
+      "text": "일본이 그림으로 남긴 조선 사절단.",
+      "images": [
+        "board"
+      ],
+      "sfx": "click"
+    },
+    {
+      "text": "에도시대 일본 그림에는 낯선 행렬이 자주 나옴.",
+      "images": [
+        {
+          "bg": "에도거리",
+          "ira": "https://www.irasutoya.com/2014/03/blog-post_6159.html",
+          "pos": "center",
+          "size": 0.6
+        }
+      ],
+      "sfx": "huh",
+      "sfx_on": "낯선"
+    },
+    {
+      "text": "바로 조선에서 온 사절단, 조선통신사임.",
+      "images": [
+        {
+          "ai": "Simple clipart of a grand Joseon dynasty Korean diplomatic procession, officials in traditional Korean hanbok robes and black gat hats, flags, musicians, no text",
+          "fill": true
+        }
+      ],
+      "red": [
+        "조선통신사"
+      ],
+      "sfx": "dundun"
+    },
+    {
+      "text": "1607년부터 1811년까지, 무려 열두 번이나 일본에 갔음.",
+      "images": [
+        {
+          "ai": "Simple clipart of traditional Joseon Korean wooden sailing ships crossing a blue sea toward Japan, no text",
+          "fill": true
+        }
+      ],
+      "red": [
+        "열두",
+        "번이나"
+      ]
+    },
+    {
+      "text": "한 번 갈 때 인원만 400명에서 500명이었음.",
+      "images": [
+        {
+          "ai": "Simple clipart of a very long line of Joseon Korean envoys in hanbok marching on a road, seen from above, no text",
+          "fill": true
+        },
+        {
+          "char": "햄찌",
+          "face": "놀람",
+          "fx": "punch"
+        }
+      ],
+      "red": [
+        "500명이었음"
+      ],
+      "sfx": "shock",
+      "sfx_on": "500명이었음"
+    },
+    {
+      "text": "행렬이 지나가는 길에는 구경꾼이 가득했고,",
+      "images": [
+        {
+          "bg": "에도거리",
+          "ira": "https://www.irasutoya.com/2014/03/blog-post_6159.html",
+          "pos": "left",
+          "size": 0.5
+        },
+        {
+          "bg": "에도거리",
+          "ira": "https://www.irasutoya.com/2014/03/blog-post_3938.html",
+          "pos": "right",
+          "size": 0.5,
+          "keep": true
+        }
+      ]
+    },
+    {
+      "text": "화가들은 그 모습을 긴 두루마리 그림으로 남겼음.",
+      "images": [
+        {
+          "ai": "Simple clipart of an unrolled Japanese emaki picture scroll showing a colorful procession of Korean envoys, no text",
+          "fill": true
+        }
+      ]
+    },
+    {
+      "text": "근데 진짜 인기는 행렬이 아니었음.",
+      "images": [
+        {
+          "char": "회사원남",
+          "face": "의문",
+          "fx": "zoom"
+        }
+      ],
+      "sfx": "scratch"
+    },
+    {
+      "text": "사절단 숙소에 일본 사람들이 구름처럼 몰려들었는데,",
+      "images": [
+        {
+          "ai": "Simple clipart of a big crowd of Edo period Japanese townspeople in kimono crowding at the gate of a traditional inn, no text",
+          "fill": true
+        }
+      ]
+    },
+    {
+      "text": "목적은 조선 사람의 글씨와 그림이었음.",
+      "images": [
+        {
+          "ai": "Simple clipart of a Joseon Korean scholar in hanbok and gat writing calligraphy with a brush on paper, white background, no text"
+        }
+      ],
+      "red": [
+        "글씨와",
+        "그림이었음"
+      ],
+      "sfx": "ding",
+      "sfx_on": "글씨와"
+    },
+    {
+      "text": "어떤 시인은 길가에 사람들이 담처럼 늘어서자,",
+      "images": [
+        {
+          "ai": "Simple clipart of many Edo period Japanese people standing in a long line along a roadside holding blank paper, no text",
+          "fill": true
+        }
+      ]
+    },
+    {
+      "text": "말에 기대선 채로 비바람 치듯 글씨를 써 줬다고 함.",
+      "images": [
+        {
+          "ai": "Simple clipart of a Joseon Korean poet in hanbok leaning on a horse, writing calligraphy very fast with motion lines, papers flying, no text",
+          "fx": "shake"
+        }
+      ],
+      "sfx": "whoosh",
+      "sfx_on": "비바람"
+    },
+    {
+      "text": "오카야마 우시마도에는 그때 전해졌다는 춤이 아직도 남아 있음.",
+      "images": [
+        {
+          "ai": "Simple clipart of two children in colorful old Korean-style costumes and pointed hats dancing at a Japanese seaside village festival, no text",
+          "fill": true
+        }
+      ]
+    },
+    {
+      "text": "이 기록들은 2017년, 한국과 일본이 함께 세계기록유산에 올렸음.",
+      "images": [
+        {
+          "ai": "Simple clipart of an old thick book with a golden award ribbon, the cover says '세계기록유산', white background"
+        }
+      ],
+      "red": [
+        "세계기록유산에"
+      ],
+      "sfx": "tada",
+      "sfx_on": "세계기록유산에"
+    },
+    {
+      "text": "한마디로 400년 전 원조 한류였던 거임.",
+      "images": [
+        {
+          "char": "햄찌",
+          "face": "웃음",
+          "fx": "punch"
+        }
+      ],
+      "red": [
+        "원조",
+        "한류였던"
+      ],
+      "sfx": "laugh",
+      "sfx_on": "한류였던"
+    }
+  ]
+}
