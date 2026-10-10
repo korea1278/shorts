@@ -1,0 +1,68 @@
+{
+  "id": "20261010-lathe",
+  "title": ["75년 동안 고장 안 난", "괴물 기계"],
+  "title_yellow": 1,
+  "post_title": "무려 75년 동안 써먹은 기계",
+  "board": [],
+  "source": "https://m.dcinside.com/board/dcbest/469193",
+  "bgs": {
+    "마당": {"ai": "Outdoor museum courtyard with paved ground, a low modern museum building and blue sky, no people"},
+    "바다": {"ai": "Calm wide ocean under a clear blue sky with gentle waves, no ships, no people"},
+    "공장": {"ai": "Inside a large old steel factory hall with high ceiling, overhead crane rails and concrete floor, no people, no machines"}
+  },
+  "scenes": [
+    {"text": "75년 동안 고장 안 난 괴물 기계.", "images": ["board"], "sfx": "click"},
+    {"text": "일본의 한 박물관 마당에는, 길이 20미터짜리 쇳덩이가 있음.", "images": [
+      {"bg": "마당"},
+      {"bg": "마당", "keep": true, "ai": "A gigantic very long old dark green industrial metal lathe machine, side view, white background", "size": 0.85, "in": "pop"}
+    ], "red": ["20미터"], "sfx": "pop", "sfx_on": "쇳덩이"},
+    {"text": "1938년, 독일에서 배 타고 건너온 거대한 선반임.", "images": [
+      {"bg": "바다", "ira": "https://www.irasutoya.com/2015/07/blog-post_203.html", "in": "left"}
+    ], "sfx": "whoosh"},
+    {"text": "쇠를 빙글빙글 돌리면서 깎는 기계인데,", "images": [
+      {"ira": "https://www.irasutoya.com/2017/12/blog-post_61.html"},
+      {"ira": "https://www.irasutoya.com/2014/10/blog-post_12.html"}
+    ]},
+    {"text": "세계에서 제일 큰 대포를 만들려고 사 온 거였음.", "images": [
+      {"ira": "https://www.irasutoya.com/2015/02/blog-post_298.html", "fx": "punch"}
+    ], "red": ["제일 큰 대포"], "sfx": "dundun"},
+    {"text": "전함 야마토의 포신을, 하나하나 깎아냈다고 함.", "images": [
+      {"bg": "바다", "ira": "https://www.irasutoya.com/2017/11/blog-post_535.html"}
+    ]},
+    {"text": "포신 하나가, 무려 160톤이 넘었음.", "images": [
+      {"ai": "A huge long steel cannon barrel lying on a giant scale whose display says '160톤'", "fill": true},
+      {"char": "햄찌", "face": "놀람", "fx": ["punch", "lines"]}
+    ], "red": ["160톤"], "sfx": "shock", "sfx_on": "160톤이"},
+    {"text": "그런데 전쟁이 끝나면서, 기계도 일자리를 잃음.", "images": [
+      {"bg": "공장", "ai": "A big old dark green industrial lathe machine switched off and covered with dust, white background", "size": 0.8, "fx": "dark"}
+    ], "sfx": "fail"},
+    {"text": "보통은 고철로 녹이는데, 이 기계는 달랐음.", "images": [
+      {"ai": "A pile of rusty scrap metal junk, simple clipart, white background"},
+      {"ai": "A shiny clean dark green industrial lathe machine with sparkles around it, white background", "fx": "flash"}
+    ]},
+    {"text": "민간 회사로 팔려가서, 큰 배의 쇠 기둥을 깎기 시작함.", "images": [
+      {"bg": "공장", "ai": "A very long shiny steel ship propeller shaft rod lying horizontally, white background", "size": 0.8},
+      {"bg": "공장", "keep": true, "ira": "https://www.irasutoya.com/2014/10/blog-post_12.html", "pos": "right", "size": 0.45}
+    ]},
+    {"text": "회사가 바뀌어도, 묵묵히 일만 했음.", "images": [
+      {"bg": "공장", "ai": "A big old dark green industrial lathe machine busily working with metal sparks flying, white background", "size": 0.8, "fx": "shake"}
+    ]},
+    {"text": "그렇게 멈춘 해가, 무려 2013년.", "images": [
+      {"ai": "A wall calendar page showing big text '2013년', simple clipart, white background", "fx": "punch"}
+    ], "red": ["2013년"], "sfx": "ding", "sfx_on": "2013년"},
+    {"text": "75년 만에 겨우 퇴근한 거임.", "images": [
+      {"ira": "https://www.irasutoya.com/2014/06/blog-post_90.html"}
+    ], "red": ["75년"], "sfx": "tada"},
+    {"text": "2022년엔 사람들이 돈을 모아서, 박물관으로 옮겨줬음.", "images": [
+      {"ira": "https://www.irasutoya.com/2014/01/blog-post_5281.html"},
+      {"ira": "https://www.irasutoya.com/2017/05/blog-post_203.html"}
+    ]},
+    {"text": "지금은 그 마당에서, 인생 첫 휴가 중.", "images": [
+      {"bg": "마당", "ai": "A big old dark green industrial lathe machine relaxing happily wearing sunglasses, cute cartoon style, white background", "size": 0.8}
+    ], "red": ["첫 휴가"], "sfx": "pop"},
+    {"text": "참고로 75년 동안 받은 월급은, 0원임.", "images": [
+      {"ai": "An empty open brown pay envelope with text '월급 0원' written on it, simple clipart, white background"},
+      {"char": "햄찌", "face": "억울", "fx": ["zoom", "bw"]}
+    ], "red": ["0원"], "sfx": "fail", "sfx_on": "0원임"}
+  ]
+}
