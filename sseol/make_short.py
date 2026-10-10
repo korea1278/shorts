@@ -18,6 +18,17 @@
   {"news"|"sns"|"chat"|"map": {...}}           가짜 기사·SNS·문자·지도 화면 (sseol/templates.py)
   그림 항목이나 장면에 "fx": "zoom" 또는 ["shake", "lines"] — 밈 효과 (FX 참고)
 
+움직이는 그림 (레퍼런스: 배경 위에 인물이 아래에서 쑥 올라오고 물건이 뿅 나타남)
+  job "bgs": {"거실": {"ai": "Cozy Korean living room ..."}}  배경 (사람 없는 AI 그림, 이라스토야도 됨)
+  그림 항목 {"bg": "거실", "char": "엄마", "face": "놀람"}   배경 위에 인물 (흰 바탕은 자동으로 지운다)
+    "in": up(아래서 올라옴) down left right pop(뿅) fade none — 없으면 배경 있을 땐 up, 흰 바탕·keep 은 pop,
+          앞 장면과 같은 인물·같은 자리면 다시 안 올라오고 표정만 바뀜
+    "keep": true   앞 장면 그림 위에 쌓기 (냉장고 → 세탁기 → 청소기 하나씩)
+    "pos": left·center·right 또는 0~1, "size": 높이 비율(배경 있을 때 기본 0.82), "y": bottom·middle·top 또는 0~1
+    "bob": false   숨 쉬듯 흔들림 끄기, "still": true  움직임 없이 예전처럼 한 장
+  {"bg": "거실"} 만 쓰면 빈 배경. 이라스토야·인물 그림은 배경이 없어도 흰 바탕에서 뿅 나타나고 살짝 움직인다.
+  AI 그림은 gpt-image-2 — 따옴표 안 글자를 한글로 정확히 쓴다 (예: "a book whose cover says '한국사'")
+
 대화형 썰 (여러 목소리)
   장면에 "speaker": "엄마" 를 쓰면 그 대사는 그 사람 목소리로 따로 만든다 (없으면 나레이션).
   job 의 "cast": {"엄마": {"voice": "여자", "color": "yellow", "char": "엄마"}}
@@ -99,12 +110,22 @@ DEFAULT_CONFIG = {
     "tempo": 1.25,                      # 배속 (목소리 높이는 그대로, 말만 빠르게)
     "max_pause": 0.3,                   # 배속 뒤 이보다 긴 쉼은 줄인다
     "pause_to": 0.22,
-    "image_model": "gpt-image-1",
+    "image_model": "gpt-image-2",       # 한글 글자를 정확히 쓴다 (gpt-image-1 은 책에 영어를 써 넣었음)
     "image_quality": "medium",
     "image_style": (
         "Simple, cute Japanese-style flat clip-art illustration with soft pastel colors and thin outlines, "
-        "plain white background, single clear subject, no text, no letters, no numbers, no logos, no watermark. "
+        "plain pure white background, single clear subject, no logos, no watermark. "
         "No real, identifiable people or celebrities; no existing cartoon characters or memes."
+    ),
+    "bg_style": (                       # 배경 그림 (사람 없음, 위에 이라스토야 인물이 올라간다)
+        "Soft flat illustration background in a cute Japanese clip-art style, gentle pastel colors, "
+        "wide view, empty scene with no people and no animals, nothing in the center foreground, "
+        "no logos, no watermark."
+    ),
+    # 글자 규칙: 따옴표로 준 글자만 한글로 정확히, 나머지는 글자 없음 (영어·일본어 글자 금지)
+    "text_rule": (
+        "Text rule: if the prompt quotes words, write exactly those words in Korean Hangul and nothing else. "
+        "Otherwise draw no text at all. Never draw English, Japanese or any other letters, numbers or signs."
     ),
     "sfx_db": -10,                      # 효과음 크기 (목소리 평균 크기보다 이만큼 작게)
     "bgm": False,                       # 배경음악 (사용자 요청으로 기본 끔)
@@ -262,13 +283,19 @@ def insert_pause(voice, starts, ends, at, dur):
 
 
 # ── 그림 ────────────────────────────────────────────────
-def gen_image(prompt, cfg, out_png):
+def gen_image(prompt, cfg, out_png, kind="pic"):
+    """kind: pic 보통 그림 · bg 배경 (사람 없음) · cut 배경 위에 올릴 물건·인물 (흰 바탕을 나중에 지운다)"""
     headers = {}
     if os.environ.get("OPENAI_API_KEY"):
         headers["Authorization"] = "Bearer " + os.environ["OPENAI_API_KEY"]
+    style = cfg["bg_style"] if kind == "bg" else cfg["image_style"]
+    if kind == "cut":
+        style += " Only the subject, isolated, no floor, no shadow, nothing else around it."
     res = http_json("https://api.openai.com/v1/images/generations",
-                    {"model": cfg["image_model"], "prompt": f"{prompt}\n\nStyle: {cfg['image_style']}",
-                     "size": "1536x1024", "quality": cfg["image_quality"], "n": 1}, headers)
+                    {"model": cfg["image_model"],
+                     "prompt": f"{prompt}\n\nStyle: {style}\n{cfg['text_rule']}",
+                     "size": "1024x1024" if kind == "cut" else "1536x1024", "quality": cfg["image_quality"],
+                     "n": 1}, headers)
     with open(out_png, "wb") as f:
         f.write(base64.b64decode(res["data"][0]["b64_json"]))
 
@@ -308,6 +335,75 @@ def cover(img, w, h):
     im = img.convert("RGB").resize((math.ceil(img.width * s), math.ceil(img.height * s)), Image.LANCZOS)
     x, y = (im.width - w) // 2, (im.height - h) // 2
     return im.crop((x, y, x + w, y + h))
+
+
+def cut_white(img):
+    """흰 바탕을 투명하게 (가장자리에서 이어진 흰 부분만 지운다. 이미 투명한 그림은 그대로)"""
+    im = img.convert("RGBA")
+    a = np.asarray(im)
+    if (a[..., 3] < 200).mean() > 0.05:
+        return im.crop(im.getchannel("A").getbbox() or (0, 0, im.width, im.height))
+    rgb = a[..., :3].astype(np.int16)
+    edge = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]])
+    base = np.median(edge, axis=0)                          # 바탕색 (완전한 흰색이 아닐 때도 있다)
+    m = Image.fromarray(((np.abs(rgb - base).max(axis=2) < 26) * 255).astype(np.uint8))
+    m = Image.fromarray(np.pad(np.asarray(m), 1, constant_values=255)).copy()   # copy: 안 하면 floodfill 이 안 먹음
+    ImageDraw.floodfill(m, (0, 0), 128, thresh=0)
+    bgmask = (np.asarray(m)[1:-1, 1:-1] == 128)
+    alpha = Image.fromarray(((~bgmask) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.8))
+    out = np.array(im)
+    out[..., 3] = np.minimum(out[..., 3], np.asarray(alpha))
+    return Image.fromarray(out).crop(Image.fromarray(out[..., 3]).getbbox() or (0, 0, im.width, im.height))
+
+
+def ease_out(p, back=False):
+    p = min(1.0, max(0.0, p))
+    if back:                                       # 살짝 넘쳤다가 제자리 (뿅)
+        c = 1.9
+        return 1 + (c + 1) * (p - 1) ** 3 + c * (p - 1) ** 2
+    return 1 - (1 - p) ** 3
+
+
+IN_TIME = 0.32                                     # 등장 움직임 길이 (초)
+POS_X = {"left": 0.27, "center": 0.5, "right": 0.73}
+
+
+def stage_frame(stage, t):
+    """움직이는 그림 한 장면: 천천히 움직이는 배경 + 아래에서 올라오거나 뿅 나타나는 그림들"""
+    bg = stage["bg"]
+    if stage.get("bg_moves"):                          # 배경은 같은 배경이 이어지는 동안 천천히 확대·이동
+        p = min(1.0, max(0.0, (t - stage["bg_t0"]) / max(1.0, stage["bg_t1"] - stage["bg_t0"])))
+        z = 1.0 + 0.07 * p
+        cw, chh = bg.width / z, bg.height / z
+        x0 = (bg.width - cw) * (0.5 + 0.3 * stage.get("bg_dir", 1) * (p - 0.5))
+        pic = bg.resize((W, IMG_H), Image.BILINEAR, box=(x0, (bg.height - chh) / 2, x0 + cw, (bg.height + chh) / 2))
+    else:
+        pic = bg.copy()
+    for L in stage["layers"]:
+        im, dt = L["im"], t - L["t0"]
+        x, y = L["x"], L["y"]
+        mode = L["in"]
+        p = dt / IN_TIME
+        if mode == "up":
+            y += (IMG_H - y) * (1 - ease_out(p))
+        elif mode == "down":
+            y -= (y + im.height) * (1 - ease_out(p))
+        elif mode == "left":
+            x -= (x + im.width) * (1 - ease_out(p))
+        elif mode == "right":
+            x += (W - x) * (1 - ease_out(p))
+        if L.get("bob"):                                  # 숨 쉬듯 살짝 움직임
+            y += 6 * math.sin(2 * math.pi * 0.8 * t + L["phase"])
+        if mode == "pop" and p < 1:
+            k = max(0.05, ease_out(p, back=True))
+            w2, h2 = max(1, int(im.width * k)), max(1, int(im.height * k))
+            cx, cy = x + im.width / 2, y + im.height / 2
+            im, x, y = im.resize((w2, h2), Image.BILINEAR), cx - w2 / 2, cy - h2 / 2
+        if mode == "fade" and p < 1:
+            im = im.copy()
+            im.putalpha(im.getchannel("A").point(lambda v: int(v * max(0.0, p))))
+        pic.paste(im, (int(x), int(y)), im)
+    return pic
 
 
 def placeholder_image(i, label, w, h):
@@ -619,11 +715,17 @@ def static_fx(img, fx):
     if "red" in fx:
         img = Image.blend(img, Image.new("RGB", img.size, (230, 20, 20)), 0.33)
     if "red" in fx or "dark" in fx:
-        yy, xx = np.mgrid[0:img.height, 0:img.width]
-        r = np.sqrt(((xx - img.width / 2) / (img.width / 2)) ** 2 + ((yy - img.height / 2) / (img.height / 2)) ** 2)
-        k = np.clip(1.25 - r * (0.75 if "dark" in fx else 0.45), 0.15, 1.0)[..., None]
-        img = Image.fromarray((np.asarray(img, np.float32) * k).astype(np.uint8))
+        key = (img.size, "dark" in fx)
+        if key not in _VIGNETTE:
+            yy, xx = np.mgrid[0:img.height, 0:img.width]
+            r = np.sqrt(((xx - img.width / 2) / (img.width / 2)) ** 2 +
+                        ((yy - img.height / 2) / (img.height / 2)) ** 2)
+            _VIGNETTE[key] = np.clip(1.25 - r * (0.75 if "dark" in fx else 0.45), 0.15, 1.0)[..., None]
+        img = Image.fromarray((np.asarray(img, np.float32) * _VIGNETTE[key]).astype(np.uint8))
     return img
+
+
+_VIGNETTE = {}
 
 
 _LINES = {}
@@ -838,8 +940,9 @@ def main():
             fetch_irasutoya(ref, p)
         return Image.open(p)
 
-    def picture(it, p):
-        """그림 항목 → (그림, 넣는 방식: pad 흰 여백 / full 여백 없음 / cover 꽉 채움)"""
+    def picture(it, p, cut=False):
+        """그림 항목 → (그림, 넣는 방식: pad 흰 여백 / full 여백 없음 / cover 꽉 채움)
+        cut 이면 AI 그림을 배경 위에 올릴 수 있게 흰 바탕 한 장으로 만든다"""
         if "char" in it:
             ch = chars.get(it["char"])
             if not ch:
@@ -855,8 +958,82 @@ def main():
                 placeholder_image(n, "", W, IMG_H).save(p)
             else:
                 log(f"AI 그림 만드는 중… ({os.path.basename(p)})")
-                gen_image(it["ai"], cfg, p)
+                gen_image(it["ai"], cfg, p, "cut" if cut else "pic")
         return Image.open(p), "cover" if it.get("fill") else "full"
+
+    bgs, bg_cache, cut_cache = job.get("bgs") or {}, {}, {}
+
+    def bg_image(ref):
+        """배경: job "bgs" 의 이름, 또는 {"ai": ...} / {"ira": ...}, 없으면 흰색"""
+        if not ref or ref == "white":
+            return "white", Image.new("RGB", (W, IMG_H), (255, 255, 255))
+        spec = bgs.get(ref) if isinstance(ref, str) else ref
+        if spec is None:
+            raise RuntimeError(f"배경 '{ref}' 이 job 의 \"bgs\" 에 없습니다")
+        key = json.dumps(spec, ensure_ascii=False, sort_keys=True)
+        if key not in bg_cache:
+            bp = os.path.join(work, "bg_" + hashlib.md5(key.encode()).hexdigest()[:10] + ".png")
+            if "ira" in spec:
+                im = ira_image(spec["ira"], bp)
+            elif os.path.exists(bp):
+                im = Image.open(bp)
+            elif test_mode:
+                im = placeholder_image(len(bg_cache) + 50, "", W, IMG_H)
+            else:
+                log(f"AI 배경 만드는 중… ({ref if isinstance(ref, str) else os.path.basename(bp)})")
+                gen_image(spec["ai"], cfg, bp, "bg")
+                im = Image.open(bp)
+            bg_cache[key] = cover(im, int(W * 1.12), int(IMG_H * 1.12))   # 천천히 움직일 여유
+        return key, bg_cache[key]
+
+    def stage_of(it, p, a):
+        """배경 + 그림 한 겹 (아래에서 올라옴·뿅·옆에서 들어옴), "keep" 이면 앞 장면 그림들 위에 쌓는다"""
+        bkey, bgim = bg_image(it.get("bg"))
+        real_bg = bkey != "white"
+        layers, z = [], None
+        prev = slots[-1][2] if slots and isinstance(slots[-1][2], dict) else None
+        same_bg = prev is not None and prev["bg_key"] == bkey
+        if it.get("keep"):
+            if same_bg:
+                layers = list(prev["layers"])
+            else:
+                log(f"⚠ keep: 앞 장면과 배경이 달라 쌓지 않습니다 ({os.path.basename(p)})")
+        if any(k in it for k in ("ira", "char", "ai")):
+            if test_mode and "ai" in it and not os.path.exists(p):
+                img = placeholder_image(n, "", 520, 720)
+            else:
+                img = picture(it, p, cut=True)[0]
+            ck = id(img) if test_mode else (it.get("char"), it.get("face"), it.get("ira"), p if "ai" in it else None)
+            if ck not in cut_cache:
+                cut_cache[ck] = cut_white(img)
+            im = cut_cache[ck]
+            pos = it.get("pos", "center")
+            fx_ = POS_X.get(pos, 0.5) if isinstance(pos, str) else float(pos)
+            if "size" in it or real_bg:
+                h = IMG_H * float(it.get("size", 0.82))
+                s_ = min(h / im.height, W * (0.96 if pos == "center" else 0.62) / im.width)
+            else:                                           # 흰 바탕: 예전처럼 화면에 꽉 맞게
+                s_ = min((W - 72) / im.width, (IMG_H - 72) / im.height)
+            im = im.resize((max(1, int(im.width * s_)), max(1, int(im.height * s_))), Image.LANCZOS)
+            yv = it.get("y", "bottom" if real_bg else "middle")
+            x = W * fx_ - im.width / 2
+            y = {"bottom": IMG_H - im.height, "top": 0}.get(yv, (IMG_H - im.height) / 2) \
+                if isinstance(yv, str) else IMG_H * float(yv) - im.height / 2
+            who = (it.get("char") or it.get("ira") or p, pos)    # 같은 인물·같은 자리면 표정만 바뀐 것
+            L = {"im": im, "x": x, "y": y, "t0": a, "who": who, "phase": (n * 1.7) % 6.28,
+                 "bob": it.get("bob", not it.get("keep"))}
+            mode = it.get("in")
+            last = next((l for l in reversed(prev["layers"]) if l["who"] == who) if same_bg else iter(()), None)
+            if mode is None and last is not None and not it.get("keep"):
+                mode = "none"                               # 같은 인물 표정만 바뀜 → 다시 등장하지 않음
+                L["t0"], L["phase"] = last["t0"], last["phase"]
+            if mode is None:
+                mode = "pop" if it.get("keep") or not real_bg else "up"
+            if mode not in ("up", "down", "left", "right", "pop", "fade", "none"):
+                raise RuntimeError(f"모르는 등장 방식 in='{mode}'. up·down·left·right·pop·fade·none")
+            L["in"] = mode
+            layers = [l for l in layers if l["who"] != who] + [L]
+        return {"bg": bgim, "bg_key": bkey, "bg_moves": real_bg, "layers": layers}
 
     def add(slot):
         """칸 추가 + 밈 효과 중 색 바꾸기(red·dark·bw)는 미리 그림에 입힌다"""
@@ -864,7 +1041,7 @@ def main():
         bad = [f for f in cur_fx if f not in FX]
         if bad:
             raise RuntimeError(f"모르는 효과 {bad}. 쓸 수 있는 것: {', '.join(FX)}")
-        if img != "board":
+        if not isinstance(img, (str, dict)):
             img = static_fx(img, cur_fx)
         slots.append((a, b, img, cur_fx))
 
@@ -903,9 +1080,22 @@ def main():
                     render = templates.render_news if kind == "news" else templates.render_sns
                     add((a, b, render(spec, W, IMG_H, tfont, pic)))
                 continue
+            if isinstance(it, dict) and any(k in it for k in ("bg", "in", "keep", "ira", "char")) \
+                    and not it.get("still"):
+                add((a, b, stage_of(it, p, a)))
+                continue
             img, how = picture(it, p)
             add((a, b, cover(img, W, IMG_H) if how == "cover"
                           else fit_into(img, W, IMG_H, pad=0 if how == "full" else 36)))
+    run_start, k_run = 0, 0                     # 같은 배경이 이어지는 동안 배경을 한 방향으로 천천히 움직인다
+    for k in range(len(slots) + 1):
+        cur = slots[k][2] if k < len(slots) else None
+        prv = slots[k - 1][2] if k > 0 else None
+        if k > 0 and not (isinstance(cur, dict) and isinstance(prv, dict) and cur["bg_key"] == prv["bg_key"]):
+            for j in range(run_start, k):
+                if isinstance(slots[j][2], dict):
+                    slots[j][2].update(bg_t0=slots[run_start][0], bg_t1=slots[k - 1][1], bg_dir=1 - 2 * (k_run % 2))
+            run_start, k_run = k, k_run + 1
     n_ira = len(ira_files)
     with open(os.path.join(out_dir, "credits.txt"), "w", encoding="utf-8") as f:
         f.write(f"이라스토야 그림 {n_ira}장 (영상 1편 {IRA_LIMIT}장까지)\n")
@@ -996,6 +1186,8 @@ def main():
         else:
             prog = min(1.0, max(0.0, (t - st) / max(0.1, en - st)))
             z = 1.0 + (ZOOM_END - 1.0) * prog
+            if isinstance(src, dict):                         # 움직이는 그림: 매 화면 새로 합성
+                src, z = static_fx(stage_frame(src, t), fx), 1.0
             dt = t - st
             cx, cy = W / 2, IMG_H / 2
             if "zoom" in fx:                                  # 0.3초 만에 얼굴 쪽으로 1.35배

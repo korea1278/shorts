@@ -1,0 +1,18 @@
+{
+  "id": "20261010-motion",
+  "title": ["엄마가 갑자기", "공부를 시작한 이유"],
+  "title_yellow": 1,
+  "post_title": "엄마가 갑자기 공부를 시작했다는 썰",
+  "bgs": {
+    "거실": {"ai": "Cozy Korean apartment living room with a sofa, a low table and a window"}
+  },
+  "scenes": [
+    {"text": "엄마가 갑자기 공부를 시작했다는 썰.", "images": ["board"]},
+    {"text": "어느 날 집에 갔더니,", "images": [{"bg": "거실"}]},
+    {"text": "엄마가 거실에 앉아 있었음.", "images": [{"bg": "거실", "char": "엄마", "face": "기본"}]},
+    {"text": "손에는 두꺼운 책이 들려 있었음.", "images": [{"bg": "거실", "keep": true, "ai": "A thick hardcover study book whose cover says '한국사'", "pos": "right", "size": 0.42, "y": 0.5}], "sfx": "pop"},
+    {"text": "엄마 그게 뭐야? 했더니,", "images": [{"bg": "거실", "char": "엄마", "face": "웃음"}]},
+    {"text": "한국사 자격증을 딴다고 함.", "images": [{"ai": "A cute certificate paper with a gold seal whose title says '한국사 자격증'", "in": "up"}], "sfx": "ding"},
+    {"text": "근데 첫 장부터 졸고 계셨음.", "images": [{"bg": "거실", "char": "엄마", "face": "고민", "fx": "zoom"}], "sfx": "fail"}
+  ]
+}
