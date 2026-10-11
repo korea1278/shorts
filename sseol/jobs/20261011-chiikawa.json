@@ -1,30 +1,199 @@
 {
   "id": "20261011-chiikawa",
-  "title": ["치이카와가", "처음 태어난 이유"],
+  "title": [
+    "치이카와가",
+    "처음 태어난 이유"
+  ],
   "title_yellow": 1,
   "post_title": "치이카와 탄생 비하인드스토리",
   "source": "https://m.dcinside.com/board/dcbest/469416",
   "bgs": {
-    "작업실": {"ai": "Cozy small artist workroom with a wooden desk, a desk lamp and a window at night, no people"},
-    "극장": {"ai": "Inside of an empty movie theater with red seats and a big blank screen, no people"}
+    "작업실": {
+      "ai": "Cozy small artist workroom with a wooden desk, a desk lamp and a window at night, no people"
+    },
+    "극장": {
+      "ai": "Inside of an empty movie theater with red seats and a big blank screen, no people"
+    }
   },
   "scenes": [
-    {"text": "치이카와가 처음 태어난 이유.", "images": ["board"]},
-    {"text": "작고 귀여운 걸로 유명한 캐릭터, 치이카와.", "images": [{"ira": "https://www.irasutoya.com/2021/05/blog-post_14.html"}]},
-    {"text": "근데 이 녀석, 처음엔 만화가 아니었음.", "images": [{"char": "햄찌", "face": "놀람", "fx": "punch"}], "sfx": "huh"},
-    {"text": "2017년 5월, 작가 나가노가 트위터에 낙서 하나를 올렸음.", "images": [{"bg": "작업실"}, {"bg": "작업실", "ai": "A hand holding a pencil drawing on a sketchbook, white background", "keep": true, "size": 0.6}]},
-    {"text": "작고 동그란 녀석이 그려진 그림이었음.", "images": [{"bg": "작업실", "ai": "A simple pencil doodle on a sketchbook page of a tiny round potato-shaped creature with dot eyes, white background", "size": 0.7}], "sfx": "pop"},
-    {"text": "거기 붙은 한마디가, 이렇게 살고 싶다, 였음.", "images": [{"bg": "작업실", "ai": "A sketchbook page with handwritten words '이렇게 살고 싶다' under a small doodle, white background", "size": 0.75}], "red": ["살고 싶다"]},
-    {"text": "힘든 현실에서 잠깐 도망치고 싶은 마음을 그린 거라고 함.", "images": [{"ira": "https://www.irasutoya.com/2017/03/blog-post_350.html"}, {"ira": "https://www.irasutoya.com/2018/02/blog-post_95.html"}]},
-    {"text": "이름도 거창하지 않았음.", "images": [{"char": "햄찌", "face": "기본"}]},
-    {"text": "뭔가 작고 귀여운 녀석.", "images": [{"ai": "A small paper name tag that says '뭔가 작고 귀여운 녀석', white background"}], "sfx": "boing"},
-    {"text": "근데 이름이 너무 길어서, 팬들이 줄여 부르기 시작함.", "images": [{"ira": "https://www.irasutoya.com/2016/02/blog-post_495.html"}]},
-    {"text": "한 팬이 치카와 스탬프는 언제 나오냐고 물었는데,", "images": [{"ai": "A smartphone screen showing a single chat bubble that says '치카와 스탬프 언제 나와요?', no logos, white background"}], "sfx": "bubble"},
-    {"text": "작가가 그 줄임말을 마음에 들어 했다고 함.", "images": [{"bg": "작업실", "ai": "A cartoon thumbs up hand with small hearts, white background", "size": 0.55}], "sfx": "ding"},
-    {"text": "그게 지금의 이름, 치이카와가 됨.", "images": [{"ai": "A cute sticker label that says '치이카와', pastel colors, white background"}], "sfx": "tada"},
-    {"text": "2020년엔 전용 계정을 열고 연재를 시작했고,", "images": [{"ira": "https://www.irasutoya.com/2016/05/blog-post_836.html"}]},
-    {"text": "2022년엔 애니메이션까지 나왔음.", "images": [{"ai": "A retro television showing a colorful generic cartoon of flowers and a sunny sky, no characters, white background"}]},
-    {"text": "지금은 영화관까지 접수한 캐릭터가 됐음.", "images": [{"bg": "극장"}, {"ira": "https://www.irasutoya.com/2013/07/blog-post_7666.html", "pos": "center", "size": 0.5, "keep": true}], "sfx": "kaching"},
-    {"text": "이렇게 살고 싶다던 낙서 한 장이, 작가 인생을 바꿔버린 거임.", "images": [{"char": "햄찌", "face": "웃음", "fx": ["zoom", "lines"]}], "red": ["낙서 한 장"], "sfx": "dundun", "sfx_on": "바꿔버린"}
+    {
+      "text": "치이카와가 처음 태어난 이유.",
+      "images": [
+        "board"
+      ]
+    },
+    {
+      "text": "작고 귀여운 걸로 유명한 캐릭터, 치이카와.",
+      "images": [
+        {
+          "ai": "A cute character goods shop shelf full of generic pastel plush toys of round animals, sign says '캐릭터 가게', white background"
+        }
+      ]
+    },
+    {
+      "text": "근데 이 녀석, 처음엔 만화가 아니었음.",
+      "images": [
+        {
+          "char": "햄찌",
+          "face": "놀람",
+          "fx": "punch"
+        }
+      ],
+      "sfx": "huh"
+    },
+    {
+      "text": "2017년 5월, 작가 나가노가 트위터에 낙서 하나를 올렸음.",
+      "images": [
+        {
+          "bg": "작업실"
+        },
+        {
+          "bg": "작업실",
+          "ai": "A hand holding a pencil drawing on a sketchbook, white background",
+          "keep": true,
+          "size": 0.6
+        }
+      ]
+    },
+    {
+      "text": "작고 동그란 녀석이 그려진 그림이었음.",
+      "images": [
+        {
+          "bg": "작업실",
+          "ai": "A simple pencil doodle on a sketchbook page of a tiny round potato-shaped creature with dot eyes, white background",
+          "size": 0.7
+        }
+      ],
+      "sfx": "pop"
+    },
+    {
+      "text": "거기 붙은 한마디가, 이렇게 살고 싶다, 였음.",
+      "images": [
+        {
+          "bg": "작업실",
+          "ai": "A sketchbook page with handwritten words '이렇게 살고 싶다' under a small doodle, white background",
+          "size": 0.75
+        }
+      ],
+      "red": [
+        "살고 싶다"
+      ]
+    },
+    {
+      "text": "힘든 현실에서 잠깐 도망치고 싶은 마음을 그린 거라고 함.",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2017/03/blog-post_350.html"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2018/02/blog-post_95.html"
+        }
+      ]
+    },
+    {
+      "text": "이름도 거창하지 않았음.",
+      "images": [
+        {
+          "char": "햄찌",
+          "face": "기본"
+        }
+      ]
+    },
+    {
+      "text": "뭔가 작고 귀여운 녀석.",
+      "images": [
+        {
+          "ai": "A small paper name tag that says '뭔가 작고 귀여운 녀석', white background"
+        }
+      ],
+      "sfx": "boing"
+    },
+    {
+      "text": "근데 이름이 너무 길어서, 팬들이 줄여 부르기 시작함.",
+      "images": [
+        {
+          "ai": "Three happy cartoon fans chatting with speech bubbles and hearts, no text, white background"
+        }
+      ]
+    },
+    {
+      "text": "한 팬이 치카와 스탬프는 언제 나오냐고 물었는데,",
+      "images": [
+        {
+          "ai": "A smartphone screen showing a single chat bubble that says '치카와 스탬프 언제 나와요?', no logos, white background"
+        }
+      ],
+      "sfx": "bubble"
+    },
+    {
+      "text": "작가가 그 줄임말을 마음에 들어 했다고 함.",
+      "images": [
+        {
+          "bg": "작업실",
+          "ai": "A cartoon thumbs up hand with small hearts, white background",
+          "size": 0.55
+        }
+      ],
+      "sfx": "ding"
+    },
+    {
+      "text": "그게 지금의 이름, 치이카와가 됨.",
+      "images": [
+        {
+          "ai": "A pastel name sticker with only the Korean text '치이카와' in rounded letters, decorated with small stars, no characters, no animals, white background"
+        }
+      ],
+      "sfx": "tada"
+    },
+    {
+      "text": "2020년엔 전용 계정을 열고 연재를 시작했고,",
+      "images": [
+        {
+          "ira": "https://www.irasutoya.com/2016/05/blog-post_836.html"
+        }
+      ]
+    },
+    {
+      "text": "2022년엔 애니메이션까지 나왔음.",
+      "images": [
+        {
+          "ai": "A retro television showing a colorful generic cartoon of flowers and a sunny sky, no characters, white background"
+        }
+      ]
+    },
+    {
+      "text": "지금은 영화관까지 접수한 캐릭터가 됐음.",
+      "images": [
+        {
+          "bg": "극장"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2013/07/blog-post_7666.html",
+          "pos": "center",
+          "size": 0.5,
+          "keep": true,
+          "bg": "극장"
+        }
+      ],
+      "sfx": "kaching"
+    },
+    {
+      "text": "이렇게 살고 싶다던 낙서 한 장이, 작가 인생을 바꿔버린 거임.",
+      "images": [
+        {
+          "char": "햄찌",
+          "face": "웃음",
+          "fx": [
+            "zoom",
+            "lines"
+          ]
+        }
+      ],
+      "red": [
+        "낙서 한 장"
+      ],
+      "sfx": "dundun",
+      "sfx_on": "바꿔버린"
+    }
   ]
 }
