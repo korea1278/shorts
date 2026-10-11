@@ -17,7 +17,7 @@
      "images": [{"ira": "https://www.irasutoya.com/2014/11/blog-post_252.html", "fx": "shake"},
                 {"ai": "A small wooden sailboat with a torn sail and broken mast and rudder drifting on rough waves, worried Pacific Islander teenage boys inside", "fx": "shake"}],
      "sfx": "shock", "sfx_on": "부서짐"},
-    {"text": "8일을 떠돌다 닿은 곳은, 아무도 없는 무인도였음.",
+    {"text": "8일 동안 떠돌다 닿은 곳은, 아무도 없는 무인도였음.",
      "images": [{"bg": "바다"}, {"ira": "https://www.irasutoya.com/2016/07/blog-post_692.html", "in": "pop"}],
      "sfx": "whoosh", "sfx_on": "무인도였음"},
     {"text": "영화였으면, 서로 싸우고 난리 났겠지만,",
