@@ -975,6 +975,18 @@ def main():
             return Image.open(os.path.join(CHAR_DIR, ref)).convert("RGBA"), "pad"
         if "ira" in it:
             return ira_image(it["ira"], p), "pad"
+        if "photo" in it:                                  # 쓸 권리가 확인된 사진 (위키미디어 공용 등) + 출처
+            im = Image.open(it["photo"]).convert("RGB")
+            if not it.get("credit"):
+                raise RuntimeError(f"사진 '{it['photo']}' 에 \"credit\"(출처·라이선스)이 없습니다")
+            if it["credit"] not in credits:
+                credits.append(it["credit"])
+            im = cover(im, W, IMG_H) if it.get("fill", True) else im
+            d, f = ImageDraw.Draw(im), tfont(max(18, im.width // 40), "regular")
+            tw = d.textlength("사진: " + it["credit"], font=f)
+            d.rectangle([im.width - tw - 24, im.height - f.size - 22, im.width, im.height], fill=(0, 0, 0))
+            d.text((im.width - tw - 12, im.height - f.size - 14), "사진: " + it["credit"], font=f, fill=(255, 255, 255))
+            return im, "cover"
         if not os.path.exists(p):
             if test_mode:
                 placeholder_image(n, "", W, IMG_H).save(p)
