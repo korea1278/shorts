@@ -1,0 +1,32 @@
+{
+  "id": "20261011-crowley",
+  "title": ["딸 살리려고", "약을 만든 아빠"],
+  "title_yellow": 1,
+  "post_title": "딸 살리려고 회사원에서 CEO까지 된 아빠",
+  "source": "https://m.dcinside.com/board/dcbest/469439",
+  "bgs": {
+    "거실": {"ai": "Cozy American suburban house living room with a sofa and window, no people"},
+    "진료실": {"ira": "https://www.irasutoya.com/2016/01/blog-post_278.html"},
+    "사무실": {"ai": "Small empty startup office room with two desks and computers, no people, no text"}
+  },
+  "scenes": [
+    {"text": "딸 살리려고 약을 만든 아빠.", "images": ["board"]},
+    {"text": "1998년 미국, 평범한 회사원 아빠가 있었음.", "images": [{"bg": "거실", "char": "회사원남", "face": "기본"}]},
+    {"text": "15개월 된 딸이 희귀병 진단을 받음.", "images": [{"bg": "진료실", "ira": "https://www.irasutoya.com/2013/07/blog-post_335.html"}]},
+    {"text": "폼페병이라는, 근육이 점점 약해지는 병이었음.", "images": [{"ira": "https://www.irasutoya.com/2018/01/blog-post_17.html#3"}], "red": ["폼페병"]},
+    {"text": "근데 고칠 약이 세상에 없었음.", "images": [{"ai": "An empty medicine cabinet with bare shelves, simple clipart, white background"}], "sfx": "fail"},
+    {"text": "게다가 갓 태어난 아들까지 같은 병이었음.", "images": [{"ira": "https://www.irasutoya.com/2018/01/blog-post_4.html#3", "fx": "shake"}], "sfx": "dundun", "red": ["아들까지"]},
+    {"text": "의사는 아이들이 몇 년 못 살 거라고 했음.", "images": [{"bg": "진료실", "ira": "https://www.irasutoya.com/2013/07/blog-post_335.html#4"}]},
+    {"text": "아빠는 그냥 기다릴 수가 없었음.", "images": [{"char": "회사원남", "face": "화남", "fx": "lines"}]},
+    {"text": "이 병을 연구하던 교수를 직접 찾아감.", "images": [{"ira": "https://www.irasutoya.com/2016/09/blog-post_660.html"}]},
+    {"text": "그리고 그 교수와 신약 회사를 차려버림.", "images": [{"bg": "사무실", "char": "회사원남", "face": "깨달음"}], "sfx": "pop"},
+    {"text": "의사도 과학자도 아닌 아빠가 사장이 된 거임.", "images": [{"bg": "사무실", "char": "회사원남", "face": "놀람"}, {"bg": "사무실", "ira": "https://www.irasutoya.com/2015/06/blog-post_699.html", "keep": true, "pos": "right", "size": 0.4}], "sfx": "boing", "red": ["사장"]},
+    {"text": "회사는 나중에 더 큰 제약회사에 팔렸는데,", "images": [{"ai": "A large modern pharmaceutical company building, simple clipart, no text, no logo, white background"}]},
+    {"text": "아빠는 거기서도 약 개발에 끝까지 매달렸음.", "images": [{"ira": "https://www.irasutoya.com/2017/06/blog-post_89.html"}]},
+    {"text": "그리고 2003년, 두 아이가 드디어 치료제를 맞음.", "images": [{"ai": "A gentle nurse giving an IV drip treatment to a small child in a hospital bed, simple clipart, white background"}], "sfx": "ding", "red": ["치료제"]},
+    {"text": "완치는 아니었지만, 아이들은 살아남았음.", "images": [{"ira": "https://www.irasutoya.com/2014/10/blog-post_5.html"}]},
+    {"text": "이 이야기는 해리슨 포드가 나온 영화로도 만들어짐.", "images": [{"ira": "https://www.irasutoya.com/2013/07/blog-post_7666.html"}], "sfx": "tada", "sfx_on": "영화"},
+    {"text": "그리고 몇 년 못 산다던 딸은,", "images": [{"ira": "https://www.irasutoya.com/2018/01/blog-post_17.html#4"}]},
+    {"text": "스무 살 숙녀로 자라 아빠 곁에 있었다고 함.", "images": [{"bg": "거실", "ai": "A smiling young woman in her twenties standing next to her proud middle-aged father, simple clipart, white background"}], "sfx": "ding", "red": ["스무 살"]}
+  ]
+}
