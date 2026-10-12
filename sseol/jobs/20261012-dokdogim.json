@@ -1,0 +1,213 @@
+{
+  "id": "20261012-dokdogim",
+  "title": [
+    "독도 넣었다가",
+    "수출 막힌 김의 결말"
+  ],
+  "title_yellow": 1,
+  "post_title": "독도 표시했다고 일본 수출 막혔던 김의 결말",
+  "source": "https://m.bobaedream.co.kr/board/bbs_view/best/1039014/2/1",
+  "bgs": {
+    "사무실": {
+      "ai": "Simple modern Korean company office with desks, a whiteboard and a window, no people"
+    },
+    "항구": {
+      "ai": "Busy cargo port with stacked shipping containers and cranes under a blue sky, no people"
+    }
+  },
+  "scenes": [
+    {
+      "text": "독도 넣었다가 수출 막힌 김의 결말.",
+      "images": [
+        "board"
+      ],
+      "sfx": "click"
+    },
+    {
+      "text": "한반도 지도가 그려진 김 포장, 본 적 있을 거임.",
+      "images": [
+        {
+          "ai": "A package of Korean seasoned laver (gim) with a simple green map of the Korean peninsula printed on it, including two tiny islands far to the east, no brand logo, no text",
+          "in": "pop"
+        }
+      ]
+    },
+    {
+      "text": "바로 성경김인데, 이 지도엔 독도가 꼭 들어가 있음.",
+      "images": [
+        {
+          "ai": "Close-up of a simple map of the Korean peninsula's east coast on a laver package, with two small rocky islands circled in red and labeled '독도'",
+          "fx": "zoom"
+        }
+      ],
+      "red": [
+        "독도"
+      ],
+      "sfx": "ding",
+      "sfx_on": "독도"
+    },
+    {
+      "text": "2021년, 일본에서 한국 김이 엄청 잘 팔리던 때였음.",
+      "images": [
+        {
+          "ai": "A store shelf fully stocked with many green packages of Korean seasoned laver, no brand logos, no text"
+        }
+      ]
+    },
+    {
+      "text": "그런데 일본 수입사가 조건을 하나 걸었음.",
+      "images": [
+        {
+          "bg": "사무실",
+          "ira": "https://www.irasutoya.com/2017/09/blog-post_45.html"
+        }
+      ]
+    },
+    {
+      "text": "포장에서 독도를 지워 달라는 거였음.",
+      "images": [
+        {
+          "ai": "A hand holding a pink eraser about to erase two tiny islands from a map of Korea printed on a laver package",
+          "fx": "shake"
+        }
+      ],
+      "red": [
+        "독도를 지워"
+      ],
+      "sfx": "dundun"
+    },
+    {
+      "text": "회사 안에서도 포장을 고치자는 말이 나왔음.",
+      "images": [
+        {
+          "bg": "사무실",
+          "char": "회사원남",
+          "face": "고민"
+        }
+      ]
+    },
+    {
+      "text": "근데 대표는, 독도를 지울 바엔 일본에 안 팔겠다고 했음.",
+      "images": [
+        {
+          "bg": "사무실",
+          "ira": "https://www.irasutoya.com/2017/03/blog-post_991.html",
+          "fx": "lines"
+        }
+      ],
+      "red": [
+        "안 팔겠다"
+      ],
+      "sfx": "tada",
+      "sfx_on": "안"
+    },
+    {
+      "text": "결국 일본 수출길은 그대로 막혔음.",
+      "images": [
+        {
+          "bg": "항구",
+          "ira": "https://www.irasutoya.com/2015/07/blog-post_203.html"
+        },
+        {
+          "bg": "항구",
+          "keep": true,
+          "ai": "A big bold red X mark",
+          "size": 0.6,
+          "in": "pop"
+        }
+      ],
+      "sfx": "fail"
+    },
+    {
+      "text": "여기까진 그냥 손해 본 이야기임.",
+      "images": [
+        {
+          "char": "햄찌",
+          "face": "억울",
+          "fx": "dark"
+        }
+      ]
+    },
+    {
+      "text": "대신 다른 나라 수출을 키웠음.",
+      "images": [
+        {
+          "bg": "항구",
+          "ai": "A cargo ship loaded with boxes of Korean laver sailing away with colorful arrows pointing to many different directions, no text, no flags",
+          "in": "right"
+        }
+      ],
+      "sfx": "whoosh"
+    },
+    {
+      "text": "예전엔 매출의 일 퍼센트도 안 되던 수출이,",
+      "sub": "예전엔 매출의 1%도 안 되던 수출이",
+      "images": [
+        {
+          "ai": "A simple bar chart with one tiny short bar labeled '1%'"
+        }
+      ]
+    },
+    {
+      "text": "이제는 매출의 사십 퍼센트까지 커졌다고 함.",
+      "sub": "이제는 매출의 40%까지 커졌다고 함",
+      "images": [
+        {
+          "ai": "A simple bar chart where a tiny bar labeled '1%' sits next to a very tall bar labeled '40%' with an upward arrow",
+          "fx": "punch"
+        },
+        {
+          "ira": "https://www.irasutoya.com/2012/07/blog-post_22.html"
+        }
+      ],
+      "red": [
+        "40%"
+      ],
+      "sfx": "kaching",
+      "sfx_on": "사십"
+    },
+    {
+      "text": "2024년엔 아예 포장에 독도 사진을 넣은 김을 냈음.",
+      "images": [
+        {
+          "ai": "A package of Korean seasoned laver with a photo-like picture of the rocky Dokdo islands in the blue sea printed on it, with the text '독도', no brand logo",
+          "in": "pop"
+        }
+      ],
+      "sfx": "pop"
+    },
+    {
+      "text": "수익금 일부는 독도를 위해 기부했음.",
+      "images": [
+        {
+          "ai": "The rocky Dokdo islands in a calm blue sea with a small Korean flag on top and a red heart floating above",
+          "fill": true
+        }
+      ]
+    },
+    {
+      "text": "요즘은 한반도 지도를 따라 한 김들도 나오는데,",
+      "images": [
+        {
+          "ai": "Three different laver packages side by side, each printed with a similar simple map of the Korean peninsula, no brand logos, no text"
+        }
+      ],
+      "sfx": "huh"
+    },
+    {
+      "text": "회사는 독도를 알리는 거라, 막을 이유가 없다고 함.",
+      "images": [
+        {
+          "bg": "사무실",
+          "char": "회사원남",
+          "face": "웃음",
+          "fx": "flash"
+        }
+      ],
+      "red": [
+        "막을 이유가 없다"
+      ],
+      "sfx": "laugh"
+    }
+  ]
+}
