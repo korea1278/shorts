@@ -1,0 +1,27 @@
+{
+  "id": "20261012-pilot",
+  "title": ["배 한 척 대주고", "억대 연봉 받는 직업"],
+  "title_yellow": 1,
+  "post_title": "의외로 돈 되는 희귀 직업 도선사",
+  "source": "https://m.dcinside.com/board/dcbest/469674",
+  "bgs": {
+    "항구": {"ai": "Busy Korean seaport harbor with container cranes, calm sea and blue sky, no people"}
+  },
+  "scenes": [
+    {"text": "배 한 척 대주고 억대 연봉 받는 직업.", "images": ["board"], "sfx": "click"},
+    {"text": "커다란 화물선이 항구에 들어올 때, 꼭 올라타는 사람이 있음.", "images": [{"bg": "항구"}, {"bg": "항구", "keep": true, "ira": "https://www.irasutoya.com/2015/07/blog-post_203.html", "size": 0.7}]},
+    {"text": "바로 도선사라는 직업임.", "images": [{"bg": "항구", "ai": "A fictional middle-aged Korean maritime pilot man in a navy uniform with a cap and a life vest, smiling, full body, simple clipart on white background", "size": 0.75}], "red": ["도선사"], "sfx": "ding"},
+    {"text": "선장도 아닌데, 남의 배에 타서 항구까지 길을 안내함.", "images": [{"bg": "항구", "ira": "https://www.irasutoya.com/2013/09/blog-post_7537.html", "pos": "left", "size": 0.5}, {"bg": "항구", "keep": true, "ai": "A fictional middle-aged Korean maritime pilot man in a navy uniform pointing forward with his hand, full body, simple clipart on white background", "pos": "right", "size": 0.6}], "sfx": "huh"},
+    {"text": "항구 근처는 물길이 좁고 복잡해서, 그 바다를 제일 잘 아는 사람이 맡는 거임.", "images": [{"ai": "Simple cute top-down map of a narrow winding harbor channel between islands with a big ship and a dotted route line, no text", "fill": true}, {"ai": "Simple cute top-down map of a narrow winding harbor channel between islands with a big ship and a dotted route line, no text", "fill": true, "fx": "zoom"}]},
+    {"text": "큰 배가 한 번 부딪히면, 피해가 어마어마하니까.", "images": [{"ira": "https://www.irasutoya.com/2020/09/blog-post_77.html", "fx": ["shake", "flash"]}], "sfx": "dundun"},
+    {"text": "그래서 대우도 남다름.", "images": [{"ira": "https://www.irasutoya.com/2013/12/blog-post_2984.html"}]},
+    {"text": "평균 연봉이 1억 원이 넘는다는 기사도 있음.", "images": [{"ira": "https://www.irasutoya.com/2015/03/blog-post_756.html"}, {"char": "햄찌", "face": "놀람", "fx": "punch"}], "red": ["1억"], "sfx": "kaching", "sfx_on": "1억"},
+    {"text": "게다가 정년이 65세까지라고 함.", "images": [{"ira": "https://www.irasutoya.com/2014/06/blog-post_90.html"}], "red": ["65세"]},
+    {"text": "그럼 나도 해볼까 싶지만, 문턱이 장난 아님.", "images": [{"char": "민수", "face": "웃음"}, {"char": "민수", "face": "당황", "fx": "shake"}], "sfx": "scratch", "sfx_on": "문턱이"},
+    {"text": "일단 큰 배 선장 경력부터 있어야 함.", "images": [{"bg": "항구", "ira": "https://www.irasutoya.com/2013/09/blog-post_7537.html", "size": 0.6}]},
+    {"text": "배를 탄 경력만 평균 15년 정도 필요하다고 함.", "images": [{"ai": "A cute wall calendar whose big page says '15년', simple clipart on white background"}, {"char": "햄찌", "face": "놀람", "fx": ["zoom", "lines"]}], "red": ["15년"], "sfx": "shock", "sfx_on": "15년"},
+    {"text": "시험에 붙어도, 6개월 동안 실습을 또 해야 함.", "images": [{"ira": "https://www.irasutoya.com/2018/01/blog-post_662.html"}], "red": ["6개월"]},
+    {"text": "그러니 20대 도선사는 거의 없는 셈임.", "images": [{"char": "민수", "face": "억울", "fx": "bw"}], "sfx": "fail"},
+    {"text": "억대 연봉의 비결은, 바다 위에서 버틴 15년이었던 거임.", "images": [{"bg": "항구", "ai": "A fictional gray-haired Korean maritime pilot man in a navy uniform standing proudly with arms crossed, full body, simple clipart on white background", "size": 0.75}], "red": ["15년"], "sfx": "tada"}
+  ]
+}
