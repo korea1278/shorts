@@ -1,0 +1,191 @@
+{
+ "id": "20261012vanfleet",
+ "title": [
+  "아들을 잃고도",
+  "한국을 사랑한 장군"
+ ],
+ "title_yellow": 0,
+ "post_title": "한국을 사랑했던 미군의 장군..밴 플리트",
+ "source": "https://m.dcinside.com/board/dcbest/469664",
+ "bgs": {
+  "전쟁터": {
+   "ai": "Korean War era 1950s battlefield landscape in Korea, rocky hills, dirt road, gray sky, no people, simple flat illustration"
+  },
+  "사령부": {
+   "ai": "Inside a 1950s army command tent, wooden table with a big map, lantern, no people, simple flat illustration"
+  },
+  "밤하늘": {
+   "ira": "https://www.irasutoya.com/2017/08/blog-post_796.html"
+  },
+  "연병장": {
+   "ai": "Korean military academy parade ground with old stone building and trees, clear sky, no people, simple flat illustration"
+  }
+ },
+ "scenes": [
+  {
+   "text": "아들을 잃고도 한국을 사랑한 장군.",
+   "images": [
+    "board"
+   ]
+  },
+  {
+   "text": "1951년 봄, 한 미군 장군이 한국에 왔음.",
+   "images": [
+    {
+     "bg": "전쟁터",
+     "ai": "Back view of an American army general in 1950s uniform stepping out of an old military jeep, face not visible, simple clipart, white background"
+    }
+   ]
+  },
+  {
+   "text": "미8군 사령관 제임스 밴 플리트였음.",
+   "images": [
+    {
+     "bg": "사령부",
+     "ai": "A 1950s US army general's peaked cap with three silver stars, simple clipart, white background",
+     "size": 0.6
+    }
+   ],
+   "sfx": "dundun"
+  },
+  {
+   "text": "그때, 그의 아들도 한국에 있었음.",
+   "images": [
+    {
+     "bg": "전쟁터",
+     "ai": "Silhouette of a young 1950s air force pilot in flight jacket standing, simple clipart, white background",
+     "in": "pop"
+    }
+   ]
+  },
+  {
+   "text": "B-26 폭격기를 모는 공군 조종사였음.",
+   "images": [
+    {
+     "bg": "전쟁터",
+     "ai": "A 1950s twin-engine propeller bomber airplane flying, side view, olive drab, no markings, simple clipart, white background",
+     "in": "right"
+    }
+   ]
+  },
+  {
+   "text": "1952년 3월, 아버지의 예순 번째 생일날.",
+   "images": [
+    {
+     "ai": "A simple birthday cake with candles shaped like the number 60, no text, simple clipart, white background"
+    }
+   ],
+   "sfx": "ding"
+  },
+  {
+   "text": "부자는 전쟁터에서 잠깐 만났음.",
+   "images": [
+    {
+     "bg": "전쟁터",
+     "ai": "Back view of an older army general and a young pilot son shaking hands, faces not visible, 1950s uniforms, simple clipart, white background"
+    }
+   ]
+  },
+  {
+   "text": "근데 그게 두 사람의 마지막 만남이 됐음.",
+   "images": [
+    {
+     "bg": "전쟁터",
+     "ai": "Back view of an older army general and a young pilot son shaking hands, faces not visible, 1950s uniforms, simple clipart, white background",
+     "fx": "bw"
+    }
+   ]
+  },
+  {
+   "text": "2주 뒤, 아들은 밤 폭격 임무를 나갔음.",
+   "images": [
+    {
+     "bg": "밤하늘",
+     "ai": "A 1950s twin-engine propeller bomber airplane flying, side view, dark color, no markings, simple clipart, white background",
+     "in": "left",
+     "size": 0.6
+    }
+   ],
+   "sfx": "whoosh"
+  },
+  {
+   "text": "그리고 다시는 돌아오지 않았음.",
+   "images": [
+    {
+     "bg": "밤하늘"
+    }
+   ],
+   "sfx": "cricket"
+  },
+  {
+   "text": "장교들은 당장 수색대를 보내자고 했음.",
+   "images": [
+    {
+     "bg": "사령부",
+     "ai": "Two 1950s army officers urgently pointing at a map, simple clipart, white background"
+    }
+   ]
+  },
+  {
+   "text": "근데 장군은 고개를 저었다고 함.",
+   "images": [
+    {
+     "bg": "사령부",
+     "ai": "Silhouette of an army general in 1950s uniform shaking his head with eyes closed, face in shadow, simple clipart, white background",
+     "fx": "dark"
+    }
+   ],
+   "sfx": "scratch"
+  },
+  {
+   "text": "내 아들 찾자고, 다른 병사들 목숨을 걸 순 없다는 거였음.",
+   "images": [
+    {
+     "bg": "전쟁터",
+     "ai": "Back view of a row of young 1950s soldiers with helmets standing in line, simple clipart, white background"
+    }
+   ],
+   "sfx": "dundun",
+   "red": [
+    "목숨"
+   ]
+  },
+  {
+   "text": "장군은 그 뒤로도 한국군을 키우는 데 힘을 쏟았음.",
+   "images": [
+    {
+     "bg": "연병장",
+     "ai": "1950s Korean army soldiers training together, marching with rifles, simple clipart, white background"
+    }
+   ]
+  },
+  {
+   "text": "그래서 지금도 육군사관학교에는 그의 동상이 서 있음.",
+   "images": [
+    {
+     "ai": "A bronze statue of a standing army general on a stone pedestal in a Korean campus, face small and undetailed, a stone sign that says '육군사관학교', simple flat illustration",
+     "fill": true
+    }
+   ]
+  },
+  {
+   "text": "한미 우정에 힘쓴 사람에게 주는 밴플리트상도 그의 이름임.",
+   "images": [
+    {
+     "ai": "A golden award plaque with Korean text '밴플리트상', simple clipart, white background"
+    }
+   ],
+   "sfx": "tada"
+  },
+  {
+   "text": "그런데 그 아들은, 70년이 지난 지금도 집에 돌아오지 못했음.",
+   "images": [
+    {
+     "bg": "밤하늘",
+     "ai": "An empty old 1950s pilot leather helmet and dog tags lying alone, simple clipart, white background",
+     "fx": "bw"
+    }
+   ]
+  }
+ ]
+}
