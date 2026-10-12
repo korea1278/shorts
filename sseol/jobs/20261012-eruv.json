@@ -1,0 +1,216 @@
+{
+ "id": "20261012-eruv",
+ "title": [
+  "뉴욕 길거리에 걸린",
+  "수상한 실의 정체"
+ ],
+ "title_yellow": 1,
+ "post_title": "뉴욕 길거리에 걸린 수상한 실의 정체",
+ "source": "JTA, Times of Israel, 99% Invisible, KUAC (맨해튼 에루브 기사)",
+ "bgs": {
+  "거리": {
+   "ai": "A Manhattan street with tall brick apartment buildings, sidewalks and tall utility poles, daytime, no people"
+  },
+  "새벽": {
+   "ai": "A quiet Manhattan street at dawn before sunrise, dark blue sky, glowing street lamps, tall utility poles, no people"
+  }
+ },
+ "scenes": [
+  {
+   "text": "뉴욕 길거리에 걸린 수상한 실의 정체.",
+   "images": [
+    "board"
+   ],
+   "sfx": "click"
+  },
+  {
+   "text": "맨해튼 거리를 걷다 보면, 전봇대 위에 이상한 게 보임.",
+   "images": [
+    {
+     "bg": "거리"
+    },
+    {
+     "bg": "거리",
+     "keep": true,
+     "ira": "https://www.irasutoya.com/2013/06/blog-post_3200.html",
+     "pos": "center",
+     "size": 0.5
+    }
+   ]
+  },
+  {
+   "text": "아주 높은 곳에, 투명한 낚싯줄이 길게 걸려 있음.",
+   "images": [
+    {
+     "bg": "거리",
+     "ai": "Two tall wooden utility poles side by side with a thin shiny fishing line stretched between their tops, a small sparkle on the line",
+     "pos": "center",
+     "size": 0.8,
+     "fx": "zoom"
+    }
+   ],
+   "sfx": "huh"
+  },
+  {
+   "text": "거슬린다고 끊어 버리면, 큰일 나는 줄임.",
+   "images": [
+    {
+     "bg": "거리",
+     "ira": "https://www.irasutoya.com/2013/03/blog-post_1401.html",
+     "pos": "center",
+     "size": 0.45
+    },
+    {
+     "bg": "거리",
+     "char": "햄찌",
+     "face": "놀람",
+     "fx": [
+      "shake",
+      "lines"
+     ]
+    }
+   ],
+   "sfx": "scratch"
+  },
+  {
+   "text": "이 줄의 이름은 에루브라고 함.",
+   "images": [
+    {
+     "ai": "A simple illustration of a thin line strung between the tops of two utility poles, with a big red arrow pointing at the line and a label that says '에루브'",
+     "fill": true
+    }
+   ],
+   "sfx": "ding",
+   "red": [
+    "에루브"
+   ]
+  },
+  {
+   "text": "유대교 안식일에는, 집 밖으로 물건을 들고 다니면 안 됨.",
+   "images": [
+    {
+     "bg": "거리",
+     "ai": "A friendly fictional middle-aged rabbi with a gray beard, round glasses, black hat and black coat, standing, smiling, full body",
+     "pos": "center",
+     "size": 0.6
+    }
+   ]
+  },
+  {
+   "text": "그럼 유모차도, 열쇠 하나도 못 들고 나가는 거임.",
+   "images": [
+    {
+     "ira": "https://www.irasutoya.com/2012/12/blog-post_3296.html",
+     "in": "pop"
+    },
+    {
+     "ira": "https://www.irasutoya.com/2015/07/blog-post_243.html",
+     "in": "pop"
+    }
+   ]
+  },
+  {
+   "text": "그래서 생각해 낸 방법이 바로 이 줄임.",
+   "images": [
+    {
+     "bg": "거리",
+     "ai": "A friendly fictional middle-aged rabbi with a gray beard, round glasses, black hat and black coat, raising one finger with a bright idea, sparkles around him, full body",
+     "pos": "center",
+     "size": 0.6
+    }
+   ],
+   "sfx": "tada"
+  },
+  {
+   "text": "동네 전체를 줄로 빙 둘러서, 커다란 집 한 채처럼 치는 거임.",
+   "images": [
+    {
+     "ai": "Simple cute map-style illustration of a city neighborhood seen from above, surrounded by a dashed rope line loop, with a big house icon in the center",
+     "fill": true
+    }
+   ]
+  },
+  {
+   "text": "그 길이가 무려 30킬로미터 가까이 된다고 함.",
+   "images": [
+    {
+     "ai": "Simple cute map illustration of a long narrow island city surrounded by a thin line loop, with one label that says '30km'",
+     "fill": true,
+     "fx": "punch"
+    }
+   ],
+   "sfx": "dundun",
+   "red": [
+    "30킬로미터"
+   ]
+  },
+  {
+   "text": "근데 문제는, 한 군데만 끊어져도 효력이 사라짐.",
+   "images": [
+    {
+     "bg": "거리",
+     "ai": "A thin line between two utility poles snapped and broken in the middle, the two ends dangling",
+     "pos": "center",
+     "size": 0.6
+    },
+    {
+     "bg": "거리",
+     "char": "햄찌",
+     "face": "당황",
+     "fx": "dark"
+    }
+   ],
+   "sfx": "fail"
+  },
+  {
+   "text": "그래서 매주 목요일 새벽 다섯 시, 랍비가 차를 타고 줄 전체를 점검함.",
+   "images": [
+    {
+     "bg": "새벽"
+    },
+    {
+     "bg": "새벽",
+     "keep": true,
+     "ai": "A small plain sedan car with headlights on, side view",
+     "pos": "center",
+     "size": 0.55
+    }
+   ]
+  },
+  {
+   "text": "요즘은 센서까지 백 개 넘게 달았음.",
+   "images": [
+    {
+     "ai": "A thin line strung between utility poles with many small sensor boxes attached along it, each with a tiny green light",
+     "fill": true
+    }
+   ],
+   "sfx": "bubble"
+  },
+  {
+   "text": "근데 랍비는 센서를 다 믿을 순 없다면서, 지금도 직접 돌아봄.",
+   "images": [
+    {
+     "bg": "새벽",
+     "ai": "A friendly fictional middle-aged rabbi with a gray beard, round glasses, black hat and black coat, holding a flashlight and shining it upward, full body",
+     "pos": "center",
+     "size": 0.6
+    }
+   ]
+  },
+  {
+   "text": "뉴욕 최첨단 결계의 최종 보안은, 결국 새벽에 출근하는 랍비 한 명이었음.",
+   "images": [
+    {
+     "bg": "새벽",
+     "ai": "A friendly fictional middle-aged rabbi with a gray beard, round glasses, black hat and black coat, holding a flashlight and a coffee cup, proud confident smile, full body",
+     "pos": "center",
+     "size": 0.6,
+     "fx": "zoom"
+    }
+   ],
+   "sfx": "laugh",
+   "sfx_on": "랍비"
+  }
+ ]
+}
