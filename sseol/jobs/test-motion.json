@@ -1,0 +1,18 @@
+{
+  "id": "test-motion",
+  "title": ["크게 움직이는 그림", "시험 영상"],
+  "title_yellow": 1,
+  "bgs": {"지도": {"ai": "Simple flat map of a peninsula, no text"},
+          "요새": {"photo": "File:Hwaseong Fortress Seoul.jpg"}},
+  "scenes": [
+    {"text": "크게 움직이는 그림 시험 영상.", "images": ["board"]},
+    {"text": "얼굴에 붙어 있다가 확 빠짐.", "images": [{"char": "민수", "face": "기본", "cam": {"type": "out", "at": "face", "zoom": 2.2}}]},
+    {"text": "비행기가 지도 위를 날아감.", "cam": {"type": "out", "at": [0.8, 0.7]},
+     "images": [{"bg": "지도", "char": "햄찌", "size": 0.25, "from": [0.8, 0.7], "to": [0.2, 0.3]}]},
+    {"text": "민수가 통통 걸어 들어옴.", "images": [{"bg": "지도", "char": "민수", "in": "left", "hop": true, "pos": "left"}]},
+    {"text": "그러고는 오른쪽으로 걸어감.", "images": [{"bg": "지도", "char": "민수", "to": "right", "hop": true}]},
+    {"text": "그리고 휙 나가버림.", "images": [{"bg": "지도", "char": "민수", "face": "놀람", "exit": "right"}]},
+    {"text": "진짜 요새 사진도 나옴.", "images": [{"photo": "File:Hwaseong Fortress Seoul.jpg", "cam": "right"}]},
+    {"text": "사진 배경 위에 햄찌가 쑥.", "images": [{"bg": "요새", "char": "햄찌", "face": "놀람", "cam": "in"}]}
+  ]
+}

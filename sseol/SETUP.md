@@ -21,10 +21,13 @@ www.instiz.net
 *.irasutoya.com
 *.bp.blogspot.com
 blogger.googleusercontent.com
+commons.wikimedia.org
+upload.wikimedia.org
 ```
 - `cdn.jsdelivr.net`: 제목·자막 폰트(프리텐다드)
 - 커뮤니티: 인기글 찾기 (에펨코리아는 자동 접속을 막아서 지금은 못 씀). 더쿠·아카라이브·루리웹·엠팍·인스티즈는 2026-10-09 추가
 - 이라스토야 3줄: 그림 찾기와 그림 파일
+- 위키미디어 2줄: 실제 사진 찾기와 사진 파일 (자유 이용 사진만, 2026-10-12 추가)
 
 **API credentials** → Add credential 두 번:
 

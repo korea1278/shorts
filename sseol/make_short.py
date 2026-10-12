@@ -26,6 +26,17 @@
     "keep": true   앞 장면 그림 위에 쌓기 (냉장고 → 세탁기 → 청소기 하나씩)
     "pos": left·center·right 또는 0~1, "size": 높이 비율(배경 있을 때 기본 0.82), "y": bottom·middle·top 또는 0~1
     "bob": false   숨 쉬듯 흔들림 끄기, "still": true  움직임 없이 예전처럼 한 장
+  크게 움직이기 (레퍼런스처럼 시청자 눈을 붙잡는 움직임)
+    "cam": "in"·"out"·"left"·"right"·"up"·"down" 또는 {"type": "out", "at": "face"|[0~1, 0~1], "zoom": 1.9}
+          out = 한 곳에 크게 붙었다가 확 빠짐 (장면 시작·공개), in = 천천히 다가감, left 등 = 확대한 채 훑기.
+          그림 항목이나 장면에 쓴다. 모든 그림(배경·흰 바탕·실제 사진)에 된다
+    "from"/"to": [가로, 세로] 0~1 (그림 가운데 기준) 또는 left·center·right·offleft·offright — A 에서 B 로 이동
+          (지도 위 비행기, 냉장고에서 식탁으로 가는 햄). "dur" 이동 시간, "delay" 출발 늦추기
+    "hop": true  통통 튀며 걷기 ("in": "left" 와 같이 쓰면 걸어 들어옴), "exit": left·right·up·down 장면 끝에 휙 퇴장,
+    "flip": true 좌우 뒤집기
+  {"photo": "File:이름.jpg"}  위키미디어 공용 실제 사진 (자유 이용 라이선스만, sseol/photos.py 로 찾는다).
+          왼쪽 위 '실제 사진' 표시와 오른쪽 아래 작가·라이선스가 자동으로 붙는다 ("tag": false 면 표시만 뺌).
+          배경으로도 된다: "bgs": {"요새": {"photo": "File:..."}}
   {"bg": "거실"} 만 쓰면 빈 배경. 이라스토야·인물 그림은 배경이 없어도 흰 바탕에서 뿅 나타나고 살짝 움직인다.
   AI 그림은 gpt-image-2 — 따옴표 안 글자를 한글로 정확히 쓴다 (예: "a book whose cover says '한국사'")
 
@@ -52,10 +63,11 @@ import urllib.request
 import wave
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import irasutoya  # noqa: E402
+import photos  # noqa: E402
 import templates  # noqa: E402
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -383,7 +395,27 @@ def stage_frame(stage, t):
         im, dt = L["im"], t - L["t0"]
         x, y = L["x"], L["y"]
         mode = L["in"]
-        p = dt / IN_TIME
+        p = dt / L.get("in_time", IN_TIME)
+        if L.get("path"):                                 # A 에서 B 로 이동 (비행기·물건 옮기기·걸어가기)
+            (x0, y0), (x1, y1), ta, tb = L["path"]
+            q = min(1.0, max(0.0, (t - ta) / max(0.05, tb - ta)))
+            e = q * q * (3 - 2 * q)                       # 천천히 출발 → 천천히 도착
+            x, y = x0 + (x1 - x0) * e, y0 + (y1 - y0) * e
+            if L.get("hop") and 0 < q < 1:                # 통통 튀며 걷기
+                y -= 26 * abs(math.sin(math.pi * 4 * q))
+        if L.get("hop") and mode in ("left", "right") and 0 < p < 1:
+            y -= 26 * abs(math.sin(math.pi * 3 * p))
+        if L.get("exit_t") is not None and t > L["exit_t"]:   # 장면 끝에 화면 밖으로 휙
+            q = min(1.0, (t - L["exit_t"]) / 0.35) ** 2
+            side = L["exit"]
+            if side == "left":
+                x -= (x + im.width) * q
+            elif side == "right":
+                x += (W - x) * q
+            elif side == "up":
+                y -= (y + im.height) * q
+            else:
+                y += (IMG_H - y) * q
         if mode == "up":
             y += (IMG_H - y) * (1 - ease_out(p))
         elif mode == "down":
@@ -404,6 +436,45 @@ def stage_frame(stage, t):
             im.putalpha(im.getchannel("A").point(lambda v: int(v * max(0.0, p))))
         pic.paste(im, (int(x), int(y)), im)
     return pic
+
+
+CAM_AT = {"center": (0.5, 0.5), "top": (0.5, 0.25), "bottom": (0.5, 0.75), "left": (0.25, 0.5),
+          "right": (0.75, 0.5), "top-left": (0.25, 0.25), "top-right": (0.75, 0.25),
+          "bottom-left": (0.25, 0.75), "bottom-right": (0.75, 0.75), "face": (0.5, 0.3)}
+CAM_TYPES = ("in", "out", "left", "right", "up", "down")
+
+
+def camera(cam, dt, dur):
+    """크게 움직이는 카메라 (레퍼런스: 얼굴·지도 한 곳에 붙었다가 확 빠지기, 쑥 다가가기, 옆으로 훑기)
+    in   천천히 그 자리로 다가감 (긴장·집중)          out  그 자리에 크게 붙어 있다가 확 빠짐 (전체 공개)
+    left·right·up·down  확대한 채로 그쪽으로 훑음 (긴 배경·지도·줄 선 사람들)
+    → 화면 가운데 (cx, cy) 와 확대 z"""
+    if isinstance(cam, str):
+        cam = {"type": cam}
+    kind = cam.get("type", "in")
+    at = cam.get("at", "face" if kind in ("in", "out") else "center")
+    fx_, fy_ = CAM_AT[at] if isinstance(at, str) else (float(at[0]), float(at[1]))
+    mx, my = W / 2, IMG_H / 2
+    px, py = W * fx_, IMG_H * fy_
+    if kind == "in":
+        Z = float(cam.get("zoom", 1.45))
+        q = min(1.0, dt / max(0.2, float(cam.get("dur", dur))))
+        e = q * q * (3 - 2 * q)
+        return 1 + (Z - 1) * e, mx + (px - mx) * e, my + (py - my) * e
+    if kind == "out":
+        Z = float(cam.get("zoom", 1.9))
+        q = min(1.0, max(0.0, dt - float(cam.get("hold", 0.25))) / max(0.2, float(cam.get("dur", min(1.2, dur)))))
+        e = 1 - (1 - q) ** 3
+        return Z - (Z - 1) * e, px + (mx - px) * e, py + (my - py) * e
+    Z = float(cam.get("zoom", 1.35))
+    q = min(1.0, dt / max(0.2, float(cam.get("dur", dur))))
+    e = q * q * (3 - 2 * q)
+    hw, hh = W / Z / 2, IMG_H / Z / 2
+    if kind in ("left", "right"):
+        a_, b_ = (W - hw, hw) if kind == "left" else (hw, W - hw)
+        return Z, a_ + (b_ - a_) * e, py
+    a_, b_ = (IMG_H - hh, hh) if kind == "up" else (hh, IMG_H - hh)
+    return Z, px, a_ + (b_ - a_) * e
 
 
 def placeholder_image(i, label, w, h):
@@ -962,6 +1033,61 @@ def main():
             fetch_irasutoya(ref, p)
         return Image.open(p)
 
+    photo_meta = {}
+
+    def photo_image(ref):
+        """위키미디어 공용 실제 사진 (자유 이용 라이선스만). 출처는 화면 구석과 credits.txt 에"""
+        title = photos.title_of(ref)
+        pp = os.path.join(work, "photo_" + hashlib.md5(title.encode()).hexdigest()[:10] + ".jpg")
+        if title not in photo_meta:
+            if os.path.exists(pp + ".json"):
+                with open(pp + ".json", encoding="utf-8") as f:
+                    photo_meta[title] = json.load(f)
+            elif test_mode:
+                photo_meta[title] = {"title": title, "artist": "시험", "license": "CC BY 4.0", "page": ""}
+                placeholder_image(len(photo_meta) + 80, "", 1600, 1000).save(pp)
+            else:
+                info = photos.info(title)
+                if not info["ok"]:
+                    raise RuntimeError(f"쓸 수 없는 사진 (라이선스 '{info['license']}' 또는 초상권 경고): {title}")
+                log(f"실제 사진 받는 중… ({title})")
+                with open(pp, "wb") as f:
+                    f.write(photos.get(info["url"]))
+                with open(pp + ".json", "w", encoding="utf-8") as f:
+                    json.dump(info, f, ensure_ascii=False)
+                photo_meta[title] = info
+        return Image.open(pp).convert("RGB"), photo_meta[title]
+
+    def photo_overlay(meta, tag=True):
+        """사진 위에 붙는 글: 왼쪽 위 '실제 사진' 표시 + 오른쪽 아래 작가·라이선스 (CC BY 조건)"""
+        ov = Image.new("RGBA", (W, IMG_H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(ov)
+        if tag:
+            f = tfont(34)
+            tw = d.textlength("실제 사진", font=f)
+            d.rounded_rectangle((22, 22, 22 + tw + 32, 22 + 54), 12, fill=(0, 0, 0, 170))
+            d.text((38, 49), "실제 사진", font=f, fill=(255, 236, 0), anchor="lm")
+        f = tfont(22, "regular")
+        txt = "사진: " + photos.credit_line(meta)
+        while d.textlength(txt, font=f) > W - 40 and len(txt) > 10:
+            txt = txt[:-2] + "…"
+        tw = d.textlength(txt, font=f)
+        d.rectangle((W - tw - 28, IMG_H - 40, W, IMG_H), fill=(0, 0, 0, 140))
+        d.text((W - 14, IMG_H - 20), txt, font=f, fill=(235, 235, 235), anchor="rm")
+        return ov
+
+    def photo_fit(img):
+        """비율이 비슷하면 꽉 채우고, 세로 사진처럼 많이 다르면 흐린 배경 위에 통째로"""
+        r = (img.width / img.height) / (W / IMG_H)
+        if 0.8 <= r <= 1.6:
+            return cover(img, W, IMG_H)
+        back = cover(img, W, IMG_H).filter(ImageFilter.GaussianBlur(28))
+        back = Image.blend(back, Image.new("RGB", back.size, (0, 0, 0)), 0.35)
+        s_ = min(W / img.width, IMG_H / img.height)
+        im = img.resize((int(img.width * s_), int(img.height * s_)), Image.LANCZOS)
+        back.paste(im, ((W - im.width) // 2, (IMG_H - im.height) // 2))
+        return back
+
     def picture(it, p, cut=False):
         """그림 항목 → (그림, 넣는 방식: pad 흰 여백 / full 여백 없음 / cover 꽉 채움)
         cut 이면 AI 그림을 배경 위에 올릴 수 있게 흰 바탕 한 장으로 만든다"""
@@ -975,6 +1101,8 @@ def main():
             return Image.open(os.path.join(CHAR_DIR, ref)).convert("RGBA"), "pad"
         if "ira" in it:
             return ira_image(it["ira"], p), "pad"
+        if "photo" in it:
+            return photo_image(it["photo"])[0], "photo"
         if not os.path.exists(p):
             if test_mode:
                 placeholder_image(n, "", W, IMG_H).save(p)
@@ -997,6 +1125,8 @@ def main():
             bp = os.path.join(work, "bg_" + hashlib.md5(key.encode()).hexdigest()[:10] + ".png")
             if "ira" in spec:
                 im = ira_image(spec["ira"], bp)
+            elif "photo" in spec:
+                im = photo_image(spec["photo"])[0]
             elif os.path.exists(bp):
                 im = Image.open(bp)
             elif test_mode:
@@ -1008,7 +1138,7 @@ def main():
             bg_cache[key] = cover(im, int(W * 1.12), int(IMG_H * 1.12))   # 천천히 움직일 여유
         return key, bg_cache[key]
 
-    def stage_of(it, p, a):
+    def stage_of(it, p, a, b):
         """배경 + 그림 한 겹 (아래에서 올라옴·뿅·옆에서 들어옴), "keep" 이면 앞 장면 그림들 위에 쌓는다"""
         bkey, bgim = bg_image(it.get("bg"))
         real_bg = bkey != "white"
@@ -1025,7 +1155,7 @@ def main():
                 img = placeholder_image(n, "", 520, 720)
             else:
                 img = picture(it, p, cut=True)[0]
-            ck = id(img) if test_mode else (it.get("char"), it.get("face"), it.get("ira"), p if "ai" in it else None)
+            ck = (it.get("char"), it.get("face"), it.get("ira"), p if "ai" in it else None)
             if ck not in cut_cache:
                 cut_cache[ck] = cut_white(img)
             im = cut_cache[ck]
@@ -1037,6 +1167,8 @@ def main():
             else:                                           # 흰 바탕: 예전처럼 화면에 꽉 맞게
                 s_ = min((W - 72) / im.width, (IMG_H - 72) / im.height)
             im = im.resize((max(1, int(im.width * s_)), max(1, int(im.height * s_))), Image.LANCZOS)
+            if it.get("flip"):                              # 좌우 뒤집기 (반대 방향을 보게)
+                im = ImageOps.mirror(im)
             yv = it.get("y", "bottom" if real_bg else "middle")
             x = W * fx_ - im.width / 2
             y = {"bottom": IMG_H - im.height, "top": 0}.get(yv, (IMG_H - im.height) / 2) \
@@ -1049,23 +1181,57 @@ def main():
             if mode is None and last is not None and not it.get("keep"):
                 mode = "none"                               # 같은 인물 표정만 바뀜 → 다시 등장하지 않음
                 L["t0"], L["phase"] = last["t0"], last["phase"]
+                if last.get("path") and "from" not in it and "to" not in it:
+                    L["x"], L["y"] = last["x"], last["y"]       # 이동을 마친 자리에서 표정만 바뀜
             if mode is None:
                 mode = "pop" if it.get("keep") or not real_bg else "up"
             if mode not in ("up", "down", "left", "right", "pop", "fade", "none"):
                 raise RuntimeError(f"모르는 등장 방식 in='{mode}'. up·down·left·right·pop·fade·none")
             L["in"] = mode
+            if it.get("hop"):
+                L["hop"], L["in_time"] = True, 0.7          # 걸어 들어오기는 조금 천천히
+            if "from" in it or "to" in it:                  # A → B 이동. 위치는 그림 가운데 기준 [가로, 세로] 0~1
+                def point(v):
+                    if isinstance(v, (list, tuple)):
+                        return W * float(v[0]) - im.width / 2, IMG_H * float(v[1]) - im.height / 2
+                    if v == "offleft":
+                        return -im.width, y
+                    if v == "offright":
+                        return W, y
+                    if v in POS_X:
+                        return W * POS_X[v] - im.width / 2, y
+                    raise RuntimeError(f"모르는 위치 '{v}'. [0~1, 0~1] 또는 left·center·right·offleft·offright")
+                src_ = point(it["from"]) if "from" in it else (x, y)
+                dst_ = point(it["to"]) if "to" in it else (x, y)
+                ta = a + float(it.get("delay", 0))
+                tb = ta + float(it.get("dur", max(0.3, (b - ta) * 0.85)))
+                L["path"] = (src_, dst_, ta, tb)
+                L["x"], L["y"] = dst_
+                if "in" not in it and last is None:
+                    L["in"] = "none" if "from" in it else L["in"]
+            if it.get("exit"):
+                if it["exit"] not in ("left", "right", "up", "down"):
+                    raise RuntimeError(f"모르는 퇴장 방향 exit='{it['exit']}'. left·right·up·down")
+                L["exit"], L["exit_t"] = it["exit"], max(a, b - 0.4)
             layers = [l for l in layers if l["who"] != who] + [L]
         return {"bg": bgim, "bg_key": bkey, "bg_moves": real_bg, "layers": layers}
 
-    def add(slot):
-        """칸 추가 + 밈 효과 중 색 바꾸기(red·dark·bw)는 미리 그림에 입힌다"""
+    def add(slot, overlay=None):
+        """칸 추가 + 밈 효과 중 색 바꾸기(red·dark·bw)는 미리 그림에 입힌다.
+        overlay: 카메라가 움직여도 제자리에 있는 글 (실제 사진 출처)"""
         a, b, img = slot
         bad = [f for f in cur_fx if f not in FX]
         if bad:
             raise RuntimeError(f"모르는 효과 {bad}. 쓸 수 있는 것: {', '.join(FX)}")
+        if cur_cam is not None:
+            kind = cur_cam if isinstance(cur_cam, str) else cur_cam.get("type", "in")
+            at = None if isinstance(cur_cam, str) else cur_cam.get("at")
+            if kind not in CAM_TYPES or (isinstance(at, str) and at not in CAM_AT):
+                raise RuntimeError(f"모르는 카메라 cam={cur_cam}. type: {', '.join(CAM_TYPES)} / at: "
+                                   f"{', '.join(CAM_AT)} 또는 [0~1, 0~1]")
         if not isinstance(img, (str, dict)):
             img = static_fx(img, cur_fx)
-        slots.append((a, b, img, cur_fx))
+        slots.append((a, b, img, cur_fx, {"cam": cur_cam, "overlay": overlay}))
 
     for i, s in enumerate(scenes):
         items = s.get("images")
@@ -1086,6 +1252,7 @@ def main():
             b = st + (en - st) * (j + 1) / len(items)
             fx = (it.get("fx") if isinstance(it, dict) else None) or s.get("fx") or []
             cur_fx = [fx] if isinstance(fx, str) else list(fx)
+            cur_cam = (it.get("cam") if isinstance(it, dict) else None) or s.get("cam")
             if it == "board":
                 add((a, b, "board"))
                 continue
@@ -1111,9 +1278,16 @@ def main():
                 continue
             if isinstance(it, dict) and any(k in it for k in ("bg", "in", "keep", "ira", "char")) \
                     and not it.get("still"):
-                add((a, b, stage_of(it, p, a)))
+                stage = stage_of(it, p, a, b)
+                bspec = bgs.get(it.get("bg")) if isinstance(it.get("bg"), str) else it.get("bg")
+                ov = photo_overlay(photo_image(bspec["photo"])[1], it.get("tag", True)) \
+                    if isinstance(bspec, dict) and "photo" in bspec else None
+                add((a, b, stage), ov)
                 continue
             img, how = picture(it, p)
+            if how == "photo":
+                add((a, b, photo_fit(img)), photo_overlay(photo_image(it["photo"])[1], it.get("tag", True)))
+                continue
             add((a, b, cover(img, W, IMG_H) if how == "cover"
                           else fit_into(img, W, IMG_H, pad=0 if how == "full" else 36)))
     run_start, k_run = 0, 0                     # 같은 배경이 이어지는 동안 배경을 한 방향으로 천천히 움직인다
@@ -1129,7 +1303,11 @@ def main():
     with open(os.path.join(out_dir, "credits.txt"), "w", encoding="utf-8") as f:
         f.write(f"이라스토야 그림 {n_ira}장 (영상 1편 {IRA_LIMIT}장까지)\n")
         f.write("\n".join(credits) + "\n")
-    log(f"그림 {len(slots)}칸 (이라스토야 {n_ira}장)")
+        if photo_meta:
+            f.write(f"\n실제 사진 {len(photo_meta)}장 (위키미디어 공용, 자유 이용 라이선스 — 설명란에 그대로 적기)\n")
+            for m_ in photo_meta.values():
+                f.write(f"{m_['title']} — {photos.credit_line(m_)} — {m_.get('page', '')}\n")
+    log(f"그림 {len(slots)}칸 (이라스토야 {n_ira}장" + (f", 실제 사진 {len(photo_meta)}장)" if photo_meta else ")"))
 
     # 5) 소리
     mix = np.zeros(int(SR * total), dtype=np.float32)
@@ -1204,7 +1382,8 @@ def main():
         t = fi / FPS
         while si < len(slots) - 1 and t >= slots[si][1]:
             si += 1
-        st, en, src, fx = slots[si]
+        st, en, src, fx, extra = slots[si]
+        cam = extra["cam"]
         frame = Image.new("RGB", (W, H), BG)
         if src == "board":
             frame.paste(board, (0, IMG_TOP))
@@ -1220,10 +1399,12 @@ def main():
                 src, z = static_fx(stage_frame(src, t), fx), 1.0
             dt = t - st
             cx, cy = W / 2, IMG_H / 2
+            if cam is not None:                               # 크게 움직이는 카메라
+                z, cx, cy = camera(cam, dt, en - st)
             if "zoom" in fx:                                  # 0.3초 만에 얼굴 쪽으로 1.35배
                 e = 1 - (1 - min(1.0, dt / 0.3)) ** 3
                 z *= 1 + 0.35 * e
-                cy = IMG_H / 2 - IMG_H * 0.1 * e
+                cy -= IMG_H * 0.1 * e
             if "punch" in fx:                                 # 1.25배에서 0.15초 만에 제자리
                 z *= 1 + 0.25 * max(0.0, 1 - dt / 0.15)
             if "shake" in fx and dt < 0.6:
@@ -1232,6 +1413,9 @@ def main():
                 cx += amp * math.sin(dt * 95)
                 cy += amp * math.cos(dt * 71)
             cw, chh = W / z, IMG_H / z
+            if cam is not None and "shake" not in fx:         # 그림 밖(검은 테두리)이 보이지 않게
+                cx = min(max(cx, cw / 2), W - cw / 2)
+                cy = min(max(cy, chh / 2), IMG_H - chh / 2)
             x0, y0 = cx - cw / 2, cy - chh / 2
             pic = src.resize((W, IMG_H), Image.BILINEAR, box=(x0, y0, x0 + cw, y0 + chh))
             if "lines" in fx:
@@ -1239,6 +1423,8 @@ def main():
                 pic.paste(lines_fx, (0, 0), lines_fx)
             if "flash" in fx and dt < 0.25:
                 pic = Image.blend(pic, Image.new("RGB", pic.size, (255, 255, 255)), 0.9 * (1 - dt / 0.25))
+            if extra["overlay"] is not None:
+                pic.paste(extra["overlay"], (0, 0), extra["overlay"])
             frame.paste(pic, (0, IMG_TOP))
         frame.paste(title, (0, 0), title)
         while sub_i < len(subs) - 1 and t >= subs[sub_i][1]:
