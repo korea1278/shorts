@@ -4,6 +4,11 @@
 사용법:
     python3 sseol/community.py best            # 인기글을 댓글·추천 많은 순으로 (못 여는 사이트는 건너뜀)
     python3 sseol/community.py read <글 주소>   # 글 본문을 글자로 (디시·보배드림·더쿠·아카·루리웹·엠팍·인스티즈)
+    python3 sseol/community.py seen <주소> ...  # 사용자에게 추천한 글을 기록 (다음 "오늘 썰"에서 빠짐)
+
+"best"는 (1) 전에 추천했거나 영상으로 만든 글을 빼고 (2) 본문을 미리 읽어 보고
+영상으로 만들 수 없는 글(본문을 못 읽음·글이 너무 짧음 = 사진 위주)도 뺀 뒤 보여준다.
+추천 기록은 세션이 바뀌어도 남도록 저장소의 `sseol-history` 브랜치(seen.txt)에 올린다.
 
 사이트: 디시·개드립·보배드림 + 더쿠·아카라이브·루리웹·엠팍·인스티즈 (2026-10-09 추가)
 새 사이트 5곳은 링크 모양으로 글을 찾는 너그러운 방식이라, 사이트 화면이 바뀌어도 대충은 가져온다.
@@ -12,9 +17,13 @@
 에펨코리아는 자동 접속 차단(430)이라 쓰지 않는다. 차단을 우회하지 않는다.
 """
 import html
+import json
+import os
 import re
+import subprocess
 import sys
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 UA = ("Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
@@ -144,23 +153,79 @@ BODY_RE = {
 }
 
 
-def best():
-    posts = []
-    for name, fn in SITES:
+HERE = os.path.dirname(os.path.abspath(__file__))
+HIST_BRANCH = "sseol-history"
+MIN_BODY = 150          # 본문 글자 수가 이보다 적으면 사진 위주 글로 보고 뺀다
+CHECK_TOP = 60          # 본문을 미리 읽어 볼 글 수 (점수 높은 순)
+# 고르는 기준에서 빼는 주제 (정치·사건사고·범죄). 제목에 있으면 본문을 읽기 전에 뺀다
+BAN = re.compile(r"대통령|국회|의원|정당|민주당|국민의힘|정의당|탄핵|선거|李|尹|성폭력|성범죄|성추행|살인|폭행|사망|숨져|"
+                 r"체포|구속|혐의|기소|불법체류|마약|사기범|흉기|참사|사고 현장")
+
+
+def git(*args, inp=None):
+    return subprocess.run(["git", "-C", HERE, *args], input=inp, capture_output=True, text=True)
+
+
+def norm(url):
+    """같은 글이면 같은 키 (주소 꼬리의 쪽수·검색 조건 무시)"""
+    url = url.split("#")[0].replace("://www.", "://").replace("://m.", "://")
+    m = re.search(r"[?&](?:id|no)=(\d+)", url)
+    if m:
+        return url.split("?")[0] + "?" + m.group(1)
+    url = url.split("?")[0]
+    m = re.search(r"^(.*/\d{5,})", url)
+    return m.group(1) if m else url
+
+
+def load_seen():
+    """전에 추천한 글(sseol-history 브랜치) + 영상으로 만든 글(jobs 의 source)"""
+    seen = set()
+    if git("fetch", "-q", "origin", HIST_BRANCH).returncode == 0:
+        seen |= {norm(l.strip()) for l in git("show", f"origin/{HIST_BRANCH}:seen.txt").stdout.splitlines() if l.strip()}
+    jobs = os.path.join(HERE, "jobs")
+    for f in os.listdir(jobs):
         try:
-            got = fn()
-            posts += got
-            print(f"# {name}: {len(got)}개", file=sys.stderr)
-        except Exception as e:
-            print(f"# {name}: 못 가져옴 ({e})", file=sys.stderr)
-    posts.sort(key=lambda p: p["comments"] * 2 + p["likes"], reverse=True)
-    for i, p in enumerate(posts, 1):
-        print(f"{i:3d}. [{p['site']}] {p['title']}  (댓글 {p['comments']} · 추천 {p['likes']}"
-              f"{' · 조회 ' + str(p['views']) if p['views'] else ''})  {p['url']}")
+            src = json.load(open(os.path.join(jobs, f))).get("source", "")
+        except Exception:
+            continue
+        if src.startswith("http"):
+            seen.add(norm(src))
+    return seen
 
 
-def read(url):
+def save_seen(urls):
+    """추천한 글 주소를 sseol-history 브랜치의 seen.txt 에 덧붙여 올린다 (작업 중인 파일은 건드리지 않음)"""
+    git("fetch", "-q", "origin", HIST_BRANCH)
+    parent = git("rev-parse", "-q", "--verify", f"origin/{HIST_BRANCH}").stdout.strip()
+    old = git("show", f"origin/{HIST_BRANCH}:seen.txt").stdout if parent else ""
+    have = {norm(l) for l in old.splitlines() if l.strip()}
+    add = []
+    for u in urls:
+        if norm(u) not in have:
+            have.add(norm(u))
+            add.append(u)
+    if not add:
+        print("이미 기록된 글입니다.")
+        return
+    blob = git("hash-object", "-w", "--stdin", inp=old + "".join(u + "\n" for u in add)).stdout.strip()
+    tree = git("mktree", inp=f"100644 blob {blob}\tseen.txt\n").stdout.strip()
+    commit = git("commit-tree", tree, *(["-p", parent] if parent else []), "-m", f"추천 기록 {len(add)}개").stdout.strip()
+    for wait in (0, 2, 4, 8, 16):
+        if wait:
+            subprocess.run(["sleep", str(wait)])
+        r = git("push", "-q", "origin", f"{commit}:refs/heads/{HIST_BRANCH}")
+        if r.returncode == 0:
+            print(f"추천 기록 {len(add)}개 저장 (전체 {len(have)}개)")
+            return
+    print("추천 기록을 올리지 못함:", r.stderr.strip(), file=sys.stderr)
+
+
+def fetch_body(url):
+    """(제목, 본문, 그림 수, 본문 상자를 찾았는지). 읽을 수 없는 사이트면 None"""
+    if "dogdrip.net" in url:
+        return None
     s = get(url)
+    found = True
     if "dcinside.com" in url:
         title = re.search(r'<span class="tit">(.*?)</span>', s, re.S)
         body = re.search(r'<div class="thum-txtin">(.*?)</div>\s*</div>\s*<div class="(?:recom|innerbox|outr)', s, re.S) \
@@ -174,19 +239,90 @@ def read(url):
         title = re.search(r'<meta property="og:title" content="([^"]*)"', s) or re.search(r"<title>(.*?)</title>", s, re.S)
         body = next((b for b in (re.search(r, s, re.S) for r in BODY_RE[k]) if b), None)
         if not body:                                      # 화면이 바뀌었으면 요약 글이라도
+            found = False
             body = re.search(r'<meta property="og:description" content="([^"]*)"', s)
     else:
+        return None
+    imgs = len(re.findall(r"<img", body.group(1))) if body else 0
+    return (clean(title.group(1)) if title else "?", clean(body.group(1)) if body else "", imgs, found and bool(body))
+
+
+def makeable(p):
+    """영상으로 만들 수 있는 글인지: 본문을 읽을 수 있고, 글이 충분히 길다 (사진 한 장짜리가 아님)"""
+    try:
+        got = fetch_body(p["url"])
+    except Exception:
+        return False, "본문 못 읽음"
+    if not got:
+        return False, "본문 자동으로 못 읽는 사이트"
+    _, text, imgs, found = got
+    letters = len(re.sub(r"\s", "", text))
+    if not found:
+        return False, "본문 상자 못 찾음"
+    if letters < MIN_BODY:
+        return False, f"글이 짧음 ({letters}자, 그림 {imgs}개)"
+    if letters < 400 and letters < imgs * 20:
+        return False, f"사진 위주 ({letters}자, 그림 {imgs}개)"
+    p["body_len"], p["imgs"] = letters, imgs
+    return True, ""
+
+
+def best(show_all=False):
+    posts = []
+    for name, fn in SITES:
+        try:
+            got = fn()
+            posts += got
+            print(f"# {name}: {len(got)}개", file=sys.stderr)
+        except Exception as e:
+            print(f"# {name}: 못 가져옴 ({e})", file=sys.stderr)
+    posts.sort(key=lambda p: p["comments"] * 2 + p["likes"], reverse=True)
+
+    seen = set() if show_all else load_seen()
+    fresh, dup, ban = [], 0, 0
+    for p in posts:
+        k = norm(p["url"])
+        if k in seen:
+            dup += 1
+            continue
+        seen.add(k)                                       # 목록 안의 겹친 글도 하나만
+        if BAN.search(p["title"]):
+            ban += 1
+            continue
+        fresh.append(p)
+    print(f"# 전에 추천·제작한 글 {dup}개 뺌, 정치·사건사고 제목 {ban}개 뺌", file=sys.stderr)
+
+    top = fresh[:CHECK_TOP]
+    with ThreadPoolExecutor(8) as ex:
+        res = list(ex.map(makeable, top))
+    out, why = [], {}
+    for p, (ok, reason) in zip(top, res):
+        if ok:
+            out.append(p)
+        else:
+            why[reason.split(" (")[0]] = why.get(reason.split(" (")[0], 0) + 1
+    print("# 영상으로 못 만들 글 뺌: " + (", ".join(f"{k} {v}개" for k, v in why.items()) or "없음"), file=sys.stderr)
+    for i, p in enumerate(out, 1):
+        print(f"{i:3d}. [{p['site']}] {p['title']}  (댓글 {p['comments']} · 추천 {p['likes']}"
+              f"{' · 조회 ' + str(p['views']) if p['views'] else ''} · 본문 {p['body_len']}자 · 그림 {p['imgs']}개)  {p['url']}")
+
+
+def read(url):
+    got = fetch_body(url)
+    if not got:
         print("이 사이트는 본문을 자동으로 읽을 수 없습니다. 글 내용을 직접 붙여 넣어 주세요.")
         return
-    imgs = len(re.findall(r"<img", body.group(1))) if body else 0
-    print("제목:", clean(title.group(1)) if title else "?")
+    title, text, imgs, _ = got
+    print("제목:", title)
     print(f"(그림 {imgs}개)")
-    print(clean(body.group(1)) if body else "(본문을 찾지 못함)")
+    print(text or "(본문을 찾지 못함)")
 
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2 and sys.argv[1] == "best":
-        best()
+        best(show_all="--all" in sys.argv)
+    elif len(sys.argv) >= 3 and sys.argv[1] == "seen":
+        save_seen(sys.argv[2:])
     elif len(sys.argv) >= 3 and sys.argv[1] == "read":
         read(sys.argv[2])
     else:
