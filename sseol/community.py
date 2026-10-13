@@ -3,18 +3,19 @@
 
 사용법:
     python3 sseol/community.py best            # 인기글을 댓글·추천 많은 순으로 (못 여는 사이트는 건너뜀)
-    python3 sseol/community.py read <글 주소>   # 글 본문을 글자로 (디시·보배드림·더쿠·아카·루리웹·엠팍·인스티즈)
+    python3 sseol/community.py read <글 주소>   # 글 본문을 글자로 (디시·보배드림·더쿠·아카·루리웹·엠팍·인스티즈·네이트판·클리앙)
     python3 sseol/community.py seen <주소> ...  # 사용자에게 추천한 글을 기록 (다음 "오늘 썰"에서 빠짐)
 
 "best"는 (1) 전에 추천했거나 영상으로 만든 글을 빼고 (2) 본문을 미리 읽어 보고
 영상으로 만들 수 없는 글(본문을 못 읽음·글이 너무 짧음 = 사진 위주)도 뺀 뒤 보여준다.
 추천 기록은 세션이 바뀌어도 남도록 저장소의 `sseol-history` 브랜치(seen.txt)에 올린다.
 
-사이트: 디시·개드립·보배드림 + 더쿠·아카라이브·루리웹·엠팍·인스티즈 (2026-10-09 추가)
+사이트: 디시·개드립·보배드림 + 더쿠·아카라이브·루리웹·엠팍·인스티즈 (2026-10-09 추가) + 네이트판·클리앙 (2026-10-13 추가)
 새 사이트 5곳은 링크 모양으로 글을 찾는 너그러운 방식이라, 사이트 화면이 바뀌어도 대충은 가져온다.
 
 개드립은 글 본문 페이지가 자동 접속 차단(Cloudflare)이라 목록만 가져온다.
 에펨코리아는 자동 접속 차단(430)이라 쓰지 않는다. 차단을 우회하지 않는다.
+오늘의유머(Cloudflare 확인 화면)·뽐뿌(403)도 자동 접속을 막아서 쓰지 않는다 (2026-10-13 확인).
 """
 import html
 import json
@@ -27,10 +28,15 @@ from concurrent.futures import ThreadPoolExecutor
 
 UA = ("Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
+# 네이트판·클리앙은 휴대폰 접속을 모바일 주소(m.)로 보내는데 그 주소는 허용 도메인이 아니라 PC 화면으로 읽는다
+UA_PC = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+         "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+PC_SITES = ("pann.nate.com", "clien.net")
 
 
 def get(url):
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Language": "ko-KR,ko"})
+    ua = UA_PC if any(k in url for k in PC_SITES) else UA
+    req = urllib.request.Request(url, headers={"User-Agent": ua, "Accept-Language": "ko-KR,ko"})
     with urllib.request.urlopen(req, timeout=20) as r:
         return r.read().decode("utf-8", errors="ignore")
 
@@ -102,16 +108,20 @@ def link_list(site, url, link_re, base=""):
         key = re.sub(r"[?&](page|mode|category|p|m)=[^&]*", "", href)
         title = clean(re.sub(r"<span[^>]*(?:reply|comment|num|cmt|count)[^>]*>.*?</span>", "", m.group(2), flags=re.S))
         title = re.sub(r"\s*[\[(]\d+[\])]\s*$", "", title).strip()
+        full = re.search(r'title="([^"]{4,})"', m.group(0)[:m.group(0).find(">") + 1])
+        if full and re.search(r"(\.\.\.|…)$", title):                # 잘린 제목이면 title="..." 의 전체 제목
+            title = html.unescape(full.group(1)).strip()
         if key in seen or len(title) < 4:
             continue
         seen.add(key)
-        stop = min(m.end() + 600, ms[i + 1].start() if i + 1 < len(ms) else len(s))   # 다음 글 앞까지만
+        nxt = next((n.start() for n in ms[i + 1:] if n.group(1) != m.group(1)), len(s))   # 같은 글의 다른 링크(요약·그림)는 넘어감
+        stop = min(m.end() + 600, nxt)                                                   # 다음 글 앞까지만
         near = clean(s[m.start():max(stop, m.end())])[:200]
         cm = re.search(r"[\[(](\d{1,5})[\])]", near)
         out.append({"site": site, "title": title.split("\n")[0][:80], "url": href if href.startswith("http") else base + href,
                     "comments": num(cm.group(1) if cm else ""),
-                    "likes": num((re.search(r"추천\s*(\d+)", near) or [None, ""])[1]),
-                    "views": num((re.search(r"조회\s*(\d+)", near) or [None, ""])[1])})
+                    "likes": num((re.search(r"추천\s*([\d,]+)", near) or [None, ""])[1]),
+                    "views": num((re.search(r"조회\s*([\d,]+)", near) or [None, ""])[1])})
     return out
 
 
@@ -138,8 +148,23 @@ def instiz():
                      "https://www.instiz.net")
 
 
+def pann():
+    return link_list("네이트판", "https://pann.nate.com/talk/ranking", r"/talk/\d{6,}", "https://pann.nate.com")
+
+
+def clien():
+    """모두의공원 최근 인기순(od=T33). 줄마다 댓글 수·공감 수·조회 수가 따로 적혀 있다"""
+    s = get("https://www.clien.net/service/board/park?od=T33")
+    out = []
+    for m in re.finditer(r'data-comment-count=(\d+)>.*?list-like-count"><span>(\d+)</span>.*?'
+                         r'href="(/service/board/park/\d+)[^"]*".*?title="([^"]*)".*?class="hit">([^<]*)<', s, re.S):
+        out.append({"site": "클리앙", "title": clean(m.group(4)), "url": "https://www.clien.net" + m.group(3),
+                    "comments": num(m.group(1)), "likes": num(m.group(2)), "views": num(m.group(5))})
+    return out
+
+
 SITES = (("개드립", dogdrip), ("보배드림", bobaedream), ("디시", dcinside), ("더쿠", theqoo), ("아카라이브", arca),
-         ("루리웹", ruliweb), ("엠팍", mlbpark), ("인스티즈", instiz))
+         ("루리웹", ruliweb), ("엠팍", mlbpark), ("인스티즈", instiz), ("네이트판", pann), ("클리앙", clien))
 
 # 본문 상자 (사이트별로 차례로 찾아본다)
 BODY_RE = {
@@ -150,6 +175,8 @@ BODY_RE = {
     "mlbpark.donga.com": [r'<div class="ar_txt"[^>]*>(.*?)<div class="(?:tool_cont|btn_area|reply)'],
     "instiz.net": [r'<div[^>]+id="memo_content_1"[^>]*>(.*?)<div class="(?:sympathy|comment|ad)',
                    r'<div class="memo_content[^"]*">(.*?)<div class="(?:sympathy|comment)'],
+    "pann.nate.com": [r'<div id="contentArea">(.*?)<div class="updown'],
+    "clien.net": [r'<div class="post_article"[^>]*>(.*?)</article>', r'<div class="post_article"[^>]*>(.*?)<div class="post_writer'],
 }
 
 
@@ -159,7 +186,7 @@ MIN_BODY = 150          # 본문 글자 수가 이보다 적으면 사진 위주
 CHECK_TOP = 60          # 본문을 미리 읽어 볼 글 수 (점수 높은 순)
 # 고르는 기준에서 빼는 주제 (정치·사건사고·범죄). 제목에 있으면 본문을 읽기 전에 뺀다
 BAN = re.compile(r"대통령|국회|의원|정당|민주당|국민의힘|정의당|탄핵|선거|李|尹|성폭력|성범죄|성추행|살인|폭행|사망|숨져|"
-                 r"체포|구속|혐의|기소|불법체류|마약|사기범|흉기|참사|사고 현장")
+                 r"체포|구속|혐의|기소|불법체류|마약|사기범|흉기|참사|사고 현장|국감|국정감사|압수수색|검찰|장관|여사")
 
 
 def git(*args, inp=None):
@@ -255,7 +282,9 @@ def makeable(p):
         return False, "본문 못 읽음"
     if not got:
         return False, "본문 자동으로 못 읽는 사이트"
-    _, text, imgs, found = got
+    title, text, imgs, found = got
+    if re.search(r"(\.\.\.|…)$", p["title"]) and title != "?":     # 목록에서 잘린 제목은 글 제목으로
+        p["title"] = re.sub(r"\s*[|:]\s*(네이트 ?판|클리앙)\s*$", "", title)
     letters = len(re.sub(r"\s", "", text))
     if not found:
         return False, "본문 상자 못 찾음"
