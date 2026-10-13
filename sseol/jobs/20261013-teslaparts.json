@@ -1,0 +1,191 @@
+{
+ "id": "20261013-teslaparts",
+ "title": [
+  "차값은 싼데",
+  "수리비는 몇 배?"
+ ],
+ "title_yellow": 1,
+ "post_title": "테슬라 부품가격 얼마나 비싼가?",
+ "source": "https://m.dcinside.com/board/dcbest/469940",
+ "bgs": {
+  "도로": {
+   "ai": "A clean Korean city street with apartment buildings and trees, no people, no cars"
+  },
+  "정비소": {
+   "ai": "Inside a clean car repair garage with tools on the wall and a lift, no people, no cars"
+  }
+ },
+ "scenes": [
+  {
+   "text": "차값은 싼데, 수리비는 몇 배?",
+   "images": [
+    "board"
+   ],
+   "sfx": "click"
+  },
+  {
+   "text": "요즘 길에서 테슬라 진짜 많이 보임.",
+   "images": [
+    {
+     "bg": "도로"
+    },
+    {
+     "bg": "도로",
+     "keep": true,
+     "ai": "A sleek white modern electric sedan car, side view, no logo, no text",
+     "size": 0.8,
+     "pos": "center"
+    }
+   ]
+  },
+  {
+   "text": "근데 차주들 사이에서 자꾸 나오는 말이 있음.",
+   "images": [
+    {
+     "bg": "도로",
+     "char": "회사원남",
+     "face": "고민"
+    }
+   ]
+  },
+  {
+   "text": "차는 괜찮은데, 사고 나면 지갑이 터진다는 거임.",
+   "sub": "차는 괜찮은데 사고 나면 지갑이 터진다는 거임",
+   "red": [
+    "지갑이 터진다"
+   ],
+   "images": [
+    {
+     "ira": "https://www.irasutoya.com/2020/07/blog-post_672.html",
+     "fx": "shake"
+    }
+   ],
+   "sfx": "shock",
+   "sfx_on": "지갑이"
+  },
+  {
+   "text": "그래서 공임 빼고, 순수 부품값만 비교해 봤음.",
+   "images": [
+    {
+     "bg": "정비소",
+     "char": "회사원남",
+     "face": "의문"
+    }
+   ]
+  },
+  {
+   "text": "먼저 헤드라이트 하나 가격.",
+   "images": [
+    {
+     "bg": "정비소",
+     "ai": "A single modern car LED headlight unit, product view, no text",
+     "size": 0.7
+    }
+   ],
+   "sfx": "pop"
+  },
+  {
+   "text": "현대 싼타페는 대략, 칠십만 원임.",
+   "sub": "현대 싼타페는 대략 70만 원임",
+   "images": [
+    {
+     "bg": "정비소",
+     "ai": "A simple paper price tag that says '70만 원'",
+     "pos": "left",
+     "size": 0.45,
+     "y": 0.45
+    }
+   ],
+   "sfx": "ding"
+  },
+  {
+   "text": "근데 테슬라 모델 와이는, 이백이십만 원이 넘음.",
+   "sub": "근데 테슬라 모델Y는 220만 원이 넘음",
+   "red": [
+    "220만 원"
+   ],
+   "images": [
+    {
+     "bg": "정비소",
+     "keep": true,
+     "ai": "A simple paper price tag that says '220만 원'",
+     "pos": "right",
+     "size": 0.45,
+     "fx": "punch",
+     "y": 0.45
+    }
+   ],
+   "sfx": "dundun",
+   "sfx_on": "이백이십만"
+  },
+  {
+   "text": "거의 세 배임.",
+   "red": [
+    "세 배"
+   ],
+   "images": [
+    {
+     "char": "햄찌",
+     "face": "놀람",
+     "fx": [
+      "zoom",
+      "lines"
+     ]
+    }
+   ],
+   "sfx": "boing"
+  },
+  {
+   "text": "수입 고급 세단이랑 맞먹는 수준이라고 함.",
+   "images": [
+    {
+     "bg": "도로",
+     "ai": "A shiny black luxury sedan car, side view, no logo, no text",
+     "size": 0.8
+    }
+   ]
+  },
+  {
+   "text": "이유는 차 안팎에 붙은 카메라랑 센서가 엄청 많아서임.",
+   "images": [
+    {
+     "ai": "Simple clipart of a white electric car seen from above with many small cameras and sensors marked by glowing dots around its body, no text",
+     "fill": true
+    }
+   ],
+   "sfx": "bubble"
+  },
+  {
+   "text": "그래서 살짝 긁기만 해도, 수리비가 확 뛰는 거임.",
+   "sub": "그래서 살짝 긁기만 해도 수리비가 확 뛰는 거임",
+   "images": [
+    {
+     "ai": "Simple clipart of a shocked Korean man holding a car repair bill paper whose title says '수리비 청구서'"
+    }
+   ],
+   "sfx": "kaching",
+   "sfx_on": "확"
+  },
+  {
+   "text": "보험료도 고급 수입차급이라는 말이 나올 정도.",
+   "images": [
+    {
+     "ai": "A car insurance document paper with a car icon whose title says '자동차 보험료'"
+    }
+   ]
+  },
+  {
+   "text": "결국 테슬라는, 사는 돈보다 안 박는 실력이 더 중요하다는 거임.",
+   "red": [
+    "안 박는 실력"
+   ],
+   "images": [
+    {
+     "ira": "https://www.irasutoya.com/2016/04/blog-post_630.html"
+    }
+   ],
+   "sfx": "tada",
+   "sfx_on": "실력이"
+  }
+ ]
+}
