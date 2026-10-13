@@ -1,0 +1,29 @@
+{
+  "id": "20261013jjamppong",
+  "title": ["8만 명 몰린 짬뽕축제", "앉을 곳이 없다"],
+  "title_yellow": 1,
+  "post_title": "8만 명 몰린 짬뽕축제, 앉을 곳이 없다",
+  "source": "https://m.dcinside.com/board/dcbest/469963",
+  "bgs": {
+    "축제거리": {"ai": "A Korean old downtown street during a food festival, white canopy tents and colorful banners, no people"}
+  },
+  "scenes": [
+    {"text": "8만 명 몰린 짬뽕축제, 앉을 곳이 없다.", "images": ["board"]},
+    {"text": "이번 달 9일부터 3일 동안, 군산에서 짬뽕 축제가 열렸음.", "images": [{"bg": "축제거리"}]},
+    {"text": "군산은 짬뽕으로 유명한 도시임.", "images": [{"bg": "축제거리", "keep": true, "ai": "A big bowl of spicy red Korean jjamppong seafood noodle soup with mussels and squid", "pos": "center", "size": 0.6, "in": "pop"}], "sfx": "pop"},
+    {"text": "근데 짬뽕을 파는 가게는 딱 일곱 곳뿐이었음.", "images": [{"bg": "축제거리", "ira": "https://www.irasutoya.com/2015/05/blog-post_52.html", "size": 0.6}]},
+    {"text": "그런데 3일 동안 온 사람이, 무려 7만 9천 명.", "images": [{"bg": "축제거리", "ira": "https://www.irasutoya.com/2014/03/blog-post_6094.html", "size": 0.8, "fx": "zoom"}], "sfx": "dundun", "sfx_on": "무려", "red": ["7만 9천 명"]},
+    {"text": "3년 전엔 3만 명이었으니, 두 배가 훨씬 넘음.", "images": [{"ai": "A simple cute bar chart with two bars, a short bar labeled '3만 명' and a very tall bar labeled '8만 명', with an upward arrow", "in": "up"}]},
+    {"text": "문제는 짬뽕을 받아도, 앉을 자리가 없었다는 거임.", "images": [{"bg": "축제거리", "ai": "A fictional Korean man in his late 20s with short black hair wearing a plain navy hoodie, holding a bowl of red noodle soup with both hands and looking around confused", "size": 0.7}]},
+    {"text": "테이블도 의자도 턱없이 모자랐음.", "images": [{"bg": "축제거리", "ai": "A few outdoor folding tables and plastic chairs completely full of people eating, no empty seats", "size": 0.8}], "sfx": "scratch"},
+    {"text": "결국 사람들은 보도블록에 쪼그려 앉았음.", "images": [{"bg": "축제거리", "ai": "Several people squatting on a sidewalk eating noodle soup from disposable bowls", "size": 0.85}]},
+    {"text": "뜨거운 짬뽕 그릇을 손에 들고, 바닥에서 후루룩.", "images": [{"bg": "축제거리", "ai": "A fictional Korean man in his late 20s with short black hair wearing a plain navy hoodie, squatting on the ground and slurping red noodle soup from a bowl in his hand, steam rising", "size": 0.75, "fx": "lines"}]},
+    {"text": "그래서 나온 기사 제목이, 맛있으면 뭐해, 였음.", "images": [{"news": {"outlet": "썰뉴스", "headline": "맛있으면 뭐해… 앉을 곳 없는 짬뽕축제", "lead": "방문객 8만 명, 바닥에서 먹는 짬뽕", "img": {"char": "민수", "face": "억울"}}}], "sfx": "ding"},
+    {"text": "군산시는 예산이 모자랐다고 설명했음.", "images": [{"ira": "https://www.irasutoya.com/2016/04/blog-post_49.html"}]},
+    {"text": "전체 예산은 1억 5천만 원.", "images": [{"ai": "A pile of Korean won banknotes with a big label that says '1억 5천만 원'"}], "sfx": "kaching", "red": ["1억 5천만 원"]},
+    {"text": "그중 1억 넘게가 행사장 기본 시설에 들어갔다고 함.", "images": [{"ai": "Festival setup items: white canopy tents, a portable toilet, electric cables and a small stage, simple clip art"}]},
+    {"text": "근데 반전은 사람들 반응이었음.", "images": [{"char": "햄찌", "face": "놀람", "fx": "punch"}], "sfx": "boing"},
+    {"text": "1억 5천으로 8만 명 모았으면, 오히려 가성비 축제라는 거임.", "images": [{"sns": {"name": "누리꾼", "handle": "@netizen", "text": "1억 5천으로 8만 명 모았으면 이거 완전 가성비 축제 아님?", "likes": 128, "comments": 34}}], "red": ["가성비"]},
+    {"text": "바닥에서 먹어도, 짬뽕은 맛있었나 봄.", "images": [{"bg": "축제거리", "ai": "A fictional Korean man in his late 20s with short black hair wearing a plain navy hoodie, sitting on the ground holding an empty noodle bowl and smiling happily with a satisfied face", "size": 0.75}], "sfx": "laugh"}
+  ]
+}
