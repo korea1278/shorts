@@ -1,0 +1,50 @@
+{
+  "id": "20261013-medicine",
+  "title": ["식약처에 따졌더니", "돌아온 답변"],
+  "title_yellow": 1,
+  "post_title": "식약처에 정보공개청구해서 답변 받았음",
+  "source": "https://m.dcinside.com/board/dcbest/469967",
+  "sub_style": "plain",
+  "show_speaker": true,
+  "bgs": {
+    "공항": {"ai": "Empty modern Korean international airport arrival hall with customs inspection counters, no people, no text"},
+    "방": {"ai": "Cozy small Korean studio apartment room with a desk and a laptop, evening light, no people, no text"}
+  },
+  "cast": {
+    "나": {"voice": "남자", "color": "sky", "char": "민수", "pos": "left"},
+    "세관 직원": {"voice": "아저씨", "color": "orange", "char": "아저씨", "pos": "right"}
+  },
+  "scenes": [
+    {"text": "외국에서 처방받은 약을, 식약처에 따졌다는 썰.", "images": ["board"]},
+    {"text": "요즘 위고비, 마운자로 같은 비만약이 엄청 유행임.", "images": [
+      {"ira": "https://www.irasutoya.com/2018/11/blog-post_92.html", "pos": "left", "size": 0.55},
+      {"ai": "A plain white medical injection pen for weight loss, no text, no logo, simple clipart", "keep": true, "pos": "right", "size": 0.45}], "sfx": "pop"},
+    {"text": "근데 이 약, 해외에서 사 오면 공항에서 막힘.", "images": [
+      {"bg": "공항", "ira": "https://www.irasutoya.com/2016/05/blog-post_373.html"}]},
+    {"text": "식약처가 위해 우려 품목으로 정해서, 세관에 통보했기 때문임.", "images": [
+      {"bg": "공항", "ira": "https://www.irasutoya.com/2014/11/blog-post_736.html"}]},
+    {"speaker": "나", "mood": "억울", "bg": "공항", "text": "아니, 현지 병원에서 처방받은 정품인데요?"},
+    {"speaker": "세관 직원", "bg": "공항", "text": "그래도 통관 보류입니다."},
+    {"text": "실제로 세관 적발이 작년보다 몇 배로 늘었음.", "images": [
+      {"ai": "Simple bar chart with bars rising sharply and a big red upward arrow, no text, no numbers, flat clipart", "fx": "punch"}], "sfx": "dundun"},
+    {"text": "억울했던 한 사람이, 식약처에 정보공개청구를 넣었음.", "images": [
+      {"bg": "방", "char": "민수", "face": "억울"}]},
+    {"speaker": "나", "mood": "화남", "bg": "방", "text": "이 정책, 다시 검토한 문서 전부 보여주세요.", "sfx": "typing"},
+    {"text": "정품이랑 출처 모를 직구 약, 위험을 따로 따져 봤냐고도 물었음.", "images": [
+      {"ai": "A clean pharmacy medicine box with a prescription label, white background, no readable text", "pos": "left", "size": 0.45},
+      {"ai": "A suspicious crumpled brown parcel with a question mark, white background, no text", "keep": true, "pos": "right", "size": 0.45}]},
+    {"text": "그리고 날아온 답변.", "images": [
+      {"ai": "A laptop screen showing a new message notification that says '답변 도착', simple clipart"}], "sfx": "bubble"},
+    {"text": "직구 약은 안전을 확인할 수 없어서, 원래 안 된다는 설명이 쭉 이어짐.", "images": [
+      {"ai": "A very long official paper document unrolling down like a scroll, filled with gray lines instead of words, simple clipart", "fill": true}]},
+    {"text": "그리고 마지막 줄.", "images": [
+      {"ai": "Close-up of the bottom of an official paper document, gray lines above, last line is blank and highlighted with a yellow marker, simple clipart", "fx": "zoom"}]},
+    {"text": "청구하신 정보는, 모두 존재하지 않습니다.", "red": ["존재하지"], "images": [
+      {"ai": "An official paper document with a large red stamped Korean text '모두 부존재', simple clipart", "fx": "punch"}], "sfx": "dundun"},
+    {"speaker": "나", "mood": "놀람", "text": "검토한 문서가, 아예 없다고요?", "images": [
+      {"char": "민수", "face": "놀람", "fx": ["zoom", "shake"]}], "sfx": "shock"},
+    {"text": "막는 건 확실한데, 다시 따져 본 서류는 한 장도 없었다는 거임.", "images": [
+      {"ai": "An empty open file folder with nothing inside, simple clipart, white background", "pos": "left", "size": 0.5},
+      {"char": "햄찌", "face": "당황", "keep": true, "pos": "right", "size": 0.5}], "sfx": "cricket"}
+  ]
+}
