@@ -11,6 +11,8 @@
 추천 기록은 세션이 바뀌어도 남도록 저장소의 `sseol-history` 브랜치(seen.txt)에 올린다.
 
 사이트: 디시·개드립·보배드림 + 더쿠·아카라이브·루리웹·엠팍·인스티즈 (2026-10-09 추가)
+루리웹은 PC 화면으로 읽고(휴대폰 화면은 허용 목록 밖 주소로 넘어감), 엠팍은 불펜 베스트 목록을 읽는다 (2026-10-13 고침).
+사이트마다 PER_SITE개씩 본문을 확인해서 댓글 수가 안 보이는 사이트도 빠지지 않는다.
 새 사이트 5곳은 링크 모양으로 글을 찾는 너그러운 방식이라, 사이트 화면이 바뀌어도 대충은 가져온다.
 
 개드립은 글 본문 페이지가 자동 접속 차단(Cloudflare)이라 목록만 가져온다.
@@ -29,8 +31,13 @@ UA = ("Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
 
 
+PC_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+PC_SITES = ("ruliweb.com",)   # 휴대폰 UA면 허용 목록 밖 모바일 주소(m.ruliweb.com)로 넘어가는 곳
+
+
 def get(url):
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Language": "ko-KR,ko"})
+    ua = PC_UA if any(d in url for d in PC_SITES) else UA
+    req = urllib.request.Request(url, headers={"User-Agent": ua, "Accept-Language": "ko-KR,ko"})
     with urllib.request.urlopen(req, timeout=20) as r:
         return r.read().decode("utf-8", errors="ignore")
 
@@ -96,7 +103,7 @@ def link_list(site, url, link_re, base=""):
     바로 뒤의 [12] 또는 (12) 를 댓글 수로 본다. 추천·조회는 근처에 '추천 N' '조회 N' 이 있을 때만."""
     s = get(url)
     out, seen = [], set()
-    ms = list(re.finditer(r'<a[^>]+href="(' + link_re + r')"[^>]*>(.*?)</a>', s, re.S))
+    ms = list(re.finditer(r'<a[^>]+href=["\'](' + link_re + r')["\'][^>]*>(.*?)</a>', s, re.S))
     for i, m in enumerate(ms):
         href = html.unescape(m.group(1))
         key = re.sub(r"[?&](page|mode|category|p|m)=[^&]*", "", href)
@@ -124,13 +131,30 @@ def arca():
 
 
 def ruliweb():
-    return link_list("루리웹", "https://bbs.ruliweb.com/best/humor_only",
-                     r"https://bbs\.ruliweb\.com/best/board/\d+/read/\d+[^\"]*")
+    s = get("https://bbs.ruliweb.com/best/humor_only")
+    out = []
+    for row in s.split('<tr class="table_body')[1:]:            # 한 줄 = 글 하나
+        a = re.search(r'href="(/best/board/\d+/read/\d+)', row)
+        t = re.search(r'<(strong|span) class="text_over">(.*?)</\1>', row, re.S)
+        if not (a and t):
+            continue
+        out.append({"site": "루리웹", "title": clean(t.group(2)), "url": "https://bbs.ruliweb.com" + a.group(1),
+                    "comments": num((re.search(r'num_reply[^>]*>\s*\((\d+)\)', row) or [None, ""])[1]),
+                    "likes": num((re.search(r'<td class="recomd">\s*(\d+)', row) or [None, ""])[1]),
+                    "views": num((re.search(r'<td class="hit">\s*(\d+)', row) or [None, ""])[1])})
+    return out
 
 
 def mlbpark():
-    return link_list("엠팍", "https://mlbpark.donga.com/mp/best.php?b=bullpen&m=view",
-                     r"https://mlbpark\.donga\.com/mp/b\.php\?[^\"]*id=\d+[^\"]*")
+    s = get("https://mlbpark.donga.com/mp/best.php?b=bullpen&m=reply")      # 불펜 베스트
+    out, seen = [], set()
+    for m in re.finditer(r"href='(https://mlbpark\.donga\.com/mp/b\.php\?[^']*id=(\d+)[^']*)'[^>]*class='txt'>(.*?)</a>", s, re.S):
+        if m.group(2) in seen:
+            continue
+        seen.add(m.group(2))
+        out.append({"site": "엠팍", "title": " ".join(clean(m.group(3)).split()), "url": html.unescape(m.group(1)),
+                    "comments": 0, "likes": 0, "views": 0})
+    return out
 
 
 def instiz():
@@ -146,8 +170,8 @@ BODY_RE = {
     "theqoo.net": [r'<div class="rd_body[^"]*">(.*?)<div class="(?:rd_ft|document_popup)'],
     "arca.live": [r'<div class="fr-view article-content">(.*?)</div>\s*</div>\s*<div class="(?:article-menu|included)',
                   r'<div class="fr-view article-content">(.*?)<div class="(?:article-menu|vote)'],
-    "ruliweb.com": [r'<div class="view_content[^"]*">(.*?)<div class="(?:row|board_bottom|notice_read)'],
-    "mlbpark.donga.com": [r'<div class="ar_txt"[^>]*>(.*?)<div class="(?:tool_cont|btn_area|reply)'],
+    "ruliweb.com": [r'<div class="view_content[^"]*"[^>]*>(.*?)<div class="(?:row|board_bottom|notice_read)'],
+    "mlbpark.donga.com": [r'<div class=["\']ar_txt["\'][^>]*>(.*?)<div class=["\'](?:tool_cont|btn_area|reply)'],
     "instiz.net": [r'<div[^>]+id="memo_content_1"[^>]*>(.*?)<div class="(?:sympathy|comment|ad)',
                    r'<div class="memo_content[^"]*">(.*?)<div class="(?:sympathy|comment)'],
 }
@@ -156,10 +180,10 @@ BODY_RE = {
 HERE = os.path.dirname(os.path.abspath(__file__))
 HIST_BRANCH = "sseol-history"
 MIN_BODY = 150          # 본문 글자 수가 이보다 적으면 사진 위주 글로 보고 뺀다
-CHECK_TOP = 60          # 본문을 미리 읽어 볼 글 수 (점수 높은 순)
+PER_SITE = 15           # 사이트마다 본문을 미리 읽어 볼 글 수 (점수 높은 순)
 # 고르는 기준에서 빼는 주제 (정치·사건사고·범죄). 제목에 있으면 본문을 읽기 전에 뺀다
 BAN = re.compile(r"대통령|국회|의원|정당|민주당|국민의힘|정의당|탄핵|선거|李|尹|성폭력|성범죄|성추행|살인|폭행|사망|숨져|"
-                 r"체포|구속|혐의|기소|불법체류|마약|사기범|흉기|참사|사고 현장")
+                 r"체포|구속|혐의|기소|불법체류|마약|사기범|흉기|참사|사고 현장|칼부림|속보|^공지$")
 
 
 def git(*args, inp=None):
@@ -292,7 +316,10 @@ def best(show_all=False):
         fresh.append(p)
     print(f"# 전에 추천·제작한 글 {dup}개 뺌, 정치·사건사고 제목 {ban}개 뺌", file=sys.stderr)
 
-    top = fresh[:CHECK_TOP]
+    by_site = {}                                          # 사이트마다 골고루 (숫자가 없는 사이트도 빠지지 않게)
+    for p in fresh:
+        by_site.setdefault(p["site"], []).append(p)
+    top = [p for ps in by_site.values() for p in ps[:PER_SITE]]
     with ThreadPoolExecutor(8) as ex:
         res = list(ex.map(makeable, top))
     out, why = [], {}

@@ -26,6 +26,23 @@ blogger.googleusercontent.com
 - 커뮤니티: 인기글 찾기 (에펨코리아는 자동 접속을 막아서 지금은 못 씀). 더쿠·아카라이브·루리웹·엠팍·인스티즈는 2026-10-09 추가
 - 이라스토야 3줄: 그림 찾기와 그림 파일
 
+**(선택) 사이트 더 늘리기** — 아래 줄도 Allowed domains에 넣고 새 세션에서 "새 사이트 연결해줘"라고 하면
+클로드가 실제로 열어 보고, 본문까지 읽혀서 영상으로 만들 수 있는 곳만 `community.py`에 추가합니다.
+```
+waffleboard.io
+www.clien.net
+*.ppomppu.co.kr
+pann.nate.com
+www.82cook.com
+*.humoruniv.com
+www.todayhumor.co.kr
+*.inven.co.kr
+www.slrclub.com
+damoang.net
+```
+- `waffleboard.io`: 커뮤니티 순위 사이트 (어떤 커뮤니티를 더 붙일지 고를 때)
+- 더쿠·인스티즈·아카라이브는 사이트가 자동 접속을 막아서(403) 지금은 안 나옵니다. 우회하지 않습니다.
+
 **API credentials** → Add credential 두 번:
 
 | 이름 | Allowed websites | 헤더 Name | Prefix | Value |
