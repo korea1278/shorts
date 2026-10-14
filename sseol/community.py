@@ -3,7 +3,7 @@
 
 사용법:
     python3 sseol/community.py best            # 인기글을 댓글·추천 많은 순으로 (못 여는 사이트는 건너뜀)
-    python3 sseol/community.py read <글 주소>   # 글 본문을 글자로 (디시·보배드림·더쿠·아카·루리웹·엠팍·인스티즈)
+    python3 sseol/community.py read <글 주소>   # 글 본문 + 본문 사진 주소 (디시·보배드림·더쿠·아카·루리웹·엠팍·인스티즈)
     python3 sseol/community.py seen <주소> ...  # 사용자에게 추천한 글을 기록 (다음 "오늘 썰"에서 빠짐)
 
 "best"는 (1) 전에 추천했거나 영상으로 만든 글을 빼고 (2) 본문을 미리 읽어 보고
@@ -244,8 +244,29 @@ def save_seen(urls):
     print("추천 기록을 올리지 못함:", r.stderr.strip(), file=sys.stderr)
 
 
+IMG_SKIP = re.compile(r"dccon|emoticon|emoji|icon|spacer|blank|loading|logo|banner|^data:|\.svg", re.I)
+
+
+def photo_urls(body_html, page_url):
+    """본문 안 사진 주소 (이모티콘·아이콘 빼고). 쇼츠 1순위 그림 재료"""
+    out = []
+    for tag in re.findall(r"<img\b[^>]*>", body_html, re.I):
+        m = (re.search(r'data-original="([^"]+)"', tag) or re.search(r'data-src="([^"]+)"', tag)
+             or re.search(r'\bsrc="([^"]+)"', tag))
+        if not m:
+            continue
+        u = html.unescape(m.group(1)).strip()
+        if u.startswith("//"):
+            u = "https:" + u
+        elif u.startswith("/"):
+            u = re.match(r"https?://[^/]+", page_url).group(0) + u
+        if u.startswith("http") and not IMG_SKIP.search(u) and u not in out:
+            out.append(u)
+    return out
+
+
 def fetch_body(url):
-    """(제목, 본문, 그림 수, 본문 상자를 찾았는지). 읽을 수 없는 사이트면 None"""
+    """(제목, 본문, 그림 수, 본문 상자를 찾았는지, 사진 주소들). 읽을 수 없는 사이트면 None"""
     if "dogdrip.net" in url:
         return None
     s = get(url)
@@ -268,7 +289,9 @@ def fetch_body(url):
     else:
         return None
     imgs = len(re.findall(r"<img", body.group(1))) if body else 0
-    return (clean(title.group(1)) if title else "?", clean(body.group(1)) if body else "", imgs, found and bool(body))
+    photos = photo_urls(body.group(1), url) if body and found else []
+    return (clean(title.group(1)) if title else "?", clean(body.group(1)) if body else "", imgs, found and bool(body),
+            photos)
 
 
 def makeable(p):
@@ -279,7 +302,7 @@ def makeable(p):
         return False, "본문 못 읽음"
     if not got:
         return False, "본문 자동으로 못 읽는 사이트"
-    _, text, imgs, found = got
+    _, text, imgs, found, _ = got
     letters = len(re.sub(r"\s", "", text))
     if not found:
         return False, "본문 상자 못 찾음"
@@ -339,10 +362,14 @@ def read(url):
     if not got:
         print("이 사이트는 본문을 자동으로 읽을 수 없습니다. 글 내용을 직접 붙여 넣어 주세요.")
         return
-    title, text, imgs, _ = got
+    title, text, imgs, _, photos = got
     print("제목:", title)
     print(f"(그림 {imgs}개)")
     print(text or "(본문을 찾지 못함)")
+    if photos:                                            # 쇼츠 1순위 그림: {"photo": "주소"}
+        print("\n원본 사진 (job 그림에 {\"photo\": \"주소\"} 로 쓴다):")
+        for i, u in enumerate(photos, 1):
+            print(f"  사진 {i}: {u}")
 
 
 if __name__ == "__main__":

@@ -6,14 +6,25 @@
     python3 sseol/make_short.py sseol/jobs/<작업이름>.json --test   # API 없이 시험 렌더
 
 레퍼런스(커뮤니티 썰 쇼츠) 형식 — 자세한 수치는 sseol/REFERENCE.md
-  검은 배경 · 맨 위 아주 두꺼운 2줄 제목(노랑/흰) · 가운데 그림(이라스토야 또는 AI)
-  · 그림 아래쪽 검은 상자 자막(노랑) · 시작은 게시판 목록에서 글을 클릭하는 화면
-  · 자연스러운 나레이션(긴 쉼만 줄임) · 웃음 포인트 효과음 · 배경음악 없음(설정으로 켤 수 있음) · 구독 부탁 없이 끝
+  검은 배경 · 맨 위 아주 두꺼운 2줄 제목(노랑/흰) · 가운데 사진(실제 사진 > 밈 > 실사풍 AI)
+  · 그림 아래쪽 검은 상자 자막(노랑) · 0초부터 충격 키워드 대형 자막 + 메인 사진 (게시판 클릭 인트로 없음)
+  · 모든 컷 켄 번스(1.05~1.15배 서서히 확대) · 한 그림 2초 넘게 안 멈춤 (1.5초마다 교체)
+  · 빠른 나레이션(쉼 0.15초 넘으면 0.1초로) · 웃음 포인트 효과음 · 배경음악 없음 · 구독 부탁 없이 끝
 
-장면 그림(images)은 여러 개 넣으면 장면 시간을 나눠 차례로 보여준다. 항목 형식:
-  {"ira": "이라스토야 글 주소 또는 그림 주소"}   흰 바탕에 그림 (영상 1편 20장까지)
-  {"ai": "English prompt"}                     AI 그림
-  "board"                                      게시판 목록 클릭 화면 (보통 첫 장면)
+후킹 인트로 (영상 0초부터)
+  job "hook": "길바닥 거지"  또는  {"text": "길바닥/거지 됨", "red": ["거지"]}
+    첫 장면 동안 그림 위에 아주 큰 키워드 자막이 꽂힌다 (일반 자막은 그동안 숨김). "/" 로 두 줄.
+  첫 장면 images 에는 가장 자극적인 메인 사진을 넣는다. 첫 장면 text 는 질문형·감정형 후킹 문장 1개.
+
+장면 그림(images)은 여러 개 넣으면 장면 시간을 나눠 차례로 보여준다. 항목 형식 (위가 우선순위 높음):
+  {"photo": "사진 주소 또는 sseol/photos/파일"}  1순위: 커뮤니티 원본 사진·뉴스 실물 사진
+                                               (community.py read 가 본문 사진 주소를 보여준다)
+      "ref": "원글 주소" (사진 서버가 원글 주소를 요구할 때, 없으면 job "source"), "fill": true 꽉 채워 자르기
+  {"meme": "huh고양이"}                         2순위: sseol/assets/memes/ 에 사용자가 넣어 둔 밈 그림
+                                               (파일이 없으면 햄찌 리액션으로 대신, "face" 로 표정)
+  {"ai": "English prompt"}                     3순위: 실사풍 AI 사진 (동화풍·웹툰풍 아님)
+  {"ira": "이라스토야 글 주소 또는 그림 주소"}   예전 방식 (일러스트라 기본으로는 안 씀, 영상 1편 20장까지)
+  "board"                                      예전 게시판 클릭 화면 — 없앴음. 쓰면 다음 사진으로 대신한다
   {"char": "민수", "face": "화남"}              등장인물 표정 (sseol/assets/characters/index.json)
   {"news"|"sns"|"chat"|"map": {...}}           가짜 기사·SNS·문자·지도 화면 (sseol/templates.py)
   그림 항목이나 장면에 "fx": "zoom" 또는 ["shake", "lines"] — 밈 효과 (FX 참고)
@@ -97,31 +108,36 @@ FX = {
     "bw": "흑백 (회상·허무)",
 }
 CHAR_DIR = os.path.join(ROOT, "assets", "characters")
-ZOOM_END = 1.04
 IRA_LIMIT = 20                              # 이라스토야 영상 1편 최대 장수
 
 DEFAULT_CONFIG = {
     "voice_id": "",                     # 나레이션 목소리 (voices 에 "나레이션" 이 없을 때)
     "voices": {},                       # 대화형 썰 역할별 목소리 {"여자": {"voice_id": ..., "voice_settings": {...}}}
     "mood_tags": True,                  # mood 에 맞춰 v3 감정 태그를 붙인다
-    "dialogue_gap": 0.25,               # 화자가 바뀔 때 사이 쉼 (배속 전)
+    "dialogue_gap": 0.1,                # 화자가 바뀔 때 사이 쉼 (배속 전, 쇼츠 템포로 짧게)
     "tts_model": "eleven_v3",           # 가장 자연스러운 최신 모델 (사용자 선택)
     "voice_settings": {"stability": 0.5, "similarity_boost": 0.8},
     "tempo": 1.25,                      # 배속 (목소리 높이는 그대로, 말만 빠르게)
-    "max_pause": 0.3,                   # 배속 뒤 이보다 긴 쉼은 줄인다
-    "pause_to": 0.22,
+    "max_pause": 0.15,                  # 배속 뒤 이보다 긴 쉼은 줄인다 (0.2초 넘는 빈틈이 없게)
+    "pause_to": 0.1,
     "image_model": "gpt-image-2",       # 한글 글자를 정확히 쓴다 (gpt-image-1 은 책에 영어를 써 넣었음)
     "image_quality": "low",
+    # 실사풍 (사용자 요청: 동화풍·웹툰풍 그림 금지). 실제 사진이 없을 때만 쓴다
     "image_style": (
-        "Simple, cute Japanese-style flat clip-art illustration with soft pastel colors and thin outlines, "
-        "plain pure white background, single clear subject, no logos, no watermark. "
-        "No real, identifiable people or celebrities; no existing cartoon characters or memes."
-    ),
-    "bg_style": (                       # 배경 그림 (사람 없음, 위에 이라스토야 인물이 올라간다)
-        "Soft flat illustration background in a cute Japanese clip-art style, gentle pastel colors, "
-        "wide view, empty scene with no people and no animals, nothing in the center foreground, "
+        "Photorealistic candid photo, as if taken on a smartphone in Korea, natural lighting, realistic textures, "
+        "news-photo or community-post feel, dramatic but believable moment, sharp focus on the main subject. "
+        "Not an illustration, not a cartoon, not anime, not a painting, not 3D render. "
+        "No real, identifiable people or celebrities (faces may be partly turned away or out of focus); "
         "no logos, no watermark."
     ),
+    "bg_style": (                       # 배경 사진 (사람 없음)
+        "Photorealistic wide photo of a real place in Korea, natural lighting, empty scene with no people, "
+        "nothing in the center foreground, not an illustration, no logos, no watermark."
+    ),
+    "hook_sfx": "shock",                # 0초 후킹 키워드가 꽂힐 때 효과음 (첫 장면에 sfx 가 없을 때, "" 이면 없음)
+    "kb_zoom": [1.05, 1.15],            # 켄 번스: 컷마다 이 범위 안에서 서서히 확대
+    "max_hold": 2.0,                    # 한 그림이 이보다 오래 멈춰 있지 않게
+    "cut_step": 1.5,                    # 긴 문장은 이 간격으로 그림(또는 구도)을 바꾼다
     # 글자 규칙: 따옴표로 준 글자만 한글로 정확히, 나머지는 글자 없음 (영어·일본어 글자 금지)
     "text_rule": (
         "Text rule: if the prompt quotes words, write exactly those words in Korean Hangul and nothing else. "
@@ -141,12 +157,6 @@ FONT_SOURCES = {
     "regular": [("Pretendard-Medium.otf",
                  "https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/public/static/Pretendard-Medium.otf")],
 }
-
-DEFAULT_BOARD = [
-    "요즘 편의점 알바 근황", "의외로 모르는 사람 많은 생활 꿀팁", "회사에서 있었던 레전드 사건",
-    "우리 동네 중국집 사장님 클라스", "생각보다 비싼 물건들", "엄마가 보낸 카톡 모음",
-    "군대에서 진짜 있었던 일", "요즘 초등학생들 수준", "택배 기사님이 남긴 메모",
-]
 
 
 def log(*a):
@@ -414,39 +424,6 @@ def placeholder_image(i, label, w, h):
     d.text((w / 2, h / 2), f"그림 {i}", font=ImageFont.truetype(font_path("bold"), 70), fill=(60, 60, 60),
            anchor="mm")
     return im
-
-
-# ── 게시판 목록 클릭 화면 ──────────────────────────────────
-def make_board(post_title, others):
-    """어두운 게시판 목록 (사이트 이름·로고 없음). 가운데 줄이 이번 글."""
-    rows = 9
-    rh = IMG_H // rows
-    im = Image.new("RGB", (W, IMG_H), (14, 14, 18))
-    d = ImageDraw.Draw(im)
-    f = ImageFont.truetype(font_path("regular"), 38)
-    fb = ImageFont.truetype(font_path("bold"), 38)
-    titles = list(others[:rows - 1])
-    titles.insert(rows // 2, post_title)
-    for i, t in enumerate(titles):
-        y = i * rh
-        me = i == rows // 2
-        if me:
-            d.rectangle((0, y, W, y + rh), fill=(44, 34, 74))
-        d.line((0, y + rh - 1, W, y + rh - 1), fill=(32, 32, 40), width=2)
-        d.rounded_rectangle((28, y + rh / 2 - 13, 56, y + rh / 2 + 13), 4,
-                            outline=(120, 170, 120) if me else (70, 90, 70), width=3)
-        d.text((76, y + rh / 2), t, font=fb if me else f, fill=(250, 250, 250) if me else (110, 110, 118),
-               anchor="lm")
-    return im
-
-
-def make_cursor(scale=1.0):
-    s = int(64 * scale)
-    cur = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    d = ImageDraw.Draw(cur)
-    pts = [(0.05, 0.02), (0.05, 0.78), (0.24, 0.6), (0.38, 0.92), (0.5, 0.86), (0.36, 0.55), (0.62, 0.55)]
-    d.polygon([(x * s, y * s) for x, y in pts], fill=(255, 255, 255), outline=(0, 0, 0), width=max(2, s // 20))
-    return cur
 
 
 # ── 소리 (직접 합성) ─────────────────────────────────────
@@ -772,6 +749,154 @@ def speed_lines(v):
     return _LINES[v]
 
 
+# ── 실제 사진 · 밈 ──────────────────────────────────────────
+PHOTO_DIR = os.path.join(ROOT, "photos")           # 사용자가 직접 넣는 사진 (뉴스 캡처 등)
+MEME_DIR = os.path.join(ROOT, "assets", "memes")    # 사용자가 직접 넣는 밈 그림
+MEME_EXT = (".png", ".jpg", ".jpeg", ".webp", ".gif")
+PHOTO_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+
+def fetch_photo(ref, out_png, referer=""):
+    """커뮤니티·뉴스 사진 받기. 주소면 내려받고(원글 주소를 Referer 로), 파일 이름이면 sseol/photos/ 에서 찾는다."""
+    if not re.match(r"https?://", ref):
+        for cand in (ref, os.path.join(ROOT, ref), os.path.join(PHOTO_DIR, ref)):
+            if os.path.exists(cand):
+                Image.open(cand).convert("RGB").save(out_png)
+                return
+        raise RuntimeError(f"사진 파일을 못 찾음: {ref} (sseol/photos/ 에 넣어 주세요)")
+    req = urllib.request.Request(ref.replace("&amp;", "&"), headers={
+        "User-Agent": PHOTO_UA, "Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
+        **({"Referer": referer} if referer else {})})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        data = r.read()
+    tmp = out_png + ".src"
+    with open(tmp, "wb") as f:
+        f.write(data)
+    try:
+        im = Image.open(tmp)
+        im.seek(0)                                     # 움짤이면 첫 장
+        im.convert("RGB").save(out_png)
+    except Exception:
+        raise RuntimeError(f"사진을 열 수 없음 (그림 파일이 아님): {ref}")
+    finally:
+        os.remove(tmp)
+
+
+def find_meme(name):
+    for ext in MEME_EXT:
+        p = os.path.join(MEME_DIR, name + ext)
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def blur_fill(img, w, h):
+    """세로·가로 비율이 다른 사진: 흐린 확대 배경 위에 사진 전체를 얹는다 (쇼츠에서 흔한 방식)"""
+    img = img.convert("RGB")
+    back = cover(img, w // 4, h // 4).filter(ImageFilter.GaussianBlur(6)).resize((w, h), Image.BILINEAR)
+    back = Image.blend(back, Image.new("RGB", (w, h), (0, 0, 0)), 0.35)
+    s = min(w / img.width, h / img.height)
+    im = img.resize((max(1, int(img.width * s)), max(1, int(img.height * s))), Image.LANCZOS)
+    back.paste(im, ((w - im.width) // 2, (h - im.height) // 2))
+    return back
+
+
+def place_photo(img, fill=None):
+    """사진을 그림 영역에: 비율이 비슷하면 꽉 채우고(살짝 잘림), 많이 다르면 흐린 배경 + 전체"""
+    r = (img.width / img.height) / (W / IMG_H)
+    if fill or (fill is None and 0.8 <= r <= 1.35):
+        return cover(img, W, IMG_H)
+    return blur_fill(img, W, IMG_H)
+
+
+# ── 0초 후킹 키워드 ──────────────────────────────────────────
+def make_hook(spec):
+    """그림 위에 꽂히는 아주 큰 키워드 자막 (노랑 + 두꺼운 검은 테두리, red 단어는 빨강). "/" 로 두 줄."""
+    if isinstance(spec, str):
+        spec = {"text": spec}
+    lines = [l.strip() for l in re.split(r"\s*/\s*|\n", spec.get("text", "")) if l.strip()][:2]
+    if not lines:
+        return None
+    color = rgb(spec.get("color", "yellow"))
+    reds = {w for r in spec.get("red", []) for w in r.split()}
+    f = fit_font(font_path("black"), lines, W - 160, 180, 90)       # 처음 1.15배로 꽂혀도 안 잘리게
+    asc, desc = f.getmetrics()
+    lh = int((asc + desc) * 1.02)
+    stroke = max(10, f.size // 11)
+    layer = Image.new("RGBA", (W, lh * len(lines) + stroke * 4), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    sp = d.textlength(" ", font=f)
+    for i, l in enumerate(lines):
+        words = l.split(" ")
+        widths = [d.textlength(w, font=f) for w in words]
+        x = (W - (sum(widths) + sp * (len(words) - 1))) / 2
+        y = stroke * 2 + lh * i + lh / 2
+        for w, ww in zip(words, widths):
+            d.text((x, y), w, font=f, fill=RED if any(r in w for r in reds) else color, anchor="lm",
+                   stroke_width=stroke, stroke_fill=(0, 0, 0))
+            x += ww + sp
+    return layer
+
+
+# ── 켄 번스 (모든 컷이 서서히 확대·이동) ─────────────────────────
+def kb_preset(k, cfg, piece=0):
+    """k번째 컷의 움직임: 시작·끝 확대 배율과 가운데가 흘러가는 방향.
+    piece > 0 은 같은 그림을 다른 구도로 다시 쓰는 컷 (긴 문장을 1.5초마다 끊을 때)"""
+    lo, hi = cfg.get("kb_zoom", [1.05, 1.15])
+    rnd = ((k * 0.6180339887) % 1.0)                    # 컷마다 고르게 다른 값 (매번 같은 결과)
+    z1 = lo + (hi - lo) * rnd
+    dirs = [(1, 0), (-1, 0), (0, -1), (1, -1), (-1, 1), (0, 1)]
+    dx, dy = dirs[k % len(dirs)]
+    if piece == 0:
+        return {"z0": 1.0, "z1": z1, "dx": dx, "dy": dy, "fx": 0.0, "fy": 0.0}
+    focus = [(-0.22, -0.12), (0.22, -0.08), (0.0, 0.14), (-0.18, 0.1), (0.18, 0.12)][(k + piece) % 5]
+    z0 = hi + 0.03 * (piece % 2)                         # 다른 구도: 한 번에 확 당겨 잡고 다시 서서히
+    return {"z0": z0, "z1": z0 + (z1 - 1.0) * 0.6, "dx": -dx, "dy": -dy, "fx": focus[0], "fy": focus[1]}
+
+
+def kb_box(kb, prog):
+    """켄 번스 한 장면: (배율, 가운데 x, 가운데 y) — 그림 밖으로 안 나가게"""
+    e = prog * prog * (3 - 2 * prog)                     # 부드럽게 시작·끝
+    z = kb["z0"] + (kb["z1"] - kb["z0"]) * e
+    room_x, room_y = W * (1 - 1 / z) / 2, IMG_H * (1 - 1 / z) / 2
+    cx = W / 2 + room_x * max(-1.0, min(1.0, kb["fx"] / 0.25 * 0.9 + kb["dx"] * 0.55 * (e - 0.5)))
+    cy = IMG_H / 2 + room_y * max(-1.0, min(1.0, kb["fy"] / 0.25 * 0.9 + kb["dy"] * 0.55 * (e - 0.5)))
+    return z, cx, cy
+
+
+# ── 대본 점검 (목소리 만들기 전에) ─────────────────────────────
+NEWS_TONE = re.compile(r"(했음|였음|었음|았음|있음|없음|됐음|함|됨|임|거임|"          # 음슴체·보고서체
+                       r"[했였었았혔졌렸쳤]다|한다|된다|이다|밝혔|전했|설명했)$")
+NEWS_TONE_OK = {"처음", "마음", "다음", "얼음", "웃음", "울음", "기쁨", "슬픔", "느낌", "조금", "지금", "요즘", "다짐",
+                "게임", "모임", "고함", "한마디임"}
+SCENE_MAX = 16          # 장면 문장 공백 제외 글자 (예전 평균 약 17자 → 20% 짧게 = 14자 안팎)
+HOOK_MAX = 24           # 첫 문장 공백 제외 글자 (1.25배속 약 7글자/초 → 3초 안팎)
+
+
+def lint_script(job, scenes):
+    """보고서식 말투·긴 문장·약한 후킹을 목소리 만들기 전에 잡는다. (말투 문제는 멈춤, 나머지는 경고)"""
+    hard, soft = [], []
+    for i, s in enumerate(scenes):
+        if s.get("speaker"):
+            continue                                       # 등장인물 대사는 그 사람 말투 그대로
+        for sent in re.split(r"(?<=[.?!…])\s+", s["text"].strip()):
+            last = re.sub(r"[\s,.?!…\"']+$", "", sent).split(" ")[-1] if sent.strip() else ""
+            if last and last not in NEWS_TONE_OK and NEWS_TONE.search(last):
+                hard.append(f"장면 {i + 1} '{last}' — 보고서·음슴체 말투 (예: ~잖아? / ~거야 / ~더라고 / ~했대)")
+        n = len(re.sub(r"[\s,.?!…\"']", "", s["text"]))
+        if i == 0 and n > HOOK_MAX:
+            soft.append(f"첫 문장 {n}자 — 3초 안에 안 끝남 ({HOOK_MAX}자 이하 권장)")
+        elif i and n > SCENE_MAX:
+            soft.append(f"장면 {i + 1} {n}자 — 더 짧게 끊기 ({SCENE_MAX}자 이하)")
+    first = scenes[0]["text"] if scenes else ""
+    if not job.get("hook"):
+        soft.append('job "hook"(0초 대형 키워드 자막)이 없음')
+    if first and "?" not in first and not re.search(r"레전드|역대급|충격|실화|미친|대참사|결국|이유|상황|썰", first):
+        soft.append("첫 문장이 질문형·감정 유발형이 아님")
+    return hard, soft
+
+
 # ── 메인 ────────────────────────────────────────────────
 def main():
     if len(sys.argv) < 2:
@@ -787,6 +912,14 @@ def main():
     work = os.path.join(out_dir, "work")
     os.makedirs(work, exist_ok=True)
     scenes = job["scenes"]
+    hard, soft = lint_script(job, scenes)
+    for m in soft:
+        log("⚠ 대본: " + m)
+    if hard:
+        for m in hard:
+            log("✖ 대본: " + m)
+        if "--force" not in sys.argv:
+            raise SystemExit("대본 말투를 썰 푸는 구어체로 고친 뒤 다시 실행하세요 (그대로 만들려면 --force)")
 
     # 1) 나레이션 원고
     full, spans = "", []
@@ -935,9 +1068,8 @@ def main():
         subs[-1][1] = total
 
     # 4) 그림
-    post_title = job.get("post_title") or " ".join(job["title"])
-    board = make_board(post_title, job.get("board") or DEFAULT_BOARD)
-    slots = []           # (시작, 끝, 그림 또는 "board")
+    slots = []           # (시작, 끝, 그림, 밈 효과, 켄 번스)
+    src_ref = job.get("source", "")
     credits, ira_files, n = [], {}, 0
     chars = load_characters()
     fonts_cache = {}
@@ -975,6 +1107,20 @@ def main():
             return Image.open(os.path.join(CHAR_DIR, ref)).convert("RGBA"), "pad"
         if "ira" in it:
             return ira_image(it["ira"], p), "pad"
+        if "photo" in it:                                     # 1순위: 실제 사진
+            if not os.path.exists(p):
+                if test_mode and re.match(r"https?://", it["photo"]):
+                    placeholder_image(n, "", 900, 1300 if n % 2 else 700).save(p)
+                else:
+                    log(f"사진 받는 중… ({os.path.basename(p)})")
+                    fetch_photo(it["photo"], p, it.get("ref") or src_ref)
+            return Image.open(p), "photo"
+        if "meme" in it:                                      # 2순위: 사용자가 넣어 둔 밈
+            mp = find_meme(it["meme"])
+            if mp:
+                return Image.open(mp), "photo"
+            log(f"⚠ 밈 '{it['meme']}' 파일이 sseol/assets/memes/ 에 없어 햄찌 리액션으로 대신합니다")
+            return picture({"char": "햄찌", "face": it.get("face", "놀람")}, p)
         if not os.path.exists(p):
             if test_mode:
                 placeholder_image(n, "", W, IMG_H).save(p)
@@ -1065,7 +1211,7 @@ def main():
             raise RuntimeError(f"모르는 효과 {bad}. 쓸 수 있는 것: {', '.join(FX)}")
         if not isinstance(img, (str, dict)):
             img = static_fx(img, cur_fx)
-        slots.append((a, b, img, cur_fx))
+        slots.append((a, b, img, cur_fx, None))
 
     for i, s in enumerate(scenes):
         items = s.get("images")
@@ -1076,19 +1222,21 @@ def main():
             auto = {"char": c, "face": face}
             if role.get("pos"):                              # 말하는 사람 자리 (나는 왼쪽, 엄마는 오른쪽)
                 auto["pos"] = role["pos"]
-            items = ["board"] if i == 0 else [auto] if c else [{"ai": s["text"]}]
+            items = [auto] if c else [{"ai": s["text"]}]
+        if "board" in items:                                 # 게시판 클릭 인트로는 없앴다 → 다음 사진으로
+            nxt = next((x for sc in scenes[i + 1:] for x in (sc.get("images") or []) if x != "board"), None)
+            log(f"⚠ 장면 {i + 1}: 게시판 클릭 화면은 없앴습니다. 메인 사진을 넣어 주세요"
+                + (" (지금은 다음 장면 사진으로 대신)" if nxt else ""))
+            items = [x for x in items if x != "board"] or [nxt or {"ai": s["text"]}]
         if s.get("bg"):                                      # 장면 "bg" 는 그 장면 그림 모두에 (배경 위에서 말함)
             items = [dict(it, bg=s["bg"]) if isinstance(it, dict) and "bg" not in it
-                     and not any(k in it for k in templates.TEMPLATES) else it for it in items]
+                     and not any(k in it for k in (*templates.TEMPLATES, "photo", "meme")) else it for it in items]
         st, en = scene_times[i]
         for j, it in enumerate(items):
             a = st + (en - st) * j / len(items)
             b = st + (en - st) * (j + 1) / len(items)
             fx = (it.get("fx") if isinstance(it, dict) else None) or s.get("fx") or []
             cur_fx = [fx] if isinstance(fx, str) else list(fx)
-            if it == "board":
-                add((a, b, "board"))
-                continue
             n += 1
             p = os.path.join(work, f"img_{i + 1:02d}_{j + 1}.png")
             kind = next((k for k in templates.TEMPLATES if k in it), None)
@@ -1114,8 +1262,26 @@ def main():
                 add((a, b, stage_of(it, p, a)))
                 continue
             img, how = picture(it, p)
+            if how == "photo":
+                add((a, b, place_photo(img, it.get("fill"))))
+                continue
             add((a, b, cover(img, W, IMG_H) if how == "cover"
                           else fit_into(img, W, IMG_H, pad=0 if how == "full" else 36)))
+    # 한 그림이 max_hold 초 넘게 멈추지 않게: 긴 컷은 cut_step 초마다 다른 구도로 끊는다 (+ 모든 컷 켄 번스)
+    max_hold, step = float(cfg.get("max_hold", 2.0)), float(cfg.get("cut_step", 1.5))
+    split, reframed = [], 0
+    for k, (a, b, img, fx, _) in enumerate(slots):
+        if isinstance(img, dict) or b - a <= max_hold:       # 움직이는 그림(배경+인물)은 이미 움직인다
+            split.append((a, b, img, fx, kb_preset(len(split), cfg)))
+            continue
+        m = math.ceil((b - a) / step)
+        reframed += 1
+        for j in range(m):
+            split.append((a + (b - a) * j / m, a + (b - a) * (j + 1) / m, img, fx if j == 0 else
+                          [f for f in fx if f in ("bw", "red", "dark")], kb_preset(len(split), cfg, j)))
+    slots = split
+    if reframed:
+        log(f"2초 넘는 컷 {reframed}곳을 1.5초마다 다른 구도로 나눔 (사진·짤을 더 넣으면 더 좋음)")
     run_start, k_run = 0, 0                     # 같은 배경이 이어지는 동안 배경을 한 방향으로 천천히 움직인다
     for k in range(len(slots) + 1):
         cur = slots[k][2] if k < len(slots) else None
@@ -1136,9 +1302,11 @@ def main():
     mix[:len(voice)] += voice[:len(mix)]
     voiced = voice[np.abs(voice) > 0.02]
     vrms = float(np.sqrt((voiced ** 2).mean())) if len(voiced) else 0.1
+    hook_sfx = cfg.get("hook_sfx") if job.get("hook") and scenes and not scenes[0].get("sfx") else ""
     for i, s in enumerate(scenes):
-        if s.get("sfx"):
-            fx = load_sfx(s["sfx"])
+        name = s.get("sfx") or (hook_sfx if i == 0 else "")
+        if name:
+            fx = load_sfx(name)
             act = fx[np.abs(fx) > np.abs(fx).max() * 0.05]          # 소리 나는 부분의 크기 기준
             fx = fx / (np.sqrt((act ** 2).mean()) + 1e-9) * vrms * 10 ** (cfg["sfx_db"] / 20)
             at = scene_times[i][0]
@@ -1187,7 +1355,6 @@ def main():
 
     # 6) 화면
     title = make_title(job["title"], int(job.get("title_yellow", 0)))
-    cursors = [make_cursor(1.0), make_cursor(0.85)]
     out_mp4 = os.path.join(out_dir, f"{job_id}.mp4")
     cmd = ["ffmpeg", "-y", "-v", "error",
            "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
@@ -1199,51 +1366,50 @@ def main():
     n_frames = int(total * FPS)
     si, sub_i = 0, 0
     log(f"영상 합성 중… ({total:.1f}초, {n_frames}프레임)")
-    row_y = IMG_TOP + (IMG_H // 9) * 4 + (IMG_H // 9) // 2
+    hook = make_hook(job["hook"]) if job.get("hook") else None
+    hook_end = scene_times[0][1] if hook else 0.0
+    hook_y = IMG_TOP + int(IMG_H * 0.46)                     # 그림 한가운데 조금 위
     for fi in range(n_frames):
         t = fi / FPS
         while si < len(slots) - 1 and t >= slots[si][1]:
             si += 1
-        st, en, src, fx = slots[si]
+        st, en, src, fx, kb = slots[si]
         frame = Image.new("RGB", (W, H), BG)
-        if src == "board":
-            frame.paste(board, (0, IMG_TOP))
-            p = min(1.0, (t - st) / 0.7)
-            p = 1 - (1 - p) ** 3
-            cx, cy = int(420 + (130 - 420) * p), int(row_y + 200 + (8 - 200) * p)
-            click = 0.75 <= t - st < 0.9
-            frame.paste(cursors[1 if click else 0], (cx, cy), cursors[1 if click else 0])
-        else:
-            prog = min(1.0, max(0.0, (t - st) / max(0.1, en - st)))
-            z = 1.0 + (ZOOM_END - 1.0) * prog
-            if isinstance(src, dict):                         # 움직이는 그림: 매 화면 새로 합성
-                src, z = static_fx(stage_frame(src, t), fx), 1.0
-            dt = t - st
-            cx, cy = W / 2, IMG_H / 2
-            if "zoom" in fx:                                  # 0.3초 만에 얼굴 쪽으로 1.35배
-                e = 1 - (1 - min(1.0, dt / 0.3)) ** 3
-                z *= 1 + 0.35 * e
-                cy = IMG_H / 2 - IMG_H * 0.1 * e
-            if "punch" in fx:                                 # 1.25배에서 0.15초 만에 제자리
-                z *= 1 + 0.25 * max(0.0, 1 - dt / 0.15)
-            if "shake" in fx and dt < 0.6:
-                z *= 1.05
-                amp = 22 * (1 - dt / 0.6)
-                cx += amp * math.sin(dt * 95)
-                cy += amp * math.cos(dt * 71)
-            cw, chh = W / z, IMG_H / z
-            x0, y0 = cx - cw / 2, cy - chh / 2
-            pic = src.resize((W, IMG_H), Image.BILINEAR, box=(x0, y0, x0 + cw, y0 + chh))
-            if "lines" in fx:
-                lines_fx = speed_lines(fi // 3 % 4)
-                pic.paste(lines_fx, (0, 0), lines_fx)
-            if "flash" in fx and dt < 0.25:
-                pic = Image.blend(pic, Image.new("RGB", pic.size, (255, 255, 255)), 0.9 * (1 - dt / 0.25))
-            frame.paste(pic, (0, IMG_TOP))
+        prog = min(1.0, max(0.0, (t - st) / max(0.1, en - st)))
+        if isinstance(src, dict):                             # 움직이는 그림: 매 화면 새로 합성 (배경이 이미 움직임)
+            src, z, cx, cy = static_fx(stage_frame(src, t), fx), 1.0, W / 2, IMG_H / 2
+        else:                                                 # 켄 번스: 서서히 확대 + 한쪽으로 흐름
+            z, cx, cy = kb_box(kb, prog)
+        dt = t - st
+        if "zoom" in fx:                                      # 0.3초 만에 얼굴 쪽으로 1.35배
+            e = 1 - (1 - min(1.0, dt / 0.3)) ** 3
+            z *= 1 + 0.35 * e
+            cy -= IMG_H * 0.1 * e
+        if "punch" in fx or (hook and si == 0):               # 1.25배에서 0.15초 만에 제자리 (0초 후킹은 자동)
+            z *= 1 + 0.25 * max(0.0, 1 - dt / 0.15)
+        if "shake" in fx and dt < 0.6:
+            z *= 1.05
+            amp = 22 * (1 - dt / 0.6)
+            cx += amp * math.sin(dt * 95)
+            cy += amp * math.cos(dt * 71)
+        cw, chh = W / z, IMG_H / z
+        x0 = min(max(cx - cw / 2, 0.0), W - cw) if z >= 1 else cx - cw / 2   # 그림 밖(검은 테두리)이 안 보이게
+        y0 = min(max(cy - chh / 2, 0.0), IMG_H - chh) if z >= 1 else cy - chh / 2
+        pic = src.resize((W, IMG_H), Image.BILINEAR, box=(x0, y0, x0 + cw, y0 + chh))
+        if "lines" in fx:
+            lines_fx = speed_lines(fi // 3 % 4)
+            pic.paste(lines_fx, (0, 0), lines_fx)
+        if "flash" in fx and dt < 0.25:
+            pic = Image.blend(pic, Image.new("RGB", pic.size, (255, 255, 255)), 0.9 * (1 - dt / 0.25))
+        frame.paste(pic, (0, IMG_TOP))
         frame.paste(title, (0, 0), title)
+        if hook and t < hook_end:                             # 0초부터 대형 키워드 (처음 0.12초 크게 꽂힘)
+            k = 1 + 0.15 * max(0.0, 1 - t / 0.12)
+            hl = hook if k == 1 else hook.resize((int(hook.width * k), int(hook.height * k)), Image.BILINEAR)
+            frame.paste(hl, ((W - hl.width) // 2, hook_y - hl.height // 2), hl)
         while sub_i < len(subs) - 1 and t >= subs[sub_i][1]:
             sub_i += 1
-        if subs and subs[sub_i][0] - 0.05 <= t < subs[sub_i][1] and src != "board":
+        if subs and subs[sub_i][0] - 0.05 <= t < subs[sub_i][1] and not (hook and t < hook_end):
             layer, y = subs[sub_i][2], subs[sub_i][3]
             frame.paste(layer, (0, y - layer.info["cy"]), layer)
         proc.stdin.write(frame.tobytes())

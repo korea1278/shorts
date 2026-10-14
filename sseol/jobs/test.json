@@ -1,13 +1,14 @@
 {
   "id": "test",
-  "title": ["경찰도 인정해주는", "비상 상황"],
-  "title_yellow": 0,
-  "post_title": "경찰도 인정해주는 비상 상황",
+  "title": ["짬뽕 먹으러 갔다가", "거지 된 축제"],
+  "title_yellow": 1,
+  "hook": {"text": "짬뽕 먹다가/길바닥 거지", "red": ["거지"]},
+  "source": "https://example.com/post/123",
   "scenes": [
-    {"text": "경찰도 인정해주는 비상 상황", "images": ["board"]},
-    {"text": "예전에 꽉 막힌 고속도로에서 배가 너무 아파서", "images": [{"ira": "https://www.irasutoya.com/2013/12/blog-post_7091.html"}]},
-    {"text": "갓길로 미친 듯이 달리고 있었음", "images": [{"ai": "a small silver sedan speeding on a highway shoulder, simple clip-art"}]},
-    {"text": "근데 앞에 경찰차가 서 있는 거임", "images": [{"ira": "https://www.irasutoya.com/2015/12/blog-post_507.html"}], "sfx": "dundun"},
-    {"text": "선생님 많이 급하셨나 봐요", "sub": "\"많이 급하셨나 봐요\"", "color": "white", "pause": 0.3, "sfx": "boing"}
+    {"text": "짬뽕 먹으러 갔다가 길바닥 거지 된 축제, 들어봤어?", "images": [{"photo": "https://example.com/main.jpg"}]},
+    {"text": "군산 하면 짬뽕이 유명하잖아?", "images": [{"photo": "https://example.com/a.jpg"}, {"ai": "A steaming bowl of red Korean jjamppong noodle soup on a restaurant table"}]},
+    {"text": "근데 자리가 없어도 너무 없는 거야.", "images": [{"meme": "huh고양이", "face": "당황"}], "sfx": "huh"},
+    {"text": "줄 서다가 결국 길바닥에 앉아서 먹었대.", "images": [{"photo": "https://example.com/b.jpg", "fill": true}], "fx": "shake", "sfx": "fail"},
+    {"text": "가격 보고 또 한 번 놀랐다는 거지.", "images": [{"ai": "A long line of people waiting outside a crowded Korean street food festival"}], "red": ["가격"]}
   ]
 }
