@@ -7,7 +7,9 @@
     python3 sseol/community.py seen <주소> ...  # 사용자에게 추천한 글을 기록 (다음 "오늘 썰"에서 빠짐)
 
 "best"는 (1) 전에 추천했거나 영상으로 만든 글을 빼고 (2) 본문을 미리 읽어 보고
-영상으로 만들 수 없는 글(본문을 못 읽음·글이 너무 짧음 = 사진 위주)도 뺀 뒤 보여준다.
+영상으로 만들 수 없는 글(본문을 못 읽음·글이 너무 짧음 = 사진 위주)도 빼고 (3) 화제성 필터:
+오늘 올라온 글 중 추천 50+ · 댓글 30+ 만 남겨 (4) 1순위(본문 사진 + 댓글 비율 높음) → 2순위(추천·댓글 폭발)
+→ 3순위 차례로 보여준다. 숫자는 글 페이지에서 직접 읽는다. `--all`이면 기록·화제성 필터 없이 전부.
 추천 기록은 세션이 바뀌어도 남도록 저장소의 `sseol-history` 브랜치(seen.txt)에 올린다.
 
 사이트: 디시·개드립·보배드림 + 더쿠·아카라이브·루리웹·엠팍·인스티즈 (2026-10-09 추가)
@@ -26,6 +28,7 @@ import subprocess
 import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 
 UA = ("Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
@@ -180,7 +183,13 @@ BODY_RE = {
 HERE = os.path.dirname(os.path.abspath(__file__))
 HIST_BRANCH = "sseol-history"
 MIN_BODY = 150          # 본문 글자 수가 이보다 적으면 사진 위주 글로 보고 뺀다
-PER_SITE = 15           # 사이트마다 본문을 미리 읽어 볼 글 수 (점수 높은 순)
+PER_SITE = 30           # 사이트마다 본문을 미리 읽어 볼 글 수 (점수 높은 순)
+# 화제성 필터 (2026-10-14 사용자 요청): 베스트 탭의 "오늘" 글 중 추천 50+ · 댓글 30+ 만
+MIN_LIKES, MIN_COMMENTS = 50, 30
+NO_LIKES_MIN_COMMENTS = 100   # 추천 수가 화면에 안 나오는 사이트(인스티즈)는 댓글 100+ 로 대신
+HOT_RATIO = 0.5         # 1순위: 본문 사진 있고 댓글 ÷ 추천 이 이 이상 (댓글 싸움 나는 글)
+BOOM_LIKES, BOOM_COMMENTS = 300, 200   # 2순위: 사진 없어도 추천·댓글이 폭발한 글
+KST = timezone(timedelta(hours=9))
 # 고르는 기준에서 빼는 주제 (정치·사건사고·범죄). 제목에 있으면 본문을 읽기 전에 뺀다
 BAN = re.compile(r"대통령|국회|의원|정당|민주당|국민의힘|정의당|탄핵|선거|李|尹|성폭력|성범죄|성추행|살인|폭행|사망|숨져|"
                  r"체포|구속|혐의|기소|불법체류|마약|사기범|흉기|참사|사고 현장|칼부림|속보|^공지$")
@@ -265,8 +274,34 @@ def photo_urls(body_html, page_url):
     return out
 
 
+# 글 페이지 안의 작성일 · 추천 수 · 댓글 수 (목록에 숫자가 안 나오는 사이트도 정확히)
+POST_STATS = {
+    "dcinside.com": (r"<li>(\d{4})\.(\d\d)\.(\d\d) \d\d:\d\d</li>", r'id="recomm_btn">([\d,]+)',
+                     r'btn-commentgo">댓글 <span class="point-red">([\d,]+)'),
+    "bobaedream": (r'<time datetime="(\d{4})-(\d\d)-(\d\d)"', r'<span class="data3">추천 ([\d,]+)', None),
+    "ruliweb.com": (r'class="regdate"[^>]*>(\d{4})\.(\d\d)\.(\d\d)', r'추천 <span class="like">([\d,]+)',
+                    r'id="reply_count" type="hidden" value="(\d+)"'),
+    "mlbpark.donga.com": (r"contentWriteDate': '(\d{4})-(\d\d)-(\d\d)", r"id='likeCnt'>([\d,]+)",
+                          r"id='re_num'>([\d,]+)"),
+    "instiz.net": (r'article:published_time" content="(\d{4})-(\d\d)-(\d\d)', None,
+                   r'<input id="cmt" type="hidden" value="(\d+)"'),
+}
+
+
+def post_stats(s, url):
+    """{"date": "2026-10-14" 또는 "", "likes": 수 또는 None(화면에 없음), "comments": 수 또는 None}"""
+    k = next((k for k in POST_STATS if k in url), None)
+    d_re, l_re, c_re = POST_STATS.get(k, (None, None, None))
+    d = (re.search(d_re, s) if d_re else None) or re.search(
+        r'(?:article:published_time" content="|"datePublished":\s*")(\d{4})-(\d\d)-(\d\d)', s)
+    lm = re.search(l_re, s) if l_re else None
+    cm = re.search(c_re, s) if c_re else None
+    return {"date": "-".join(d.groups()) if d else "", "likes": num(lm.group(1)) if lm else None,
+            "comments": num(cm.group(1)) if cm else None}
+
+
 def fetch_body(url):
-    """(제목, 본문, 그림 수, 본문 상자를 찾았는지, 사진 주소들). 읽을 수 없는 사이트면 None"""
+    """(제목, 본문, 그림 수, 본문 상자를 찾았는지, 사진 주소들, 작성일·추천·댓글). 읽을 수 없는 사이트면 None"""
     if "dogdrip.net" in url:
         return None
     s = get(url)
@@ -291,7 +326,7 @@ def fetch_body(url):
     imgs = len(re.findall(r"<img", body.group(1))) if body else 0
     photos = photo_urls(body.group(1), url) if body and found else []
     return (clean(title.group(1)) if title else "?", clean(body.group(1)) if body else "", imgs, found and bool(body),
-            photos)
+            photos, post_stats(s, url))
 
 
 def makeable(p):
@@ -302,7 +337,10 @@ def makeable(p):
         return False, "본문 못 읽음"
     if not got:
         return False, "본문 자동으로 못 읽는 사이트"
-    _, text, imgs, found, _ = got
+    _, text, imgs, found, photos, st = got
+    p["date"], p["photos"] = st["date"], len(photos)       # 화제성 필터 재료 (페이지 숫자가 있으면 그게 정확)
+    p["likes"] = st["likes"] if st["likes"] is not None else (p["likes"] or None)
+    p["comments"] = st["comments"] if st["comments"] is not None else p["comments"]
     letters = len(re.sub(r"\s", "", text))
     if not found:
         return False, "본문 상자 못 찾음"
@@ -352,9 +390,47 @@ def best(show_all=False):
         else:
             why[reason.split(" (")[0]] = why.get(reason.split(" (")[0], 0) + 1
     print("# 영상으로 못 만들 글 뺌: " + (", ".join(f"{k} {v}개" for k, v in why.items()) or "없음"), file=sys.stderr)
-    for i, p in enumerate(out, 1):
-        print(f"{i:3d}. [{p['site']}] {p['title']}  (댓글 {p['comments']} · 추천 {p['likes']}"
-              f"{' · 조회 ' + str(p['views']) if p['views'] else ''} · 본문 {p['body_len']}자 · 그림 {p['imgs']}개)  {p['url']}")
+
+    today = datetime.now(KST).strftime("%Y-%m-%d")
+    hot, why = [], {}
+    for p in out:
+        reason = None if show_all else hot_reason(p, today)
+        if reason:
+            why[reason] = why.get(reason, 0) + 1
+        else:
+            p["tier"] = tier(p)
+            hot.append(p)
+    print(f"# 화제성 필터 ({today} 글 · 추천 {MIN_LIKES}+ · 댓글 {MIN_COMMENTS}+): "
+          + (", ".join(f"{k} {v}개 뺌" for k, v in why.items()) or "모두 통과") + f" → {len(hot)}개 남음", file=sys.stderr)
+    hot.sort(key=lambda p: (p["tier"], -heat(p)))
+    for i, p in enumerate(hot, 1):
+        likes = p["likes"] if p["likes"] is not None else "?"
+        print(f"{i:3d}. {TIER_NAME[p['tier']]} [{p['site']}] {p['title']}  (댓글 {p['comments']} · 추천 {likes}"
+              f"{' · 조회 ' + str(p['views']) if p['views'] else ''} · 본문 {p['body_len']}자 · 사진 {p['photos']}장)  {p['url']}")
+
+
+def hot_reason(p, today):
+    """오늘 글이 아니거나 반응이 모자라면 뺀 이유, 통과면 None"""
+    if p.get("date") != today:
+        return "오늘 글 아님" if p.get("date") else "작성일 모름"
+    if p["likes"] is None:                                # 추천 수가 화면에 없는 사이트
+        return None if p["comments"] >= NO_LIKES_MIN_COMMENTS else "반응 모자람"
+    return None if p["likes"] >= MIN_LIKES and p["comments"] >= MIN_COMMENTS else "반응 모자람"
+
+
+def heat(p):
+    return p["comments"] * 2 + (p["likes"] or 0)
+
+
+TIER_NAME = {1: "★1순위", 2: "★2순위", 3: "  3순위"}
+def tier(p):
+    """1순위: 본문 사진 + 댓글 비율 높음 (댓글 ÷ 추천 ≥ HOT_RATIO) / 2순위: 추천·댓글 폭발 / 3순위: 나머지"""
+    ratio = p["comments"] / p["likes"] if p["likes"] else 1.0
+    if p.get("photos") and ratio >= HOT_RATIO:
+        return 1
+    if (p["likes"] or 0) >= BOOM_LIKES or p["comments"] >= BOOM_COMMENTS:
+        return 2
+    return 3
 
 
 def read(url):
@@ -362,8 +438,10 @@ def read(url):
     if not got:
         print("이 사이트는 본문을 자동으로 읽을 수 없습니다. 글 내용을 직접 붙여 넣어 주세요.")
         return
-    title, text, imgs, _, photos = got
+    title, text, imgs, _, photos, st = got
     print("제목:", title)
+    print(f"(작성일 {st['date'] or '?'} · 추천 {st['likes'] if st['likes'] is not None else '?'} · "
+          f"댓글 {st['comments'] if st['comments'] is not None else '?'})")
     print(f"(그림 {imgs}개)")
     print(text or "(본문을 찾지 못함)")
     if photos:                                            # 쇼츠 1순위 그림: {"photo": "주소"}
