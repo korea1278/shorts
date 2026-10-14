@@ -7,14 +7,21 @@
 
 레퍼런스(커뮤니티 썰 쇼츠) 형식 — 자세한 수치는 sseol/REFERENCE.md
   검은 배경 · 맨 위 아주 두꺼운 2줄 제목(노랑/흰) · 가운데 사진(실제 사진 > 밈 > 실사풍 AI)
-  · 그림 아래쪽 검은 상자 자막(노랑) · 0초부터 충격 키워드 대형 자막 + 메인 사진 (게시판 클릭 인트로 없음)
+  · 그림 아래쪽 검은 상자 자막(노랑) · 0초부터 메인 원본 사진 (가운데 대형 키워드·게시판 인트로 없음)
   · 모든 컷 켄 번스(1.05~1.15배 서서히 확대) · 한 그림 2초 넘게 안 멈춤 (1.5초마다 교체)
   · 빠른 나레이션(쉼 0.15초 넘으면 0.1초로) · 웃음 포인트 효과음 · 배경음악 없음 · 구독 부탁 없이 끝
 
-후킹 인트로 (영상 0초부터)
-  job "hook": "길바닥 거지"  또는  {"text": "길바닥/거지 됨", "red": ["거지"]}
-    첫 장면 동안 그림 위에 아주 큰 키워드 자막이 꽂힌다 (일반 자막은 그동안 숨김). "/" 로 두 줄.
-  첫 장면 images 에는 가장 자극적인 메인 사진을 넣는다. 첫 장면 text 는 질문형·감정형 후킹 문장 1개.
+인트로 (영상 0초부터)
+  첫 장면 images 에는 가장 자극적인 원본 사진을 넣는다 (0초 첫 프레임 = 원본 사진). 첫 장면 text 는 질문형·감정형 후킹 문장 1개.
+  job "hook" 대형 키워드는 위 제목과 겹쳐서 2026-10-14 부터 화면에 안 나온다 (config "hook_overlay": true 면 다시 나옴)
+
+그림 재탕 방지 (2026-10-14, 어기면 목소리 만들기 전에 멈춤)
+  · 밈은 같은 파일을 영상당 1번만
+  · 원본 사진 한 장은 구도마다 1번: "crop": "text"(사진 속 손글씨·쪽지·문서를 gpt-4o-mini 가 찾아 화면 비율로 확대)
+    · "full"(흐린 배경 + 전체) · "fill"(꽉 채움). 안 적으면 안 쓴 구도를 이 순서로 자동으로 고른다
+  · AI 그림(gpt-image-2)은 영상당 2장까지 (config "ai_max"). 그림 없는 장면은 gpt-4o-mini 가 대사를 보고
+    실사 B-roll 설명을 써서 AI 1장으로 채운다 (이것도 2장에 들어감)
+  · 그림이 모자라면 "images": ["prev"] — 앞 장면 그림을 이어 보여준다 (켄 번스로 구도만 바뀜)
 
 장면 그림(images)은 여러 개 넣으면 장면 시간을 나눠 차례로 보여준다. 항목 형식 (위가 우선순위 높음):
   {"photo": "사진 주소 또는 sseol/photos/파일"}  1순위: 커뮤니티 원본 사진·뉴스 실물 사진
@@ -53,6 +60,7 @@ API 키는 환경변수(ELEVENLABS_API_KEY, OPENAI_API_KEY)가 있으면 쓰고,
 """
 import base64
 import hashlib
+import io
 import json
 import math
 import os
@@ -136,6 +144,12 @@ DEFAULT_CONFIG = {
         "nothing in the center foreground, not an illustration, no logos, no watermark."
     ),
     "hook_sfx": "shock",                # 0초 후킹 키워드가 꽂힐 때 효과음 (첫 장면에 sfx 가 없을 때, "" 이면 없음)
+    # 2026-10-14 사용자 요청: 위 제목과 겹치는 가운데 대형 키워드는 없앤다 → 0초부터 원본 사진이 그대로 보인다
+    "hook_overlay": False,
+    # 그림 재탕 방지 (2026-10-14): 밈은 영상당 1번, 원본 사진은 구도(글자 확대·전체·꽉 채움)마다 1번, AI 는 영상당 ai_max 장
+    "ai_max": 2,
+    "vision_model": "gpt-4o-mini",      # 사진 속 손글씨·쪽지·문서 글자 위치 찾기 → 그 부분을 화면 비율로 확대
+    "broll_model": "gpt-4o-mini",       # 그림이 없는 장면의 대사 → 실사 B-roll 그림 설명(영어) 쓰기
     "kb_zoom": [1.05, 1.15],            # 켄 번스: 컷마다 이 범위 안에서 서서히 확대
     "max_hold": 2.0,                    # 한 그림이 이보다 오래 멈춰 있지 않게
     "cut_step": 1.5,                    # 긴 문장은 이 간격으로 그림(또는 구도)을 바꾼다
@@ -309,6 +323,92 @@ def gen_image(prompt, cfg, out_png, kind="pic", quality=None):
                      "n": 1}, headers)
     with open(out_png, "wb") as f:
         f.write(base64.b64decode(res["data"][0]["b64_json"]))
+
+
+def chat_json(model, content, max_tokens=200):
+    """OpenAI 채팅 (JSON 답). 키는 OPENAI_API_KEY 또는 환경 프록시가 붙인다"""
+    headers = {"Authorization": "Bearer " + os.environ["OPENAI_API_KEY"]} if os.environ.get("OPENAI_API_KEY") else {}
+    res = http_json("https://api.openai.com/v1/chat/completions",
+                    {"model": model, "response_format": {"type": "json_object"}, "max_tokens": max_tokens,
+                     "messages": [{"role": "user", "content": content}]}, headers)
+    return json.loads(res["choices"][0]["message"]["content"])
+
+
+VISION_GRID = 6
+VISION_ASK = (
+    "The photo has a red 6x6 grid; rows A-F top to bottom, columns 1-6 left to right, labels in yellow. "
+    "Is there handwriting, a paper note, a sign, a document or a screen with readable text that is an important "
+    'subject of the photo? Answer JSON only: {"text": true or false, "cells": ["D3", ...]} '
+    "listing every cell that contains part of that text area.")
+
+
+def text_box(png, cfg, cache):
+    """사진 속 글자(손글씨·쪽지·문서) 영역 [x0,y0,x1,y1] (0~1) 또는 None. 결과는 cache 파일에 저장해 재사용.
+    gpt-4o-mini 는 좌표를 바로 물으면 가운데로 찍어서, 번호 붙인 6x6 칸을 그려 글자가 있는 칸을 고르게 한다"""
+    if os.path.exists(cache):
+        with open(cache) as f:
+            return json.load(f).get("box")
+    n = VISION_GRID
+    im = Image.open(png).convert("RGB")
+    im.thumbnail((768, 768))
+    d = ImageDraw.Draw(im)
+    for k in range(1, n):
+        d.line([(im.width * k / n, 0), (im.width * k / n, im.height)], fill=(255, 0, 0), width=2)
+        d.line([(0, im.height * k / n), (im.width, im.height * k / n)], fill=(255, 0, 0), width=2)
+    for r in range(n):
+        for c in range(n):
+            d.text((im.width * c / n + 4, im.height * r / n + 3), f"{'ABCDEF'[r]}{c + 1}", fill=(255, 255, 0))
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=85)
+    try:
+        got = chat_json(cfg["vision_model"], [
+            {"type": "text", "text": VISION_ASK},
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode(),
+                                                "detail": "high"}}])
+        cells = [(("ABCDEF".index(c[0].upper())), int(c[1:]) - 1) for c in got.get("cells") or []
+                 if re.fullmatch(r"[A-Fa-f][1-6]", str(c))] if got.get("text") else []
+        box = [min(c for _, c in cells) / n, min(r for r, _ in cells) / n,
+               (max(c for _, c in cells) + 1) / n, (max(r for r, _ in cells) + 1) / n] if cells else None
+    except Exception as e:                                    # 판별이 안 되면 그냥 전체 사진으로
+        log(f"⚠ 사진 글자 판별 실패 ({e}) → 전체 사진으로")
+        return None
+    with open(cache, "w") as f:
+        json.dump({"box": box}, f)
+    return box
+
+
+def text_crop(img, box, margin=0.08, min_frac=0.32):
+    """글자 영역을 그림 칸 비율(W:IMG_H)로 넓혀 가운데에 두고 잘라 꽉 채운다 (너무 확대하지는 않게)"""
+    iw, ih = img.size
+    x0, y0, x1, y1 = box[0] * iw, box[1] * ih, box[2] * iw, box[3] * ih
+    bw, bh = (x1 - x0) * (1 + 2 * margin), (y1 - y0) * (1 + 2 * margin)
+    bw = max(bw, iw * min_frac)
+    a = W / IMG_H
+    bw, bh = (bh * a, bh) if bw / bh < a else (bw, bw / a)
+    k = min(1.0, iw / bw, ih / bh)                             # 사진 밖으로 나가면 비율 유지한 채 줄임
+    bw, bh = bw * k, bh * k
+    cx = min(max((x0 + x1) / 2, bw / 2), iw - bw / 2)
+    cy = min(max((y0 + y1) / 2, bh / 2), ih - bh / 2)
+    return cover(img.convert("RGB").crop((int(cx - bw / 2), int(cy - bh / 2), int(cx + bw / 2), int(cy + bh / 2))),
+                 W, IMG_H)
+
+
+BROLL_ASK = (
+    "You write image prompts for B-roll in a Korean YouTube Short. Narration line (Korean): {line}\n"
+    "Story context: {ctx}\n"
+    "Write ONE short English prompt (max 40 words) for a photorealistic smartphone photo that shows this line "
+    "literally, set in Korea. No identifiable faces (people may be seen from behind or only hands). "
+    "If a sign or banner must be readable, quote its exact Korean words in single quotes; otherwise no text. "
+    'Answer JSON: {{"prompt": "..."}}')
+
+
+def broll_prompt(line, ctx, cfg):
+    """그림이 없는 장면: 대사를 보고 실사 B-roll 그림 설명을 쓴다 (gpt-4o-mini)"""
+    try:
+        return chat_json(cfg["broll_model"], BROLL_ASK.format(line=line, ctx=ctx[:300]))["prompt"]
+    except Exception as e:
+        log(f"⚠ B-roll 설명 쓰기 실패 ({e}) → 대사로 바로 그림")
+        return line
 
 
 def fetch_irasutoya(ref, out_png):
@@ -891,11 +991,56 @@ def lint_script(job, scenes):
         elif i and n > SCENE_MAX:
             soft.append(f"장면 {i + 1} {n}자 — 더 짧게 끊기 ({SCENE_MAX}자 이하)")
     first = scenes[0]["text"] if scenes else ""
-    if not job.get("hook"):
-        soft.append('job "hook"(0초 대형 키워드 자막)이 없음')
+    first_img = next(iter(scenes[0].get("images") or []), None) if scenes else None
+    if not (isinstance(first_img, dict) and "photo" in first_img):
+        soft.append("첫 그림이 원본 사진이 아님 (0초에는 가장 자극적인 원본 사진)")
     if first and "?" not in first and not re.search(r"레전드|역대급|충격|실화|미친|대참사|결국|이유|상황|썰", first):
         soft.append("첫 문장이 질문형·감정 유발형이 아님")
     return hard, soft
+
+
+PHOTO_CROPS = ("text", "full", "fill")       # 원본 사진 한 장을 쓸 수 있는 구도 (글자 확대 · 흐린 배경+전체 · 꽉 채움)
+
+
+def needs_broll(s, cast):
+    """그림이 없고 표정 인물도 없는 장면 → 엔진이 실사 B-roll 을 만든다"""
+    return not s.get("images") and not ((cast.get(s.get("speaker") or NARRATOR) or {}).get("char"))
+
+
+def lint_pictures(job, cfg):
+    """그림 재탕·남발을 목소리 만들기 전에 잡는다 (전부 멈춤)"""
+    bad, memes, photos, ai = [], {}, {}, 0
+    cast = job.get("cast") or {}
+    for i, s in enumerate(job["scenes"]):
+        items = s.get("images") or []
+        if needs_broll(s, cast):
+            ai += 1
+        for j, it in enumerate(items):
+            if it == "prev":
+                if i == 0 or j:
+                    bad.append(f'장면 {i + 1}: "prev"(앞 그림 이어 보기)는 둘째 장면부터, 그 장면 그림으로 혼자만')
+                continue
+            if not isinstance(it, dict):
+                continue
+            if "meme" in it:
+                memes.setdefault(it["meme"], []).append(i + 1)
+            if "photo" in it:
+                photos.setdefault(it["photo"], []).append((i + 1, it.get("crop") or ("fill" if it.get("fill") else None)))
+            if "ai" in it:
+                ai += 1
+    for name, at in memes.items():
+        if len(at) > 1:
+            bad.append(f"밈 '{name}' 이 {len(at)}번 (장면 {', '.join(map(str, at))}) — 같은 짤은 영상당 1번만")
+    for ref, uses in photos.items():
+        crops = [c for _, c in uses if c]
+        if len(uses) > len(PHOTO_CROPS) or len(crops) != len(set(crops)):
+            bad.append(f"원본 사진 재탕 (장면 {', '.join(str(k) for k, _ in uses)}) — 한 사진은 구도"
+                       f"({'·'.join(PHOTO_CROPS)})마다 1번씩, 최대 {len(PHOTO_CROPS)}번: {ref[-50:]}")
+        bad += [f"장면 {k}: 모르는 구도 crop='{c}' ({'·'.join(PHOTO_CROPS)})" for k, c in uses if c and c not in PHOTO_CROPS]
+    if ai > int(cfg.get("ai_max", 2)):
+        bad.append(f"AI 그림 {ai}장 — 영상당 {cfg.get('ai_max', 2)}장까지 (그림 없는 장면도 AI B-roll 1장). "
+                   'AI 대신 "prev"(앞 그림 이어 보기)나 안 쓴 사진 구도를 쓰세요')
+    return bad
 
 
 # ── 메인 ────────────────────────────────────────────────
@@ -914,13 +1059,14 @@ def main():
     os.makedirs(work, exist_ok=True)
     scenes = job["scenes"]
     hard, soft = lint_script(job, scenes)
+    hard += lint_pictures(job, cfg)
     for m in soft:
         log("⚠ 대본: " + m)
     if hard:
         for m in hard:
             log("✖ 대본: " + m)
         if "--force" not in sys.argv:
-            raise SystemExit("대본 말투를 썰 푸는 구어체로 고친 뒤 다시 실행하세요 (그대로 만들려면 --force)")
+            raise SystemExit("대본 말투·그림 재탕을 고친 뒤 다시 실행하세요 (그대로 만들려면 --force)")
 
     # 1) 나레이션 원고
     full, spans = "", []
@@ -1070,6 +1216,7 @@ def main():
 
     # 4) 그림
     slots = []           # (시작, 끝, 그림, 밈 효과, 켄 번스)
+    crops_used = {}      # 원본 사진 주소 → 이미 쓴 구도들
     src_ref = job.get("source", "")
     credits, ira_files, n = [], {}, 0
     chars = load_characters()
@@ -1227,7 +1374,15 @@ def main():
             auto = {"char": c, "face": face}
             if role.get("pos"):                              # 말하는 사람 자리 (나는 왼쪽, 엄마는 오른쪽)
                 auto["pos"] = role["pos"]
-            items = [auto] if c else [{"ai": s["text"]}]
+            if c:
+                items = [auto]
+            else:                                            # 그림 없는 장면 → 실사 B-roll (AI 영상당 ai_max 장 안에서)
+                ctx = " ".join(x["text"] for x in scenes[max(0, i - 3):i + 2])
+                pp = os.path.join(work, f"img_{i + 1:02d}_1.png")
+                prompt = s["text"] if test_mode or os.path.exists(pp) else broll_prompt(s["text"], ctx, cfg)
+                if not os.path.exists(pp) and not test_mode:
+                    log(f"장면 {i + 1} B-roll: {prompt}")
+                items = [{"ai": prompt}]
         if "board" in items:                                 # 게시판 클릭 인트로는 없앴다 → 다음 사진으로
             nxt = next((x for sc in scenes[i + 1:] for x in (sc.get("images") or []) if x != "board"), None)
             log(f"⚠ 장면 {i + 1}: 게시판 클릭 화면은 없앴습니다. 메인 사진을 넣어 주세요"
@@ -1237,6 +1392,10 @@ def main():
             items = [dict(it, bg=s["bg"]) if isinstance(it, dict) and "bg" not in it
                      and not any(k in it for k in (*templates.TEMPLATES, "photo", "meme")) else it for it in items]
         st, en = scene_times[i]
+        if items == ["prev"] and slots:                      # 앞 그림을 이 장면까지 이어서 (켄 번스로 구도만 바뀜)
+            a0, _, img0, fx0, kb0 = slots[-1]
+            slots[-1] = (a0, en, img0, fx0, kb0)
+            continue
         for j, it in enumerate(items):
             a = st + (en - st) * j / len(items)
             b = st + (en - st) * (j + 1) / len(items)
@@ -1267,6 +1426,22 @@ def main():
                 add((a, b, stage_of(it, p, a)))
                 continue
             img, how = picture(it, p)
+            if how == "photo" and "photo" in it and os.path.exists(p):   # 원본 사진: 구도마다 1번 (재탕 방지)
+                used = crops_used.setdefault(it["photo"], [])
+                crop = it.get("crop") or ("fill" if it.get("fill") else None)
+                if crop is None:
+                    box = None if test_mode else text_box(p, cfg, p + ".text.json")
+                    crop = next(c for c in PHOTO_CROPS if c not in used and (c != "text" or box))
+                used.append(crop)
+                if crop == "text":
+                    box = None if test_mode else text_box(p, cfg, p + ".text.json")
+                    if box:
+                        log(f"장면 {i + 1}: 사진 속 글자를 화면 비율로 확대")
+                        add((a, b, text_crop(img, box)))
+                        continue
+                    crop = "full"
+                add((a, b, cover(img, W, IMG_H) if crop == "fill" else blur_fill(img, W, IMG_H)))
+                continue
             if how == "photo":
                 add((a, b, place_photo(img, it.get("fill"))))
                 continue
@@ -1307,7 +1482,7 @@ def main():
     mix[:len(voice)] += voice[:len(mix)]
     voiced = voice[np.abs(voice) > 0.02]
     vrms = float(np.sqrt((voiced ** 2).mean())) if len(voiced) else 0.1
-    hook_sfx = cfg.get("hook_sfx") if job.get("hook") and scenes and not scenes[0].get("sfx") else ""
+    hook_sfx = cfg.get("hook_sfx") if job.get("hook") and cfg.get("hook_overlay") and scenes and not scenes[0].get("sfx") else ""
     for i, s in enumerate(scenes):
         name = s.get("sfx") or (hook_sfx if i == 0 else "")
         if name:
@@ -1371,7 +1546,7 @@ def main():
     n_frames = int(total * FPS)
     si, sub_i = 0, 0
     log(f"영상 합성 중… ({total:.1f}초, {n_frames}프레임)")
-    hook = make_hook(job["hook"]) if job.get("hook") else None
+    hook = make_hook(job["hook"]) if job.get("hook") and cfg.get("hook_overlay") else None
     hook_end = scene_times[0][1] if hook else 0.0
     hook_y = IMG_TOP + int(IMG_H * 0.46)                     # 그림 한가운데 조금 위
     for fi in range(n_frames):
