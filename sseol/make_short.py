@@ -769,7 +769,7 @@ def fetch_photo(ref, out_png, referer=""):
     req = urllib.request.Request(ref.replace("&amp;", "&"), headers={
         "User-Agent": PHOTO_UA, "Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
         **({"Referer": referer} if referer else {})})
-    with urllib.request.urlopen(req, timeout=60) as r:
+    with urllib.request.urlopen(req, timeout=5) as r:   # 5초 안에 안 오면 재시도 없이 실패 → 그 사진은 건너뜀
         data = r.read()
     tmp = out_png + ".src"
     with open(tmp, "wb") as f:
@@ -1114,7 +1114,11 @@ def main():
                     placeholder_image(n, "", 900, 1300 if n % 2 else 700).save(p)
                 else:
                     log(f"사진 받는 중… ({os.path.basename(p)})")
-                    fetch_photo(it["photo"], p, it.get("ref") or src_ref)
+                    try:
+                        fetch_photo(it["photo"], p, it.get("ref") or src_ref)
+                    except Exception as e:                    # 막히거나 느린 서버는 바로 건너뜀
+                        log(f"⚠ 사진 못 받음, 건너뜀 ({e}) → 햄찌 리액션으로 대신: {it['photo'][:80]}")
+                        return picture({"char": "햄찌", "face": it.get("face", "놀람")}, p)
             return Image.open(upscale.prepare(p)), "photo"           # 작은 사진은 2배 선명하게
         if "meme" in it:                                      # 2순위: 사용자가 넣어 둔 밈
             mp = find_meme(it["meme"])
