@@ -65,6 +65,7 @@ import json
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -150,7 +151,8 @@ DEFAULT_CONFIG = {
     "ai_max": 2,
     "vision_model": "gpt-4o-mini",      # 사진 속 손글씨·쪽지·문서 글자 위치 찾기 → 그 부분을 화면 비율로 확대
     "broll_model": "gpt-4o-mini",       # 그림이 없는 장면의 대사 → 실사 B-roll 그림 설명(영어) 쓰기
-    "kb_zoom": [1.05, 1.15],            # 켄 번스: 컷마다 이 범위 안에서 서서히 확대
+    "kb_zoom": [1.05, 1.15],            # 켄 번스: 컷마다 이 범위 안에서 서서히 확대 (밈·짤)
+    "real_zoom": [1.0, 1.08],           # 원본 사진·AI 실사: 보이는 동안 끊지 않고 1.0 → 1.08배로 아주 서서히 (2026-10-14)
     "max_hold": 2.0,                    # 한 그림이 이보다 오래 멈춰 있지 않게
     "cut_step": 1.5,                    # 긴 문장은 이 간격으로 그림(또는 구도)을 바꾼다
     # 글자 규칙: 따옴표로 준 글자만 한글로 정확히, 나머지는 글자 없음 (영어·일본어 글자 금지)
@@ -958,7 +960,7 @@ def kb_preset(k, cfg, piece=0):
 
 def kb_box(kb, prog):
     """켄 번스 한 장면: (배율, 가운데 x, 가운데 y) — 그림 밖으로 안 나가게"""
-    e = prog * prog * (3 - 2 * prog)                     # 부드럽게 시작·끝
+    e = prog if kb.get("linear") else prog * prog * (3 - 2 * prog)    # 실사는 일정한 속도, 나머지는 부드럽게 시작·끝
     z = kb["z0"] + (kb["z1"] - kb["z0"]) * e
     room_x, room_y = W * (1 - 1 / z) / 2, IMG_H * (1 - 1 / z) / 2
     cx = W / 2 + room_x * max(-1.0, min(1.0, kb["fx"] / 0.25 * 0.9 + kb["dx"] * 0.55 * (e - 0.5)))
@@ -1037,8 +1039,9 @@ def lint_pictures(job, cfg):
             bad.append(f"원본 사진 재탕 (장면 {', '.join(str(k) for k, _ in uses)}) — 한 사진은 구도"
                        f"({'·'.join(PHOTO_CROPS)})마다 1번씩, 최대 {len(PHOTO_CROPS)}번: {ref[-50:]}")
         bad += [f"장면 {k}: 모르는 구도 crop='{c}' ({'·'.join(PHOTO_CROPS)})" for k, c in uses if c and c not in PHOTO_CROPS]
-    if ai > int(cfg.get("ai_max", 2)):
-        bad.append(f"AI 그림 {ai}장 — 영상당 {cfg.get('ai_max', 2)}장까지 (그림 없는 장면도 AI B-roll 1장). "
+    ai_max = int(job.get("ai_max", cfg.get("ai_max", 2)))    # 사용자가 이 영상만 더 쓰라고 하면 job "ai_max"
+    if ai > ai_max:
+        bad.append(f"AI 그림 {ai}장 — 영상당 {ai_max}장까지 (그림 없는 장면도 AI B-roll 1장). "
                    'AI 대신 "prev"(앞 그림 이어 보기)나 안 쓴 사진 구도를 쓰세요')
     return bad
 
@@ -1217,6 +1220,7 @@ def main():
     # 4) 그림
     slots = []           # (시작, 끝, 그림, 밈 효과, 켄 번스)
     crops_used = {}      # 원본 사진 주소 → 이미 쓴 구도들
+    photo_files = {}     # 원본 사진 주소 → 받아 둔 파일
     src_ref = job.get("source", "")
     credits, ira_files, n = [], {}, 0
     chars = load_characters()
@@ -1259,6 +1263,8 @@ def main():
             if not os.path.exists(p):
                 if test_mode and re.match(r"https?://", it["photo"]):
                     placeholder_image(n, "", 900, 1300 if n % 2 else 700).save(p)
+                elif it["photo"] in photo_files and os.path.exists(photo_files[it["photo"]]):
+                    shutil.copyfile(photo_files[it["photo"]], p)       # 같은 사진은 한 번만 받는다
                 else:
                     log(f"사진 받는 중… ({os.path.basename(p)})")
                     try:
@@ -1266,6 +1272,7 @@ def main():
                     except Exception as e:                    # 막히거나 느린 서버는 바로 건너뜀
                         log(f"⚠ 사진 못 받음, 건너뜀 ({e}) → 햄찌 리액션으로 대신: {it['photo'][:80]}")
                         return picture({"char": "햄찌", "face": it.get("face", "놀람")}, p)
+            photo_files.setdefault(it["photo"], p)
             return Image.open(upscale.prepare(p)), "photo"           # 작은 사진은 2배 선명하게
         if "meme" in it:                                      # 2순위: 사용자가 넣어 둔 밈
             mp = find_meme(it["meme"])
@@ -1355,7 +1362,7 @@ def main():
             layers = [l for l in layers if l["who"] != who] + [L]
         return {"bg": bgim, "bg_key": bkey, "bg_moves": real_bg, "layers": layers}
 
-    def add(slot):
+    def add(slot, real=False):
         """칸 추가 + 밈 효과 중 색 바꾸기(red·dark·bw)는 미리 그림에 입힌다"""
         a, b, img = slot
         bad = [f for f in cur_fx if f not in FX]
@@ -1363,7 +1370,7 @@ def main():
             raise RuntimeError(f"모르는 효과 {bad}. 쓸 수 있는 것: {', '.join(FX)}")
         if not isinstance(img, (str, dict)):
             img = static_fx(img, cur_fx)
-        slots.append((a, b, img, cur_fx, None))
+        slots.append((a, b, img, cur_fx, "real" if real else None))
 
     for i, s in enumerate(scenes):
         items = s.get("images")
@@ -1437,20 +1444,24 @@ def main():
                     box = None if test_mode else text_box(p, cfg, p + ".text.json")
                     if box:
                         log(f"장면 {i + 1}: 사진 속 글자를 화면 비율로 확대")
-                        add((a, b, text_crop(img, box)))
+                        add((a, b, text_crop(img, box)), real=True)
                         continue
                     crop = "full"
-                add((a, b, cover(img, W, IMG_H) if crop == "fill" else blur_fill(img, W, IMG_H)))
+                add((a, b, cover(img, W, IMG_H) if crop == "fill" else blur_fill(img, W, IMG_H)), real=True)
                 continue
             if how == "photo":
                 add((a, b, place_photo(img, it.get("fill"))))
                 continue
             add((a, b, cover(img, W, IMG_H) if how == "cover"
-                          else fit_into(img, W, IMG_H, pad=0 if how == "full" else 36)))
+                          else fit_into(img, W, IMG_H, pad=0 if how == "full" else 36)), real="ai" in it)
     # 한 그림이 max_hold 초 넘게 멈추지 않게: 긴 컷은 cut_step 초마다 다른 구도로 끊는다 (+ 모든 컷 켄 번스)
     max_hold, step = float(cfg.get("max_hold", 2.0)), float(cfg.get("cut_step", 1.5))
     split, reframed = [], 0
-    for k, (a, b, img, fx, _) in enumerate(slots):
+    rz0, rz1 = cfg.get("real_zoom", [1.0, 1.08])
+    for k, (a, b, img, fx, kind) in enumerate(slots):
+        if kind == "real":                                   # 실사: 끊지 않고 보이는 내내 1.0 → 1.08배 서서히
+            split.append((a, b, img, fx, {"z0": rz0, "z1": rz1, "dx": 0, "dy": 0, "fx": 0.0, "fy": 0.0, "linear": True}))
+            continue
         if isinstance(img, dict) or b - a <= max_hold:       # 움직이는 그림(배경+인물)은 이미 움직인다
             split.append((a, b, img, fx, kb_preset(len(split), cfg)))
             continue
