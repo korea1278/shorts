@@ -12,6 +12,7 @@
     ]
   },
   "source": "https://m.bobaedream.co.kr/board/bbs_view/best/1039872/2/1",
+  "ai_max": 5,
   "sub_style": "plain",
   "show_speaker": true,
   "cast": {
@@ -26,7 +27,7 @@
       "images": [
         {
           "photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967579_391029289.jpg",
-          "crop": "text"
+          "crop": "fill"
         }
       ]
     },
@@ -62,7 +63,7 @@
       "images": [
         {
           "photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967579_391029289.jpg",
-          "crop": "full"
+          "crop": "text"
         }
       ]
     },
@@ -79,16 +80,16 @@
       "mood": "슬픔",
       "text": "도토리 제발 가져가지 말아 주세요.",
       "images": [
-        {
-          "photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967579_391029289.jpg",
-          "crop": "fill"
-        }
+        "prev"
       ]
     },
     {
       "text": "끝에 우는 표시까지 붙어 있었대.",
       "images": [
-        "prev"
+        {
+          "photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967579_391029289.jpg",
+          "crop": "full"
+        }
       ]
     },
     {
@@ -107,7 +108,7 @@
       "text": "산 주인 허락 없이 주우면 불법이래.",
       "images": [
         {
-          "meme": "페페 화남"
+          "ai": "Realistic photo of a person's hands holding a clear plastic bag full of acorns on a forest trail, no face"
         }
       ],
       "red": [
@@ -133,7 +134,7 @@
       "text": "도토리가 다람쥐 겨울 식량이거든.",
       "images": [
         {
-          "meme": "페페눈물"
+          "ai": "Realistic close-up photo of a Korean chipmunk holding an acorn with both paws on autumn leaves"
         }
       ]
     },
@@ -141,8 +142,7 @@
       "text": "사람이 싹 쓸어 가면 먹을 게 없지.",
       "images": [
         {
-          "photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967526_611538621.jpg",
-          "crop": "fill"
+          "meme": "페페눈물"
         }
       ]
     },
@@ -184,10 +184,7 @@
       "text": "다시 숲에 뿌려서 돌려준대.",
       "images": [
         {
-          "meme": "페페 따봉",
-          "fx": [
-            "zoom"
-          ]
+          "ai": "Realistic photo of a park worker's gloved hands scattering acorns back onto a forest floor covered with autumn leaves, no face"
         }
       ],
       "sfx": "tada"
@@ -195,7 +192,9 @@
     {
       "text": "다람쥐 입장에선 반품 완료인 거지.",
       "images": [
-        "prev"
+        {
+          "meme": "페페 따봉"
+        }
       ],
       "sfx": "laugh",
       "sfx_on": "반품"
@@ -205,7 +204,10 @@
       "mood": "웃음",
       "text": "감사합니다, 잘 먹을게요.",
       "images": [
-        "prev"
+        {
+          "photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967526_611538621.jpg",
+          "crop": "fill"
+        }
       ]
     }
   ]
