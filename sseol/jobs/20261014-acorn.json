@@ -1,0 +1,32 @@
+{
+  "id": "20261014-acorn",
+  "title": ["다람쥐가 남긴", "눈물의 쪽지"],
+  "title_yellow": 1,
+  "hook": {"text": "다람쥐의/눈물 쪽지", "red": ["눈물"]},
+  "source": "https://m.bobaedream.co.kr/board/bbs_view/best/1039872/2/1",
+  "sub_style": "plain",
+  "show_speaker": true,
+  "cast": {"다람쥐": {"voice": "여자", "color": "green"}},
+  "scenes": [
+    {"text": "산에서 이 쪽지 보고 울컥한 사람, 있어?", "images": [{"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967579_391029289.jpg"}, {"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967526_611538621.jpg"}]},
+    {"text": "뒷산 산책하다가 본 거래.", "images": [{"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967526_611538621.jpg"}]},
+    {"text": "나무 밑에 쪽지가 딱 붙어 있더라고.", "images": [{"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967526_611538621.jpg", "fill": true}, {"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967579_391029289.jpg"}], "sfx": "pop"},
+    {"text": "근데 글씨가 삐뚤빼뚤한 거야.", "images": [{"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967579_391029289.jpg", "fill": true}, {"meme": "페페 궁금"}]},
+    {"speaker": "다람쥐", "mood": "슬픔", "text": "다람쥐가 먹을 게 없어서,", "images": [{"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967579_391029289.jpg"}]},
+    {"speaker": "다람쥐", "mood": "슬픔", "text": "집 앞까지 왔어요.", "images": [{"ai": "Realistic photo of a small Korean chipmunk standing on a concrete sidewalk in front of an apartment building, looking up, sad mood"}]},
+    {"speaker": "다람쥐", "mood": "슬픔", "text": "도토리 제발 가져가지 말아 주세요.", "images": [{"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967579_391029289.jpg", "fill": true}, {"meme": "페페눈물"}]},
+    {"text": "끝에 우는 표시까지 붙어 있었대.", "images": [{"meme": "페페눈물", "fx": ["dark"]}]},
+    {"text": "근데 이거 그냥 감성 쪽지가 아니야.", "images": [{"meme": "페페 놀람", "fx": ["zoom"]}], "sfx": "dundun"},
+    {"text": "산 주인 허락 없이 주우면 불법이래.", "images": [{"ai": "Realistic photo of a person's hands holding a clear plastic bag full of acorns on a forest trail, no face"}, {"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967526_611538621.jpg"}], "red": ["불법"]},
+    {"text": "심하면 징역형까지 받을 수 있대.", "images": [{"meme": "페페 놀람", "fx": ["shake"]}], "sfx": "shock", "red": ["징역형"]},
+    {"text": "도토리가 다람쥐 겨울 식량이거든.", "images": [{"ai": "Realistic close-up photo of a Korean chipmunk holding an acorn with both paws on autumn leaves"}]},
+    {"text": "사람이 싹 쓸어 가면 먹을 게 없지.", "images": [{"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967526_611538621.jpg", "fill": true}, {"meme": "페페눈물"}]},
+    {"text": "그래서 동물들이 도심까지 내려온대.", "images": [{"ai": "Realistic night photo of a wild boar walking on an empty city street under street lights"}]},
+    {"text": "로드킬도 늘어나고 말이야.", "images": [{"ai": "Realistic photo of a Korean road warning sign on a mountain road whose sign says '야생동물 주의'"}]},
+    {"text": "실제로 서울 강남구는 단속까지 해.", "images": [{"ai": "Realistic photo of a forest trail with a banner hanging between trees that says '도토리 채취 금지'"}]},
+    {"text": "압수한 도토리 어디로 가는지 알아?", "images": [{"meme": "페페 궁금", "fx": ["zoom"]}], "sfx": "huh"},
+    {"text": "다시 숲에 뿌려서 돌려준대.", "images": [{"ai": "Realistic photo of many acorns scattered on a forest floor with fallen autumn leaves"}], "sfx": "tada"},
+    {"text": "다람쥐 입장에선 반품 완료인 거지.", "images": [{"meme": "페페 따봉"}], "sfx": "laugh", "sfx_on": "반품"},
+    {"speaker": "다람쥐", "mood": "웃음", "text": "감사합니다, 잘 먹을게요.", "images": [{"photo": "https://file1.bobaedream.co.kr/cnews/2026/10/14/17/CQoa1791967579_391029289.jpg"}]}
+  ]
+}
