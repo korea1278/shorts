@@ -68,6 +68,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import irasutoya  # noqa: E402
 import templates  # noqa: E402
+import upscale  # noqa: E402
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 W, H, FPS = 1080, 1920, 30
@@ -1114,11 +1115,11 @@ def main():
                 else:
                     log(f"사진 받는 중… ({os.path.basename(p)})")
                     fetch_photo(it["photo"], p, it.get("ref") or src_ref)
-            return Image.open(p), "photo"
+            return Image.open(upscale.prepare(p)), "photo"           # 작은 사진은 2배 선명하게
         if "meme" in it:                                      # 2순위: 사용자가 넣어 둔 밈
             mp = find_meme(it["meme"])
             if mp:
-                return Image.open(mp), "photo"
+                return Image.open(upscale.prepare(mp)), "photo"          # 저화질 짤은 2배 선명하게
             log(f"⚠ 밈 '{it['meme']}' 파일이 sseol/assets/memes/ 에 없어 햄찌 리액션으로 대신합니다")
             return picture({"char": "햄찌", "face": it.get("face", "놀람")}, p)
         if not os.path.exists(p):

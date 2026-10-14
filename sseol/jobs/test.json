@@ -7,7 +7,7 @@
   "scenes": [
     {"text": "짬뽕 먹으러 갔다가 길바닥 거지 된 축제, 들어봤어?", "images": [{"photo": "https://example.com/main.jpg"}]},
     {"text": "군산 하면 짬뽕이 유명하잖아?", "images": [{"photo": "https://example.com/a.jpg"}, {"ai": "A steaming bowl of red Korean jjamppong noodle soup on a restaurant table"}]},
-    {"text": "근데 자리가 없어도 너무 없는 거야.", "images": [{"meme": "huh고양이", "face": "당황"}], "sfx": "huh"},
+    {"text": "근데 자리가 없어도 너무 없는 거야.", "images": [{"meme": "페페 따봉"}], "sfx": "huh"},
     {"text": "줄 서다가 결국 길바닥에 앉아서 먹었대.", "images": [{"photo": "https://example.com/b.jpg", "fill": true}], "fx": "shake", "sfx": "fail"},
     {"text": "가격 보고 또 한 번 놀랐다는 거지.", "images": [{"ai": "A long line of people waiting outside a crowded Korean street food festival"}], "red": ["가격"]}
   ]
