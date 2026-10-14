@@ -38,7 +38,7 @@ PC_SITES = ("ruliweb.com",)   # 휴대폰 UA면 허용 목록 밖 모바일 주�
 def get(url):
     ua = PC_UA if any(d in url for d in PC_SITES) else UA
     req = urllib.request.Request(url, headers={"User-Agent": ua, "Accept-Language": "ko-KR,ko"})
-    with urllib.request.urlopen(req, timeout=20) as r:
+    with urllib.request.urlopen(req, timeout=5) as r:   # 5초 넘게 걸리는 사이트는 재시도 없이 건너뜀
         return r.read().decode("utf-8", errors="ignore")
 
 
@@ -251,11 +251,11 @@ def photo_urls(body_html, page_url):
     """본문 안 사진 주소 (이모티콘·아이콘 빼고). 쇼츠 1순위 그림 재료"""
     out = []
     for tag in re.findall(r"<img\b[^>]*>", body_html, re.I):
-        m = (re.search(r'data-original="([^"]+)"', tag) or re.search(r'data-src="([^"]+)"', tag)
-             or re.search(r'\bsrc="([^"]+)"', tag))
+        m = (re.search(r'data-original=(["\'])(.+?)\1', tag) or re.search(r'data-src=(["\'])(.+?)\1', tag)
+             or re.search(r'\bsrc=(["\'])(.+?)\1', tag))        # 엠팍은 src='…' (작은따옴표)
         if not m:
             continue
-        u = html.unescape(m.group(1)).strip()
+        u = html.unescape(m.group(2)).strip()
         if u.startswith("//"):
             u = "https:" + u
         elif u.startswith("/"):
