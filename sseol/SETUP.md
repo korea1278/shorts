@@ -40,6 +40,17 @@ blogger.googleusercontent.com
 - `*.pstatic.net`: 네이버 뉴스 사진 (imgnews.pstatic.net)
 - 다른 서버 사진이 막히면 클로드가 "못 받음"이라고 알려 줍니다. 그 사진은 `sseol/photos/`에 직접 넣으면 됩니다
 
+**뉴스 사진 서버 (2026-10-22 추가)** — 뉴스 화제 쇼츠(예: 부캉이)용. 위 목록에 아래 줄도 넣어 주세요
+```
+menu.sidae.com
+file2.nocutnews.co.kr
+*.edge.naverncp.com
+cdnweb01.wikitree.co.kr
+pressian.com
+img.sbs.co.kr
+i3n.news1.kr
+```
+
 **(선택) 사이트 더 늘리기** — 아래 줄도 Allowed domains에 넣고 새 세션에서 "새 사이트 연결해줘"라고 하면
 클로드가 실제로 열어 보고, 본문까지 읽혀서 영상으로 만들 수 있는 곳만 `community.py`에 추가합니다.
 ```
