@@ -214,6 +214,40 @@ def font_path(kind):
 
 
 # ── 나레이션 ────────────────────────────────────────────
+# 고유어 수사로 읽는 단위 (일레븐랩스가 "9시간"을 "구 시간", "11시"를 "십일 시"로 읽어서 2026-10-22 사용자 요청)
+NATIVE_UNITS = "시간|시|척|마리|살|명|개|번|달|가지|군데|대"
+NATIVE_ONES = ["", "한", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉"]
+NATIVE_TENS = ["", "열", "스물", "서른", "마흔", "쉰", "예순", "일흔", "여든", "아흔"]
+
+
+def native_num(n):
+    if n == 20:
+        return "스무"
+    return NATIVE_TENS[n // 10] + NATIVE_ONES[n % 10]
+
+
+def speakable(text):
+    """목소리로 보낼 글: 1~99 + 시·시간·척 같은 단위는 고유어로 ("9시간" → "아홉 시간"). 자막은 숫자 그대로.
+    돌려주는 것: (읽을 글, 원래 글자마다 읽을 글의 [시작, 끝) 위치)"""
+    out, span, i = [], [], 0
+    pat = re.compile(r"(?<![\d.])([1-9]\d?)(?=\s?(?:%s))" % NATIVE_UNITS)
+    for m in pat.finditer(text):
+        for c in text[i:m.start()]:
+            n0 = sum(map(len, out))
+            out.append(c)
+            span.append((n0, n0 + 1))
+        n0 = sum(map(len, out))
+        word = native_num(int(m.group(1))) + ("" if text[m.end():m.end() + 1] == " " else " ")
+        out.append(word)
+        span += [(n0, n0 + len(word))] * len(m.group(1))
+        i = m.end()
+    for c in text[i:]:
+        n0 = sum(map(len, out))
+        out.append(c)
+        span.append((n0, n0 + 1))
+    return "".join(out), span
+
+
 def tts_elevenlabs(text, voice, cfg, out_mp3, tag=""):
     """voice = {"voice_id", "voice_settings"}. tag(v3 감정 태그)는 앞에 붙여 읽히고, 글자 타이밍에서는 뺀다."""
     if not voice.get("voice_id"):
@@ -223,7 +257,8 @@ def tts_elevenlabs(text, voice, cfg, out_mp3, tag=""):
         headers["xi-api-key"] = os.environ["ELEVENLABS_API_KEY"]
     url = (f"https://api.elevenlabs.io/v1/text-to-speech/{voice['voice_id']}/with-timestamps"
            f"?output_format=mp3_44100_128")
-    sent = f"{tag} {text}" if tag else text
+    said, span = speakable(text)
+    sent = f"{tag} {said}" if tag else said
     res = http_json(url, {"text": sent, "model_id": cfg["tts_model"],
                           "voice_settings": voice["voice_settings"]}, headers)
     with open(out_mp3, "wb") as f:
@@ -231,9 +266,9 @@ def tts_elevenlabs(text, voice, cfg, out_mp3, tag=""):
     al = res.get("alignment") or res.get("normalized_alignment")
     chars = "".join(al.get("characters", []))
     st, en = al["character_start_times_seconds"], al["character_end_times_seconds"]
-    if chars.endswith(text) and len(st) == len(chars):
-        k = len(chars) - len(text)
-        return st[k:], en[k:]
+    if chars.endswith(said) and len(st) == len(chars):
+        k = len(chars) - len(said)
+        return [st[k + a] for a, _ in span], [en[k + b - 1] for _, b in span]
     # 글자 수가 안 맞으면(정규화 등) 전체 길이에 고르게 나눈다
     a, b = (st[0] if st else 0.0), (en[-1] if en else 1.0)
     step = (b - a) / max(1, len(text))
@@ -1153,7 +1188,7 @@ def main():
         for gi, (g0, g1, v, tag) in enumerate(groups):
             ca, cb = spans[g0][0], spans[g1][1]
             text = full[ca:cb]
-            meta = json.dumps([text, v, cfg["tts_model"], tag], ensure_ascii=False, sort_keys=True)
+            meta = json.dumps([speakable(text)[0], v, cfg["tts_model"], tag], ensure_ascii=False, sort_keys=True)
             # 파일 이름을 내용으로 정해서, 장면을 넣거나 빼도 안 바뀐 대사는 다시 만들지 않는다
             mp3 = os.path.join(work, f"voice_{hashlib.sha1(meta.encode()).hexdigest()[:10]}.mp3")
             saved = {}
