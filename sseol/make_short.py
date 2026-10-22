@@ -1056,6 +1056,9 @@ def main():
     cfg = load_config()
     with open(job_path, encoding="utf-8") as f:
         job = json.load(f)
+    for k in ("tempo", "max_pause", "pause_to", "dialogue_gap", "real_zoom", "kb_zoom", "cut_step", "max_hold"):
+        if k in job:                                # 이 영상만 다르게 (예: "tempo": 1.32 로 조금 더 빠르게)
+            cfg[k] = job[k]
     job_id = job.get("id") or os.path.splitext(os.path.basename(job_path))[0]
     out_dir = os.path.join(ROOT, "output", job_id)
     work = os.path.join(out_dir, "work")
