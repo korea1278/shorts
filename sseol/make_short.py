@@ -56,7 +56,7 @@
   job "sub_style": "plain" 이면 상자 없이 그림 아래 검은 바탕에 색 글자 (레퍼런스 대화형), 기본 "box".
 
 API 키는 환경변수(ELEVENLABS_API_KEY, OPENAI_API_KEY)가 있으면 쓰고,
-OpenAI 가 안 되면(크레딧 소진 등) GEMINI_API_KEY 가 있을 때 제미나이로 대신한다 (gemini.py).
+AI 그림·사진 글자 찾기·B-roll 설명은 제미나이로 한다 (gemini.py, GEMINI_API_KEY. 2026-10-23부터 OpenAI 안 씀).
 없으면 클로드 코드 클라우드 환경의 "API credentials"가 자동으로 붙여준다고 보고 키 없이 요청한다.
 """
 import base64
@@ -348,51 +348,29 @@ def insert_pause(voice, starts, ends, at, dur):
 
 # ── 그림 ────────────────────────────────────────────────
 def gen_image(prompt, cfg, out_png, kind="pic", quality=None):
-    """kind: pic 보통 그림 · bg 배경 (사람 없음) · cut 배경 위에 올릴 물건·인물 (흰 바탕을 나중에 지운다)"""
-    headers = {}
-    if os.environ.get("OPENAI_API_KEY"):
-        headers["Authorization"] = "Bearer " + os.environ["OPENAI_API_KEY"]
+    """kind: pic 보통 그림 · bg 배경 (사람 없음) · cut 배경 위에 올릴 물건·인물 (흰 바탕을 나중에 지운다)
+    그림은 제미나이로 만든다 (2026-10-23 사용자 요청: OpenAI 안 씀)"""
     style = cfg["bg_style"] if kind == "bg" else cfg["image_style"]
     if kind == "cut":
         style += " Only the subject, isolated, no floor, no shadow, nothing else around it."
     full = f"{prompt}\n\nStyle: {style}\n{cfg['text_rule']}"
-    try:
-        res = http_json("https://api.openai.com/v1/images/generations",
-                        {"model": cfg["image_model"], "prompt": full,
-                         "size": "1024x1024" if kind == "cut" else "1536x1024",
-                         "quality": quality or cfg["image_quality"], "n": 1}, headers)
-        data = base64.b64decode(res["data"][0]["b64_json"])
-    except Exception as e:                                    # OpenAI 크레딧 소진 등 → 제미나이로
-        if not gemini.available():
-            raise
-        log(f"⚠ OpenAI 그림 실패 ({e}) → 제미나이로")
-        data = gemini.image(full, "1:1" if kind == "cut" else "3:2")
+    data = gemini.image(full, "1:1" if kind == "cut" else "3:2")
     with open(out_png, "wb") as f:
         f.write(data)
 
 
 def chat_json(model, content, max_tokens=200):
-    """OpenAI 채팅 (JSON 답). 키는 OPENAI_API_KEY 또는 환경 프록시가 붙인다"""
-    headers = {"Authorization": "Bearer " + os.environ["OPENAI_API_KEY"]} if os.environ.get("OPENAI_API_KEY") else {}
-    try:
-        res = http_json("https://api.openai.com/v1/chat/completions",
-                        {"model": model, "response_format": {"type": "json_object"}, "max_tokens": max_tokens,
-                         "messages": [{"role": "user", "content": content}]}, headers)
-        return json.loads(res["choices"][0]["message"]["content"])
-    except Exception as e:                                    # OpenAI 가 안 되면 제미나이로 같은 질문
-        if not gemini.available():
-            raise
-        log(f"⚠ OpenAI 채팅 실패 ({e}) → 제미나이로")
-        parts = []
-        for c in content if isinstance(content, list) else [content]:
-            if isinstance(c, str):
-                parts.append(c)
-            elif c["type"] == "text":
-                parts.append(c["text"])
-            else:                                             # data:image/jpeg;base64,...
-                head, b64 = c["image_url"]["url"].split(",", 1)
-                parts.append({"mime": head[5:].split(";")[0], "data": base64.b64decode(b64)})
-        return json.loads(gemini.text(parts, json_mode=True))
+    """제미나이에게 묻고 JSON 답을 받는다 (content: 글 또는 OpenAI 형식 글·사진 목록). model 은 예전 호환용"""
+    parts = []
+    for c in content if isinstance(content, list) else [content]:
+        if isinstance(c, str):
+            parts.append(c)
+        elif c["type"] == "text":
+            parts.append(c["text"])
+        else:                                                 # data:image/jpeg;base64,...
+            head, b64 = c["image_url"]["url"].split(",", 1)
+            parts.append({"mime": head[5:].split(";")[0], "data": base64.b64decode(b64)})
+    return json.loads(gemini.text(parts, json_mode=True))
 
 
 VISION_GRID = 6

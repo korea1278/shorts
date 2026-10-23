@@ -5,7 +5,7 @@
     python3 sseol/check.py <id>        # 예: python3 sseol/check.py 20261008-housecar
 
 검사 항목
-  1. 받아쓰기(OpenAI Whisper, 안 되면 제미나이)와 대본 비교 → 다르게 들린 부분만 보여줌 (뭉개진 발음 찾기)
+  1. 받아쓰기(제미나이)와 대본 비교 → 다르게 들린 부분만 보여줌 (뭉개진 발음 찾기)
   2. 영상 중간의 빈 구간 (0.2초 넘는 침묵 — 쇼츠 템포 기준)
   3. 음량 (유튜브 기준 -14 LUFS 근처인지)
   4. 길이·말 빠르기, 화자 수, 이라스토야 장수
@@ -18,7 +18,6 @@ import re
 import subprocess
 import sys
 import urllib.request
-import uuid
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
@@ -30,31 +29,12 @@ def run(cmd):
 
 
 def transcribe(path):
-    """Whisper 받아쓰기 (키는 환경변수 또는 클라우드 환경이 자동으로 붙여 준다)"""
+    """제미나이 받아쓰기 (2026-10-23부터 OpenAI Whisper 안 씀)"""
     audio = run(["ffmpeg", "-v", "error", "-y", "-i", path, "-ac", "1", "-ar", "16000", "-b:a", "48k",
                  "/tmp/_check.mp3"])
     if audio.returncode:
         return None
-    b = uuid.uuid4().hex
-    with open("/tmp/_check.mp3", "rb") as f:
-        data = f.read()
-    body = b"".join([
-        f"--{b}\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\nwhisper-1\r\n".encode(),
-        f"--{b}\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\nko\r\n".encode(),
-        f"--{b}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.mp3\"\r\n"
-        f"Content-Type: audio/mpeg\r\n\r\n".encode(), data, f"\r\n--{b}--\r\n".encode()])
-    req = urllib.request.Request("https://api.openai.com/v1/audio/transcriptions", data=body, method="POST")
-    req.add_header("Content-Type", f"multipart/form-data; boundary={b}")
-    if os.environ.get("OPENAI_API_KEY"):
-        req.add_header("Authorization", "Bearer " + os.environ["OPENAI_API_KEY"])
-    try:
-        with urllib.request.urlopen(req, timeout=300) as r:
-            return json.loads(r.read().decode())["text"]
-    except Exception as e:                                    # OpenAI 크레딧 소진 등 → 제미나이 받아쓰기
-        if not gemini.available():
-            raise
-        print(f"(OpenAI 받아쓰기 실패: {e} → 제미나이로)")
-        return gemini.transcribe("/tmp/_check.mp3")
+    return gemini.transcribe("/tmp/_check.mp3")
 
 
 def norm(s):
