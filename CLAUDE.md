@@ -185,7 +185,7 @@
 - 시험 영상 예시: `sseol/jobs/20261009-dialogue.json`
 
 ## 설정
-- 목소리: `sseol/config.json` 의 `voice_id` (Hojin Lim). 바꾸려면 일레븐랩스 목소리 ID를 넣는다.
+- 목소리: `sseol/config.json` 의 `voice_id` (Taehyung, 2026-10-23 사용자 요청으로 Hojin Lim에서 바꿈). 바꾸려면 일레븐랩스 목소리 ID를 넣는다.
   대화형 역할 목소리는 같은 파일의 `voices` (일레븐랩스 내 목소리에 추가된 것만 쓸 수 있다).
 - 배경음악: **기본 없음** (사용자 요청: 어지럽다). 켜려면 `sseol/config.json`에 `"bgm": true`.
 - 목소리: 최신 모델 `eleven_v3`로 자연스럽게 만든 뒤 **1.25배속**(`tempo`, 목소리 높이는 그대로, 1초에 약 7글자).

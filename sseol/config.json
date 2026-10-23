@@ -1,11 +1,11 @@
 {
-  "voice_id": "fHzGR8qcnsDR2uaj9r16",
+  "voice_id": "m3gJBS8OofDJfycyA2Ip",
   "tts_model": "eleven_v3",
   "image_quality": "low",
   "voices": {
     "나레이션": {
-      "voice_id": "fHzGR8qcnsDR2uaj9r16",
-      "name": "Hojin Lim (30대 남자, 차분)"
+      "voice_id": "m3gJBS8OofDJfycyA2Ip",
+      "name": "Taehyung (20대 남자, 캐주얼)"
     },
     "남자": {
       "voice_id": "LKOcTG4J4tYTPR9DnLeM",
