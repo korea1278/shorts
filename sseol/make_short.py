@@ -56,6 +56,7 @@
   job "sub_style": "plain" 이면 상자 없이 그림 아래 검은 바탕에 색 글자 (레퍼런스 대화형), 기본 "box".
 
 API 키는 환경변수(ELEVENLABS_API_KEY, OPENAI_API_KEY)가 있으면 쓰고,
+OpenAI 가 안 되면(크레딧 소진 등) GEMINI_API_KEY 가 있을 때 제미나이로 대신한다 (gemini.py).
 없으면 클로드 코드 클라우드 환경의 "API credentials"가 자동으로 붙여준다고 보고 키 없이 요청한다.
 """
 import base64
@@ -75,6 +76,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gemini  # noqa: E402
 import irasutoya  # noqa: E402
 import templates  # noqa: E402
 import upscale  # noqa: E402
@@ -212,6 +214,40 @@ def font_path(kind):
 
 
 # ── 나레이션 ────────────────────────────────────────────
+# 고유어 수사로 읽는 단위 (일레븐랩스가 "9시간"을 "구 시간", "11시"를 "십일 시"로 읽어서 2026-10-22 사용자 요청)
+NATIVE_UNITS = "시간|시|척|마리|살|명|개|번|달|가지|군데|대"
+NATIVE_ONES = ["", "한", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉"]
+NATIVE_TENS = ["", "열", "스물", "서른", "마흔", "쉰", "예순", "일흔", "여든", "아흔"]
+
+
+def native_num(n):
+    if n == 20:
+        return "스무"
+    return NATIVE_TENS[n // 10] + NATIVE_ONES[n % 10]
+
+
+def speakable(text):
+    """목소리로 보낼 글: 1~99 + 시·시간·척 같은 단위는 고유어로 ("9시간" → "아홉 시간"). 자막은 숫자 그대로.
+    돌려주는 것: (읽을 글, 원래 글자마다 읽을 글의 [시작, 끝) 위치)"""
+    out, span, i = [], [], 0
+    pat = re.compile(r"(?<![\d.])([1-9]\d?)(?=\s?(?:%s))" % NATIVE_UNITS)
+    for m in pat.finditer(text):
+        for c in text[i:m.start()]:
+            n0 = sum(map(len, out))
+            out.append(c)
+            span.append((n0, n0 + 1))
+        n0 = sum(map(len, out))
+        word = native_num(int(m.group(1))) + ("" if text[m.end():m.end() + 1] == " " else " ")
+        out.append(word)
+        span += [(n0, n0 + len(word))] * len(m.group(1))
+        i = m.end()
+    for c in text[i:]:
+        n0 = sum(map(len, out))
+        out.append(c)
+        span.append((n0, n0 + 1))
+    return "".join(out), span
+
+
 def tts_elevenlabs(text, voice, cfg, out_mp3, tag=""):
     """voice = {"voice_id", "voice_settings"}. tag(v3 감정 태그)는 앞에 붙여 읽히고, 글자 타이밍에서는 뺀다."""
     if not voice.get("voice_id"):
@@ -221,7 +257,8 @@ def tts_elevenlabs(text, voice, cfg, out_mp3, tag=""):
         headers["xi-api-key"] = os.environ["ELEVENLABS_API_KEY"]
     url = (f"https://api.elevenlabs.io/v1/text-to-speech/{voice['voice_id']}/with-timestamps"
            f"?output_format=mp3_44100_128")
-    sent = f"{tag} {text}" if tag else text
+    said, span = speakable(text)
+    sent = f"{tag} {said}" if tag else said
     res = http_json(url, {"text": sent, "model_id": cfg["tts_model"],
                           "voice_settings": voice["voice_settings"]}, headers)
     with open(out_mp3, "wb") as f:
@@ -229,9 +266,9 @@ def tts_elevenlabs(text, voice, cfg, out_mp3, tag=""):
     al = res.get("alignment") or res.get("normalized_alignment")
     chars = "".join(al.get("characters", []))
     st, en = al["character_start_times_seconds"], al["character_end_times_seconds"]
-    if chars.endswith(text) and len(st) == len(chars):
-        k = len(chars) - len(text)
-        return st[k:], en[k:]
+    if chars.endswith(said) and len(st) == len(chars):
+        k = len(chars) - len(said)
+        return [st[k + a] for a, _ in span], [en[k + b - 1] for _, b in span]
     # 글자 수가 안 맞으면(정규화 등) 전체 길이에 고르게 나눈다
     a, b = (st[0] if st else 0.0), (en[-1] if en else 1.0)
     step = (b - a) / max(1, len(text))
@@ -318,22 +355,44 @@ def gen_image(prompt, cfg, out_png, kind="pic", quality=None):
     style = cfg["bg_style"] if kind == "bg" else cfg["image_style"]
     if kind == "cut":
         style += " Only the subject, isolated, no floor, no shadow, nothing else around it."
-    res = http_json("https://api.openai.com/v1/images/generations",
-                    {"model": cfg["image_model"],
-                     "prompt": f"{prompt}\n\nStyle: {style}\n{cfg['text_rule']}",
-                     "size": "1024x1024" if kind == "cut" else "1536x1024", "quality": quality or cfg["image_quality"],
-                     "n": 1}, headers)
+    full = f"{prompt}\n\nStyle: {style}\n{cfg['text_rule']}"
+    try:
+        res = http_json("https://api.openai.com/v1/images/generations",
+                        {"model": cfg["image_model"], "prompt": full,
+                         "size": "1024x1024" if kind == "cut" else "1536x1024",
+                         "quality": quality or cfg["image_quality"], "n": 1}, headers)
+        data = base64.b64decode(res["data"][0]["b64_json"])
+    except Exception as e:                                    # OpenAI 크레딧 소진 등 → 제미나이로
+        if not gemini.available():
+            raise
+        log(f"⚠ OpenAI 그림 실패 ({e}) → 제미나이로")
+        data = gemini.image(full, "1:1" if kind == "cut" else "3:2")
     with open(out_png, "wb") as f:
-        f.write(base64.b64decode(res["data"][0]["b64_json"]))
+        f.write(data)
 
 
 def chat_json(model, content, max_tokens=200):
     """OpenAI 채팅 (JSON 답). 키는 OPENAI_API_KEY 또는 환경 프록시가 붙인다"""
     headers = {"Authorization": "Bearer " + os.environ["OPENAI_API_KEY"]} if os.environ.get("OPENAI_API_KEY") else {}
-    res = http_json("https://api.openai.com/v1/chat/completions",
-                    {"model": model, "response_format": {"type": "json_object"}, "max_tokens": max_tokens,
-                     "messages": [{"role": "user", "content": content}]}, headers)
-    return json.loads(res["choices"][0]["message"]["content"])
+    try:
+        res = http_json("https://api.openai.com/v1/chat/completions",
+                        {"model": model, "response_format": {"type": "json_object"}, "max_tokens": max_tokens,
+                         "messages": [{"role": "user", "content": content}]}, headers)
+        return json.loads(res["choices"][0]["message"]["content"])
+    except Exception as e:                                    # OpenAI 가 안 되면 제미나이로 같은 질문
+        if not gemini.available():
+            raise
+        log(f"⚠ OpenAI 채팅 실패 ({e}) → 제미나이로")
+        parts = []
+        for c in content if isinstance(content, list) else [content]:
+            if isinstance(c, str):
+                parts.append(c)
+            elif c["type"] == "text":
+                parts.append(c["text"])
+            else:                                             # data:image/jpeg;base64,...
+                head, b64 = c["image_url"]["url"].split(",", 1)
+                parts.append({"mime": head[5:].split(";")[0], "data": base64.b64decode(b64)})
+        return json.loads(gemini.text(parts, json_mode=True))
 
 
 VISION_GRID = 6
@@ -1129,7 +1188,7 @@ def main():
         for gi, (g0, g1, v, tag) in enumerate(groups):
             ca, cb = spans[g0][0], spans[g1][1]
             text = full[ca:cb]
-            meta = json.dumps([text, v, cfg["tts_model"], tag], ensure_ascii=False, sort_keys=True)
+            meta = json.dumps([speakable(text)[0], v, cfg["tts_model"], tag], ensure_ascii=False, sort_keys=True)
             # 파일 이름을 내용으로 정해서, 장면을 넣거나 빼도 안 바뀐 대사는 다시 만들지 않는다
             mp3 = os.path.join(work, f"voice_{hashlib.sha1(meta.encode()).hexdigest()[:10]}.mp3")
             saved = {}

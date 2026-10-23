@@ -1,66 +1,66 @@
 {
   "id": "20261022-bukangi",
-  "title": ["34일째 집에", "안 가는 상어"],
+  "title": [
+    "34일째 집에",
+    "안 가는 상어"
+  ],
   "title_yellow": 1,
-  "hook": {"text": "34일째/집에 안 가는 상어", "red": ["안 가는"]},
+  "hook": {
+    "text": "34일째/집에 안 가는 상어",
+    "red": [
+      "안 가는"
+    ]
+  },
   "source": "https://news.sbs.co.kr/news/endPage.do?news_id=N1008809420",
   "tempo": 1.32,
   "cut_step": 1.2,
   "max_hold": 1.5,
-  "real_zoom": [1.0, 1.12],
-  "kb_zoom": [1.08, 1.2],
+  "real_zoom": [
+    1.0,
+    1.12
+  ],
+  "kb_zoom": [
+    1.08,
+    1.2
+  ],
   "sub_style": "plain",
   "show_speaker": false,
   "cast": {
-    "해설": {"voice": "pNInz6obpgDQGcFmaJgB", "color": "white"},
-    "페페": {"voice": "IKne3meq5aSn9XLyUdCD", "color": "yellow"},
-    "팩폭": {"voice": "TX3LPaxmHKxFdv7VOQHJ", "color": "sky"}
+    "해설": {
+      "voice": "pNInz6obpgDQGcFmaJgB",
+      "color": "white"
+    },
+    "페페": {
+      "voice": "IKne3meq5aSn9XLyUdCD",
+      "color": "yellow"
+    },
+    "팩폭": {
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "color": "sky"
+    }
   },
+  "ai_max": 3,
   "scenes": [
-    {"speaker": "해설", "text": "부산 사람 150만 명 불러 모은 상어, 알아?", "red": ["150만"],
-     "images": [{"photo": "https://menu.sidae.com/moneyweek/thumb/2026/10/21/00/2026102119035315424_1.jpg", "crop": "fill", "ref": "https://www.sidae.com/article/2026102119035315424"},
-                {"photo": "https://file2.nocutnews.co.kr/newsroom/image/2026/10/04/202610041714422240_0.jpg", "crop": "fill", "ref": "https://www.nocutnews.co.kr/news/6586992"}]},
-    {"speaker": "해설", "text": "3미터 흑상어가 수로에 들어온 거야.", "red": ["3미터"],
-     "images": [{"photo": "https://umq1gm7a8386.edge.naverncp.com/data2/content/image/2026/09/26/.cache/512/20260926500114.jpg", "crop": "fill", "ref": "https://kbmaeil.com/article/20260926500116"}]},
-    {"speaker": "해설", "text": "근데 한 달 넘게 안 나가.", "red": ["한 달"],
-     "images": [{"photo": "https://file2.nocutnews.co.kr/newsroom/image/2026/10/04/202610041716466749_0.jpg", "crop": "fill", "ref": "https://www.nocutnews.co.kr/news/6586992"}]},
-    {"speaker": "페페", "mood": "고민", "text": "이름이 부캉이? 북한에서 보낸 거 아냐?", "sfx": "huh",
-     "images": [{"meme": "페페 궁금", "fx": ["zoom"]}]},
-    {"speaker": "팩폭", "mood": "화남", "text": "뭔 소리야, 북항이라서 부캉이야.", "sfx": "scratch",
-     "images": [{"photo": "https://cdnweb01.wikitree.co.kr/webdata/editor/202610/07/img_20261007204507_0316ee51.jpg", "crop": "fill", "ref": "https://www.wikitree.co.kr/articles/1164622", "fx": ["shake"]}]},
-    {"speaker": "해설", "text": "첫 번째 작전은 물대포였어.",
-     "images": [{"photo": "https://pressian.com/_resources/10/2026/09/29/2026092916541565205_l.png", "crop": "fill", "ref": "https://pressian.com/pages/articles/2026092916542911926"}]},
-    {"speaker": "해설", "text": "배 다섯 척이 물을 쏴서 몰아냈는데,",
-     "images": [{"photo": "https://pressian.com/_resources/10/2026/09/29/2026092916541565205_l.png", "crop": "full", "ref": "https://pressian.com/pages/articles/2026092916542911926"}]},
-    {"speaker": "해설", "text": "요리조리 피해서 5시간 만에 실패.", "red": ["실패"], "sfx": "fail", "sfx_on": "실패",
-     "images": [{"photo": "https://cdnweb01.wikitree.co.kr/webdata/editor/202610/07/img_20261007204718_dda38ae8.jpg", "crop": "fill", "ref": "https://www.wikitree.co.kr/articles/1164622"}]},
-    {"speaker": "페페", "mood": "웃음", "text": "공짜 샤워만 하고 간 거네.", "sfx": "pop",
-     "images": [{"meme": "페페 따봉", "fx": ["punch"]}]},
-    {"speaker": "해설", "text": "두 번째는 50미터짜리 그물이었어.", "red": ["50미터"],
-     "images": [{"photo": "https://umq1gm7a8386.edge.naverncp.com/data2/content/image/2026/10/02/.cache/512/20261002500271.jpg", "crop": "fill", "ref": "https://kbmaeil.com/article/20261002500273"}]},
-    {"speaker": "해설", "text": "출구 바로 앞까지 밀어냈거든.",
-     "images": [{"photo": "https://umq1gm7a8386.edge.naverncp.com/data2/content/image/2026/10/02/.cache/512/20261002500271.jpg", "crop": "full", "ref": "https://kbmaeil.com/article/20261002500273"}]},
-    {"speaker": "해설", "text": "근데 다음 날, 그물 넘어서 돌아왔대.", "red": ["돌아왔대"], "sfx": "boing", "sfx_on": "돌아왔대",
-     "images": [{"photo": "https://umq1gm7a8386.edge.naverncp.com/data2/content/image/2026/09/26/.cache/512/20260926500114.jpg", "crop": "full", "ref": "https://kbmaeil.com/article/20260926500116", "fx": ["flash"]}]},
-    {"speaker": "페페", "mood": "놀람", "text": "이 정도면 전세 계약한 거 아냐?", "sfx": "dundun",
-     "images": [{"meme": "페페 놀람", "fx": ["lines"]}]},
-    {"speaker": "해설", "text": "구경 온 차들로 길이 꽉 막혔을 정도야.",
-     "images": [{"photo": "https://file2.nocutnews.co.kr/newsroom/image/2026/10/04/202610041726124861_0.jpg", "crop": "fill", "ref": "https://www.nocutnews.co.kr/news/6586992"},
-                {"photo": "https://file2.nocutnews.co.kr/newsroom/image/2026/10/04/202610041715513932_0.jpg", "crop": "fill", "ref": "https://www.nocutnews.co.kr/news/6586992"}]},
-    {"speaker": "해설", "text": "결국 세 번째, 9시간 작전 끝에,", "red": ["9시간"],
-     "images": [{"photo": "https://img.sbs.co.kr/newimg/news/20261022/202233737_1280.jpg", "crop": "fill", "ref": "https://news.sbs.co.kr/news/endPage.do?news_id=N1008809420"}]},
-    {"speaker": "해설", "text": "34일 만에 바다로 나갔어.", "red": ["34일"], "sfx": "tada",
-     "images": [{"photo": "https://menu.sidae.com/moneyweek/thumb/2026/10/21/00/2026102119035315424_1.jpg", "crop": "full", "ref": "https://www.sidae.com/article/2026102119035315424"}]},
-    {"speaker": "팩폭", "text": "그래, 이제 진짜 집에 갔네.",
-     "images": [{"photo": "https://file2.nocutnews.co.kr/newsroom/image/2026/10/04/202610041714422240_0.jpg", "crop": "full", "ref": "https://www.nocutnews.co.kr/news/6586992"}]},
-    {"speaker": "해설", "text": "근데 그날 밤 11시,", "sfx": "shock",
-     "images": [{"photo": "https://i3n.news1.kr/system/photos/2026/10/21/8172461/high.jpg", "crop": "fill", "ref": "https://www.news1.kr/local/busan-gyeongnam/6327860", "fx": ["dark"]}]},
-    {"speaker": "해설", "text": "막아 둔 구조물 넘어서 또 들어왔대.", "red": ["또"],
-     "images": [{"photo": "https://img.sbs.co.kr/newimg/news/20261022/202233738_1280.jpg", "crop": "fill", "ref": "https://news.sbs.co.kr/news/endPage.do?news_id=N1008809420", "fx": ["shake"]}]},
-    {"speaker": "팩폭", "mood": "화남", "text": "아니, 이건 진짜 말이 안 되잖아.", "sfx": "scratch",
-     "images": [{"meme": "페페 화남", "fx": ["red"]}]},
-    {"speaker": "페페", "mood": "슬픔", "text": "그냥 부산 시민으로 받아 줘라.", "sfx": "laugh",
-     "images": [{"meme": "페페눈물", "fx": ["bw"]},
-                {"photo": "https://i3n.news1.kr/system/photos/2026/10/21/8172461/high.jpg", "crop": "full", "ref": "https://www.news1.kr/local/busan-gyeongnam/6327860"}]}
+    {"speaker": "해설", "text": "150만 명을 부산에 불러 모은 상어, 알아?", "red": ["150만"], "images": [{"photo": "https://menu.sidae.com/moneyweek/thumb/2026/10/21/00/2026102119035315424_1.jpg", "crop": "fill", "ref": "https://www.sidae.com/article/2026102119035315424"}]},
+    {"speaker": "해설", "text": "3미터 흑상어가 수로에 들어온 거야.", "red": ["3미터"], "images": [{"photo": "https://umq1gm7a8386.edge.naverncp.com/data2/content/image/2026/09/26/.cache/512/20260926500114.jpg", "crop": "fill", "ref": "https://kbmaeil.com/article/20260926500116"}]},
+    {"speaker": "해설", "text": "근데 한 달 넘게 안 나가.", "red": ["한 달"], "images": [{"photo": "https://cdnweb01.wikitree.co.kr/webdata/editor/202610/07/img_20261007204718_dda38ae8.jpg", "crop": "full", "ref": "https://www.wikitree.co.kr/articles/1164622"}]},
+    {"speaker": "페페", "mood": "고민", "text": "이름이 부캉이? 북한에서 보낸 거 아냐?", "sfx": "huh", "images": [{"meme": "페페 궁금", "fx": ["zoom"]}]},
+    {"speaker": "팩폭", "mood": "화남", "text": "뭔 소리야, 북항이라서 부캉이야.", "sfx": "scratch", "images": [{"photo": "https://cdnweb01.wikitree.co.kr/webdata/editor/202610/07/img_20261007204507_0316ee51.jpg", "crop": "fill", "ref": "https://www.wikitree.co.kr/articles/1164622", "fx": ["shake"]}]},
+    {"speaker": "해설", "text": "첫 번째 작전은 물대포였어.", "images": [{"ai": "Wide shot of small harbor boats spraying strong water cannon jets into a narrow concrete seawater canal in a Busan harbor park, apartment towers behind, crowd watching from the railing far away"}]},
+    {"speaker": "해설", "text": "배 다섯 척이 물을 쏴서 몰아냈는데,", "images": [{"ai": "Close view of a dark shark dorsal fin cutting through choppy green water in a concrete harbor canal while white water cannon spray splashes down around it from boats"}]},
+    {"speaker": "해설", "text": "요리조리 피해서 5시간 만에 실패.", "red": ["실패"], "sfx": "fail", "sfx_on": "실패", "images": [{"photo": "https://cdnweb01.wikitree.co.kr/webdata/editor/202610/07/img_20261007204718_dda38ae8.jpg", "crop": "fill", "ref": "https://www.wikitree.co.kr/articles/1164622"}]},
+    {"speaker": "페페", "mood": "웃음", "text": "공짜 샤워만 하고 간 거네.", "sfx": "pop", "images": [{"meme": "페페 따봉", "fx": ["punch"]}]},
+    {"speaker": "해설", "text": "두 번째는 50미터짜리 그물이었어.", "red": ["50미터"], "images": [{"photo": "https://umq1gm7a8386.edge.naverncp.com/data2/content/image/2026/10/02/.cache/512/20261002500271.jpg", "crop": "fill", "ref": "https://kbmaeil.com/article/20261002500273"}]},
+    {"speaker": "해설", "text": "출구 바로 앞까지 밀어냈거든.", "images": [{"photo": "https://umq1gm7a8386.edge.naverncp.com/data2/content/image/2026/10/02/.cache/512/20261002500271.jpg", "crop": "full", "ref": "https://kbmaeil.com/article/20261002500273"}]},
+    {"speaker": "해설", "text": "근데 다음 날, 그물 넘어서 돌아왔대.", "red": ["돌아왔대"], "sfx": "boing", "sfx_on": "돌아왔대", "images": [{"photo": "https://umq1gm7a8386.edge.naverncp.com/data2/content/image/2026/09/26/.cache/512/20260926500114.jpg", "crop": "full", "ref": "https://kbmaeil.com/article/20260926500116", "fx": ["flash"]}]},
+    {"speaker": "페페", "mood": "놀람", "text": "이 정도면 전세 계약한 거 아냐?", "sfx": "dundun", "images": [{"meme": "페페 놀람", "fx": ["lines"]}]},
+    {"speaker": "해설", "text": "구경 온 차들로 길이 꽉 막혔을 정도야.", "images": [{"ai": "View from a pedestrian overpass of a road in a Busan waterfront district jammed with cars and tour buses, people walking toward a harbor park, afternoon light"}]},
+    {"speaker": "해설", "text": "결국 세 번째, 9시간 작전 끝에,", "red": ["9시간"], "images": [{"photo": "https://img.sbs.co.kr/newimg/news/20261022/202233737_1280.jpg", "crop": "fill", "ref": "https://news.sbs.co.kr/news/endPage.do?news_id=N1008809420"}]},
+    {"speaker": "해설", "text": "34일 만에 바다로 나갔어.", "red": ["34일"], "sfx": "tada", "images": [{"photo": "https://menu.sidae.com/moneyweek/thumb/2026/10/21/00/2026102119035315424_1.jpg", "crop": "full", "ref": "https://www.sidae.com/article/2026102119035315424"}]},
+    {"speaker": "팩폭", "text": "그래, 이제 진짜 집에 갔네.", "images": [{"photo": "https://cdnweb01.wikitree.co.kr/webdata/editor/202610/07/img_20261007204507_0316ee51.jpg", "crop": "full", "ref": "https://www.wikitree.co.kr/articles/1164622"}]},
+    {"speaker": "해설", "text": "근데 그날 밤 11시,", "sfx": "shock", "images": [{"photo": "https://img.sbs.co.kr/newimg/news/20261022/202233738_1280.jpg", "crop": "full", "ref": "https://news.sbs.co.kr/news/endPage.do?news_id=N1008809420", "fx": ["dark"]}]},
+    {"speaker": "해설", "text": "막아 둔 구조물 넘어서 또 들어왔대.", "red": ["또"], "images": [{"photo": "https://img.sbs.co.kr/newimg/news/20261022/202233738_1280.jpg", "crop": "fill", "ref": "https://news.sbs.co.kr/news/endPage.do?news_id=N1008809420", "fx": ["shake"]}]},
+    {"speaker": "팩폭", "mood": "화남", "text": "아니, 이건 진짜 말이 안 되잖아.", "sfx": "scratch", "images": [{"meme": "페페 화남", "fx": ["red"]}]},
+    {"speaker": "페페", "mood": "슬픔", "text": "그냥 부산 시민으로 받아 줘라.", "sfx": "laugh", "images": [{"meme": "페페눈물", "fx": ["bw"]}, {"photo": "https://img.sbs.co.kr/newimg/news/20261022/202233737_1280.jpg", "crop": "full", "ref": "https://news.sbs.co.kr/news/endPage.do?news_id=N1008809420"}]}
   ]
 }
